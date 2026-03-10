@@ -10,11 +10,15 @@ import (
 )
 
 // Movie is the data structure that represents a movie in our app.
-// Each field maps directly to a column in DynamoDB and a JSON key in the API response.
+// Each field has two struct tags:
+//   - `json` controls the key name in the HTTP response body.
+//   - `dynamodbav` controls the attribute name in DynamoDB.
+//
+// Both are set to lowercase so they match consistently everywhere.
 type Movie struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-	Year  int    `json:"year"`
+	ID    string `json:"id" dynamodbav:"id"`
+	Title string `json:"title" dynamodbav:"title"`
+	Year  int    `json:"year" dynamodbav:"year"`
 }
 
 // MovieRepository is an interface (a contract) that describes what operations
