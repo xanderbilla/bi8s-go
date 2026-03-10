@@ -7,12 +7,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/xanderbilla/bi8s-go/internal/app"
-	"github.com/xanderbilla/bi8s-go/internal/repository"
 )
 
 // Mount wires up all routes and middleware, then returns the finished HTTP handler.
 // Think of this as the front door of the API — every request comes through here.
-func Mount(app *app.Application, movieRepo repository.MovieRepository) http.Handler {
+func Mount(app *app.Application) http.Handler {
 
 	r := chi.NewRouter()
 
@@ -38,12 +37,17 @@ func Mount(app *app.Application, movieRepo repository.MovieRepository) http.Hand
 
 	// --- Routes ---
 
-	r.Route("/v1", func(r chi.Router) {
-		// Simple liveness check — useful for load balancers and uptime monitors.
-		r.Get("/health", HealthCheckHandler(app))
+	// Each handler is a struct that holds a pointer to the app, giving it access
+	// to config, DB, and any other shared dependencies without using globals.
+	healthHandler := &HealthHandler{App: app}
+	movieHandler := &MovieHandler{App: app}
 
-		// Returns all movies from DynamoDB.
-		r.Get("/movies", GetMoviesHandler(movieRepo))
+	r.Route("/v1", func(r chi.Router) {
+		// GET /v1/health — liveness check, returns the current environment name.
+		r.Get("/health", healthHandler.HealthCheck)
+
+		// GET /v1/movies — returns all movies from DynamoDB.
+		r.Get("/movies", movieHandler.GetMovies)
 	})
 
 	return r

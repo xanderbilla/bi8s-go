@@ -12,6 +12,7 @@ A REST API built with Go, chi, and DynamoDB on AWS.
 | Variable                | Description                                       | Default     |
 | ----------------------- | ------------------------------------------------- | ----------- |
 | `ENV`                   | Runtime environment name                          | `prod`      |
+| `DYNAMODB_TABLE`        | DynamoDB table name                               | `bi8s-dev`  |
 | `AWS_REGION`            | AWS region                                        | `us-east-1` |
 | `AWS_ACCESS_KEY_ID`     | AWS access key (optional, falls back to IAM role) | —           |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key (optional, falls back to IAM role) | —           |

@@ -2,6 +2,8 @@ package aws
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -16,11 +18,18 @@ import (
 //     IAM instance role → ~/.aws/credentials → environment variables, etc.
 func AWSConfig(region, accessKey, secretKey string) (aws.Config, error) {
 
+	if region == "" {
+		return aws.Config{}, errors.New("aws region is required")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	// Explicit credentials take priority — useful when running locally without an IAM role.
 	if accessKey != "" && secretKey != "" {
 
 		return config.LoadDefaultConfig(
-			context.Background(),
+			ctx,
 			config.WithRegion(region),
 			config.WithCredentialsProvider(
 				credentials.NewStaticCredentialsProvider(accessKey, secretKey, ""),
@@ -30,7 +39,7 @@ func AWSConfig(region, accessKey, secretKey string) (aws.Config, error) {
 
 	// No explicit credentials — let the SDK figure it out from the environment.
 	return config.LoadDefaultConfig(
-		context.Background(),
+		ctx,
 		config.WithRegion(region),
 	)
 }

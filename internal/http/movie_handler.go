@@ -3,22 +3,25 @@ package http
 import (
 	"net/http"
 
-	"github.com/xanderbilla/bi8s-go/internal/repository"
+	"github.com/xanderbilla/bi8s-go/internal/app"
 )
 
-// GetMoviesHandler fetches all movies from the repository and returns them as JSON.
-// The repo is injected as a dependency so this handler stays testable and decoupled from DynamoDB.
-func GetMoviesHandler(repo repository.MovieRepository) http.HandlerFunc {
+// MovieHandler handles movie-related HTTP routes.
+type MovieHandler struct {
+	App *app.Application
+}
 
-	return func(w http.ResponseWriter, r *http.Request) {
+// GetMovies handles GET /v1/movies.
+// It delegates to the service layer, which owns any business logic before hitting the DB.
+func (h *MovieHandler) GetMovies(w http.ResponseWriter, r *http.Request) {
 
-		// Pass the request context so the DB call respects timeouts and cancellations.
-		movies, err := repo.GetAll(r.Context())
-		if err != nil {
-			Error(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-
-		Success(w, http.StatusOK, "movies fetched", movies)
+	// Pass the request context so the service (and underlying DB call)
+	// respects timeouts and cancellations set by the middleware.
+	movies, err := h.App.MovieService.GetAll(r.Context())
+	if err != nil {
+		Error(w, http.StatusInternalServerError, err.Error())
+		return
 	}
+
+	Success(w, http.StatusOK, "movies fetched", movies)
 }
