@@ -7,20 +7,43 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/xanderbilla/bi8s-go/internal/app"
+	"github.com/xanderbilla/bi8s-go/internal/repository"
 )
 
-func Mount(app *app.Application) http.Handler {
+// Mount wires up all routes and middleware, then returns the finished HTTP handler.
+// Think of this as the front door of the API — every request comes through here.
+func Mount(app *app.Application, movieRepo repository.MovieRepository) http.Handler {
 
 	r := chi.NewRouter()
 
+	// --- Middleware stack (runs on every request, in order) ---
+
+	// Attaches a unique X-Request-Id to each request so you can trace it through logs.
 	r.Use(middleware.RequestID)
+
+	// Reads X-Forwarded-For / X-Real-IP so r.RemoteAddr reflects the real client IP,
+	// not the load balancer or proxy sitting in front.
 	r.Use(middleware.RealIP)
+
+	// Logs every request: method, path, status, latency, and the request ID.
 	r.Use(middleware.Logger)
+
+	// Catches any panic inside a handler, logs the stack trace, and returns a 500
+	// instead of letting the whole server crash.
 	r.Use(middleware.Recoverer)
+
+	// Cancels the request context after 60 seconds. Prevents slow handlers from
+	// holding onto connections forever.
 	r.Use(middleware.Timeout(60 * time.Second))
 
+	// --- Routes ---
+
 	r.Route("/v1", func(r chi.Router) {
+		// Simple liveness check — useful for load balancers and uptime monitors.
 		r.Get("/health", HealthCheckHandler(app))
+
+		// Returns all movies from DynamoDB.
+		r.Get("/movies", GetMoviesHandler(movieRepo))
 	})
 
 	return r
