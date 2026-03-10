@@ -2,21 +2,25 @@ package repository
 
 import (
 	"context"
-	"log"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// Movie represents a single movie record as stored in DynamoDB and returned by the API.
+// Movie is the data structure that represents a movie in our app.
+// Each field maps directly to a column in DynamoDB and a JSON key in the API response.
 type Movie struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
 	Year  int    `json:"year"`
 }
 
-// MovieRepository defines the contract for movie data access.
-// Anything that satisfies this interface can be swapped in — DynamoDB today, Postgres tomorrow.
+// MovieRepository is an interface (a contract) that describes what operations
+// the database layer must support. By using an interface, we can swap the
+// underlying database (e.g. from DynamoDB to PostgreSQL) without touching
+// any handler or service code — only this layer changes.
 type MovieRepository interface {
 	GetAll(ctx context.Context) ([]Movie, error)
 	Get(ctx context.Context, id string) (*Movie, error)
@@ -24,45 +28,90 @@ type MovieRepository interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// DynamoMovieRepository is the DynamoDB-backed implementation of MovieRepository.
+// DynamoMovieRepository is our concrete implementation of MovieRepository.
+// It holds a DynamoDB client and the table name it should read/write from.
 type DynamoMovieRepository struct {
 	client *dynamodb.Client
-	table  string // the DynamoDB table name to read/write from
+	table  string // name of the DynamoDB table, e.g. "bi8s-dev"
 }
 
-// Create is not yet implemented.
+// Create saves a new movie to DynamoDB.
+// We first convert the Movie struct into the format DynamoDB expects (a map of attributes),
+// then call PutItem to write it. The condition expression makes sure we never accidentally
+// overwrite a movie that already has the same ID.
 func (d *DynamoMovieRepository) Create(ctx context.Context, movie Movie) error {
+
 	item, err := attributevalue.MarshalMap(movie)
 	if err != nil {
 		return err
 	}
 
 	input := &dynamodb.PutItemInput{
-		TableName: &d.table,
-		Item:      item,
+		TableName:           &d.table,
+		Item:                item,
+		ConditionExpression: aws.String("attribute_not_exists(id)"),
 	}
 
 	_, err = d.client.PutItem(ctx, input)
-	if err != nil {
-		log.Printf("Couldn't add item to table. Here's why: %v\n", err)
-	}
 	return err
 
 }
 
-// Delete is not yet implemented.
+// Delete removes a movie from DynamoDB by its ID.
+// It uses a condition expression to make sure the movie actually exists before trying to delete it.
+// If the movie doesn't exist, DynamoDB will return an error instead of silently doing nothing.
 func (d *DynamoMovieRepository) Delete(ctx context.Context, id string) error {
-	panic("unimplemented")
+
+	input := &dynamodb.DeleteItemInput{
+		TableName: &d.table,
+		Key: map[string]types.AttributeValue{
+			"id": &types.AttributeValueMemberS{Value: id},
+		},
+		ConditionExpression: aws.String("attribute_exists(id)"),
+	}
+
+	_, err := d.client.DeleteItem(ctx, input)
+	return err
 }
 
-// Get is not yet implemented.
+// Get looks up a single movie by its ID.
+// We use ConsistentRead: true so we always get the latest version of the item,
+// not a potentially stale cached copy. If no movie is found, we return nil with no error.
 func (d *DynamoMovieRepository) Get(ctx context.Context, id string) (*Movie, error) {
-	panic("unimplemented")
+
+	input := &dynamodb.GetItemInput{
+		TableName: &d.table,
+		Key: map[string]types.AttributeValue{
+			"id": &types.AttributeValueMemberS{Value: id},
+		},
+		ConsistentRead: aws.Bool(true),
+	}
+
+	result, err := d.client.GetItem(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	// No movie found with that ID — return nil instead of an error
+	// so the caller can distinguish "not found" from an actual failure.
+	if result.Item == nil {
+		return nil, nil
+	}
+
+	var movie Movie
+
+	err = attributevalue.UnmarshalMap(result.Item, &movie)
+	if err != nil {
+		return nil, err
+	}
+
+	return &movie, nil
 }
 
-// GetAll does a full table scan and returns every movie in the table.
-// Note: Scan reads the entire table — fine for small datasets, but consider
-// using Query with an index for large tables to keep costs and latency down.
+// GetAll fetches every movie in the table using a Scan operation.
+// A Scan reads the entire table from top to bottom, which is fine for small datasets.
+// TODO: Replace with a Query using a partition key — Scan has a 1MB limit per call
+// and gets expensive on large tables. Use ExclusiveStartKey + LastEvaluatedKey for pagination.
 func (d *DynamoMovieRepository) GetAll(ctx context.Context) ([]Movie, error) {
 
 	input := &dynamodb.ScanInput{
@@ -74,9 +123,14 @@ func (d *DynamoMovieRepository) GetAll(ctx context.Context) ([]Movie, error) {
 		return nil, err
 	}
 
+	if result.Count == 0 {
+		return nil, nil
+	}
+
 	var movies []Movie
 
-	// DynamoDB returns items as attribute maps — unmarshal them into our Movie structs.
+	// DynamoDB returns data as a list of attribute maps, not plain Go structs.
+	// UnmarshalListOfMaps converts each map back into a Movie struct for us.
 	err = attributevalue.UnmarshalListOfMaps(result.Items, &movies)
 	if err != nil {
 		return nil, err
@@ -85,7 +139,8 @@ func (d *DynamoMovieRepository) GetAll(ctx context.Context) ([]Movie, error) {
 	return movies, nil
 }
 
-// NewMovieRepository creates a DynamoDB-backed MovieRepository for the given table.
+// NewMovieRepository wires up and returns a DynamoDB-backed MovieRepository.
+// Call this once at startup and pass the result into the service layer.
 func NewMovieRepository(client *dynamodb.Client, table string) MovieRepository {
 	return &DynamoMovieRepository{
 		client: client,

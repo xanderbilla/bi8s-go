@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/xanderbilla/bi8s-go/internal/app"
 	"github.com/xanderbilla/bi8s-go/internal/repository"
 )
@@ -12,7 +13,7 @@ type MovieHandler struct {
 	App *app.Application
 }
 
-// GetMovies handles GET /v1/movies.
+// GetAllMovies handles GET /v1/movies and returns all movies in the database.
 // It delegates to the service layer, which owns any business logic before hitting the DB.
 func (h *MovieHandler) GetAllMovies(w http.ResponseWriter, r *http.Request) {
 
@@ -27,10 +28,8 @@ func (h *MovieHandler) GetAllMovies(w http.ResponseWriter, r *http.Request) {
 	Success(w, http.StatusOK, "movies fetched", movies)
 }
 
-func (h *MovieHandler) GetMovie(w http.ResponseWriter, r *http.Request) {
-	// TODO: implement
-}
-
+// CreateMovie handles POST /v1/movies.
+// It reads the request body, builds a Movie struct, and saves it via the service layer.
 func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
 	var payload repository.Movie
 
@@ -54,6 +53,29 @@ func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// GetMovie handles GET /v1/movies/{movieId} and returns a single movie by its ID.
+func (h *MovieHandler) GetMovie(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "movieId")
+
+	movies, err := h.App.MovieService.Get(r.Context(), id)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	Success(w, http.StatusOK, "movie fetched", movies)
+
+}
+
+// DeleteMovie handles DELETE /v1/movies/{movieId} and removes a movie from the database.
 func (h *MovieHandler) DeleteMovie(w http.ResponseWriter, r *http.Request) {
-	// TODO: implement
+	id := chi.URLParam(r, "movieId")
+
+	if err := h.App.MovieService.Delete(r.Context(), id); err != nil {
+		Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	Success(w, http.StatusOK, "movie deleted", nil)
+
 }
