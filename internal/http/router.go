@@ -47,7 +47,12 @@ func Mount(app *app.Application) http.Handler {
 		r.Get("/health", healthHandler.HealthCheck)
 
 		// GET /v1/movies — returns all movies from DynamoDB.
-		r.Get("/movies", movieHandler.GetMovies)
+		r.Route("/movies", func(r chi.Router) {
+			r.Post("/", movieHandler.CreateMovie)
+			r.Get("/", movieHandler.GetAllMovies)
+			r.Get("/{movieId}", movieHandler.GetMovie)
+			r.Delete("/{movieId}", movieHandler.DeleteMovie)
+		})
 	})
 
 	return r

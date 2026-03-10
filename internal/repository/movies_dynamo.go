@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"log"
 
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -31,7 +32,22 @@ type DynamoMovieRepository struct {
 
 // Create is not yet implemented.
 func (d *DynamoMovieRepository) Create(ctx context.Context, movie Movie) error {
-	panic("unimplemented")
+	item, err := attributevalue.MarshalMap(movie)
+	if err != nil {
+		return err
+	}
+
+	input := &dynamodb.PutItemInput{
+		TableName: &d.table,
+		Item:      item,
+	}
+
+	_, err = d.client.PutItem(ctx, input)
+	if err != nil {
+		log.Printf("Couldn't add item to table. Here's why: %v\n", err)
+	}
+	return err
+
 }
 
 // Delete is not yet implemented.
