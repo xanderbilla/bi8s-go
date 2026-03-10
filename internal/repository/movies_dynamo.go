@@ -35,6 +35,71 @@ type DynamoMovieRepository struct {
 	table  string // name of the DynamoDB table, e.g. "bi8s-dev"
 }
 
+// GetAll fetches every movie in the table using a Scan operation.
+// A Scan reads the entire table from top to bottom, which is fine for small datasets.
+// TODO: Replace with a Query using a partition key — Scan has a 1MB limit per call
+// and gets expensive on large tables. Use ExclusiveStartKey + LastEvaluatedKey for pagination.
+func (d *DynamoMovieRepository) GetAll(ctx context.Context) ([]Movie, error) {
+
+	input := &dynamodb.ScanInput{
+		TableName: &d.table,
+	}
+
+	result, err := d.client.Scan(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Count == 0 {
+		return nil, nil
+	}
+
+	var movies []Movie
+
+	// DynamoDB returns data as a list of attribute maps, not plain Go structs.
+	// UnmarshalListOfMaps converts each map back into a Movie struct for us.
+	err = attributevalue.UnmarshalListOfMaps(result.Items, &movies)
+	if err != nil {
+		return nil, err
+	}
+
+	return movies, nil
+}
+
+// Get looks up a single movie by its ID.
+// We use ConsistentRead: true so we always get the latest version of the item,
+// not a potentially stale cached copy. If no movie is found, we return nil with no error.
+func (d *DynamoMovieRepository) Get(ctx context.Context, id string) (*Movie, error) {
+
+	input := &dynamodb.GetItemInput{
+		TableName: &d.table,
+		Key: map[string]types.AttributeValue{
+			"id": &types.AttributeValueMemberS{Value: id},
+		},
+		ConsistentRead: aws.Bool(true),
+	}
+
+	result, err := d.client.GetItem(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	// No movie found with that ID — return nil instead of an error
+	// so the caller can distinguish "not found" from an actual failure.
+	if result.Item == nil {
+		return nil, nil
+	}
+
+	var movie Movie
+
+	err = attributevalue.UnmarshalMap(result.Item, &movie)
+	if err != nil {
+		return nil, err
+	}
+
+	return &movie, nil
+}
+
 // Create saves a new movie to DynamoDB.
 // We first convert the Movie struct into the format DynamoDB expects (a map of attributes),
 // then call PutItem to write it. The condition expression makes sure we never accidentally
@@ -72,71 +137,6 @@ func (d *DynamoMovieRepository) Delete(ctx context.Context, id string) error {
 
 	_, err := d.client.DeleteItem(ctx, input)
 	return err
-}
-
-// Get looks up a single movie by its ID.
-// We use ConsistentRead: true so we always get the latest version of the item,
-// not a potentially stale cached copy. If no movie is found, we return nil with no error.
-func (d *DynamoMovieRepository) Get(ctx context.Context, id string) (*Movie, error) {
-
-	input := &dynamodb.GetItemInput{
-		TableName: &d.table,
-		Key: map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{Value: id},
-		},
-		ConsistentRead: aws.Bool(true),
-	}
-
-	result, err := d.client.GetItem(ctx, input)
-	if err != nil {
-		return nil, err
-	}
-
-	// No movie found with that ID — return nil instead of an error
-	// so the caller can distinguish "not found" from an actual failure.
-	if result.Item == nil {
-		return nil, nil
-	}
-
-	var movie Movie
-
-	err = attributevalue.UnmarshalMap(result.Item, &movie)
-	if err != nil {
-		return nil, err
-	}
-
-	return &movie, nil
-}
-
-// GetAll fetches every movie in the table using a Scan operation.
-// A Scan reads the entire table from top to bottom, which is fine for small datasets.
-// TODO: Replace with a Query using a partition key — Scan has a 1MB limit per call
-// and gets expensive on large tables. Use ExclusiveStartKey + LastEvaluatedKey for pagination.
-func (d *DynamoMovieRepository) GetAll(ctx context.Context) ([]Movie, error) {
-
-	input := &dynamodb.ScanInput{
-		TableName: &d.table,
-	}
-
-	result, err := d.client.Scan(ctx, input)
-	if err != nil {
-		return nil, err
-	}
-
-	if result.Count == 0 {
-		return nil, nil
-	}
-
-	var movies []Movie
-
-	// DynamoDB returns data as a list of attribute maps, not plain Go structs.
-	// UnmarshalListOfMaps converts each map back into a Movie struct for us.
-	err = attributevalue.UnmarshalListOfMaps(result.Items, &movies)
-	if err != nil {
-		return nil, err
-	}
-
-	return movies, nil
 }
 
 // NewMovieRepository wires up and returns a DynamoDB-backed MovieRepository.

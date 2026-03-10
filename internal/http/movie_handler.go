@@ -28,6 +28,20 @@ func (h *MovieHandler) GetAllMovies(w http.ResponseWriter, r *http.Request) {
 	Success(w, http.StatusOK, "movies fetched", movies)
 }
 
+// GetMovie handles GET /v1/movies/{movieId} and returns a single movie by its ID.
+func (h *MovieHandler) GetMovie(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "movieId")
+
+	movies, err := h.App.MovieService.Get(r.Context(), id)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	Success(w, http.StatusOK, "movie fetched", movies)
+
+}
+
 // CreateMovie handles POST /v1/movies.
 // It reads the request body, builds a Movie struct, and saves it via the service layer.
 func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
@@ -50,20 +64,6 @@ func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
 	}
 
 	Success(w, http.StatusCreated, "movie created", movie)
-
-}
-
-// GetMovie handles GET /v1/movies/{movieId} and returns a single movie by its ID.
-func (h *MovieHandler) GetMovie(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "movieId")
-
-	movies, err := h.App.MovieService.Get(r.Context(), id)
-	if err != nil {
-		Error(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	Success(w, http.StatusOK, "movie fetched", movies)
 
 }
 
