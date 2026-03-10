@@ -61,6 +61,12 @@ internal/
   service/      # Business logic layer between handlers and the repository
 migrations/     # Migration files (future use)
 docs/           # Project documentation
+  architecture.md   — how the 3 layers work and the full request flow
+  api.md            — all endpoints with example requests and responses
+  dynamodb.md       — table design, access patterns, known limitations
+  performance.md    — benchmark results, what the latency means, and how to improve it
+  todo.md           — bugs, missing features, and improvement ideas
+  adr/              — records of key technical decisions and why they were made
 scripts/        # Helper scripts (build, deploy, etc.)
 ```
 
