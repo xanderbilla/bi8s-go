@@ -51,14 +51,14 @@ func main() {
 
 	// Configure the HTTP server with sensible timeouts to avoid slow/stuck connections.
 	srv := http.Server{
-		Addr:         cfg.Addr,
+		Addr:         app.Config.Addr,
 		Handler:      mux,
 		WriteTimeout: 30 * time.Second, // max time to write a full response
 		ReadTimeout:  10 * time.Second, // max time to read the full request
 		IdleTimeout:  time.Minute,      // how long to keep idle keep-alive connections open
 	}
 
-	log.Printf("server started on %s", cfg.Addr)
+	log.Printf("server started on %s", app.Config.Addr)
 
 	// ListenAndServe blocks forever. log.Fatal will print the error and exit if it crashes.
 	log.Fatal(srv.ListenAndServe())
