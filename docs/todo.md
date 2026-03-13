@@ -4,17 +4,11 @@ A list of known issues, missing features, and ideas for improvement. Not everyth
 
 ## Bugs / Issues
 
-- `GET /v1/movies/{id}` returns `200 OK` with `null` data when a movie is not found.
-  It should return `404 Not Found` with a clear error message instead.
+- No critical API behavior bugs currently tracked.
 
 ## Missing Features
 
 - `PUT /v1/movies/{id}` — update an existing movie's title or year.
-
-- Input validation on `POST /v1/movies`:
-  - `id` must not be empty
-  - `title` must not be empty
-  - `year` must be a positive number (e.g. between 1888 and the current year)
 
 - Graceful shutdown — the server currently stops immediately when killed.
   It should finish handling in-flight requests before shutting down.

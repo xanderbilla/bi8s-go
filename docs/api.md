@@ -28,15 +28,14 @@ On errors:
 
 Returns the current runtime environment. Use this to check the server is running.
 
-**Response**
+#### Health Response
 
 ```json
 {
   "status": 200,
-  "message": "ok",
+  "message": "Health check passed!",
   "data": {
-    "status": "ok",
-    "env": "dev"
+    "version": "dev"
   }
 }
 ```
@@ -47,7 +46,7 @@ Returns the current runtime environment. Use this to check the server is running
 
 Returns all movies in the database.
 
-**Response**
+#### List Movies Response
 
 ```json
 {
@@ -66,13 +65,13 @@ Returns `null` for `data` if there are no movies yet.
 
 Returns a single movie by its ID.
 
-**URL Parameters**
+#### Get Movie URL Parameters
 
 | Parameter | Type   | Description         |
 | --------- | ------ | ------------------- |
 | `id`      | string | The ID of the movie |
 
-**Response**
+#### Get Movie Response
 
 ```json
 {
@@ -82,13 +81,21 @@ Returns a single movie by its ID.
 }
 ```
 
-Returns `null` for `data` if no movie with that ID exists.
+If no movie exists with that ID:
+
+```json
+{
+  "status": 404,
+  "message": "request failed",
+  "error": "The requested resource was not found"
+}
+```
 
 ### POST /v1/movies
 
 Creates a new movie.
 
-**Request Body**
+#### Create Movie Request Body
 
 ```json
 {
@@ -104,7 +111,13 @@ Creates a new movie.
 | `title` | string | yes      | Title of the movie          |
 | `year`  | int    | yes      | Year the movie was released |
 
-**Response**
+Validation rules:
+
+- `id`: required, 1-64 chars
+- `title`: required, 1-255 chars
+- `year`: required, 1888-2100
+
+#### Create Movie Response
 
 ```json
 {
@@ -115,26 +128,41 @@ Creates a new movie.
 ```
 
 Returns `400 Bad Request` if the body is malformed.
-Returns `500 Internal Server Error` if a movie with the same ID already exists.
+Returns `400 Bad Request` for validation errors (including unknown fields and multiple JSON objects in a single body).
+Returns `409 Conflict` if a movie with the same ID already exists.
 
 ### DELETE /v1/movies/{id}
 
 Deletes a movie by its ID.
 
-**URL Parameters**
+#### Delete Movie URL Parameters
 
 | Parameter | Type   | Description         |
 | --------- | ------ | ------------------- |
 | `id`      | string | The ID of the movie |
 
-**Response**
+#### Delete Movie Response
 
 ```json
 {
   "status": 200,
-  "message": "movie deleted",
-  "data": null
+  "message": "movie deleted"
 }
 ```
 
-Returns `500 Internal Server Error` if no movie with that ID exists.
+If no movie exists with that ID:
+
+```json
+{
+  "status": 404,
+  "message": "request failed",
+  "error": "The requested resource was not found"
+}
+```
+
+## Router-Level Errors
+
+The API also returns JSON for unmatched routes and unsupported methods.
+
+- Unknown route: `404 Not Found`
+- Unsupported method on a valid route: `405 Method Not Allowed`
