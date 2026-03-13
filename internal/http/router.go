@@ -15,6 +15,16 @@ func Mount(app *app.Application) http.Handler {
 
 	r := chi.NewRouter()
 
+	// Return JSON for unmatched routes and unsupported methods so clients
+	// always get the same response shape, even before hitting a handler.
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		Error(w, http.StatusNotFound, "The requested resource was not found")
+	})
+
+	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+		Error(w, http.StatusMethodNotAllowed, "Method not allowed for this endpoint")
+	})
+
 	// --- Middleware stack (runs on every request, in order) ---
 
 	// Attaches a unique X-Request-Id to each request so you can trace it through logs.
