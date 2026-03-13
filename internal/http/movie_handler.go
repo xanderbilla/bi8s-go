@@ -5,10 +5,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/xanderbilla/bi8s-go/internal/app"
+	"github.com/xanderbilla/bi8s-go/internal/errs"
 	"github.com/xanderbilla/bi8s-go/internal/repository"
 )
 
 // MovieHandler handles movie-related HTTP routes.
+// It delegates error responses to internal/errs so logging and payload shape
+// stay consistent across handlers.
 type MovieHandler struct {
 	App *app.Application
 }
@@ -23,7 +26,7 @@ func (h *MovieHandler) GetAllMovies(w http.ResponseWriter, r *http.Request) {
 	// if the client disconnects or the 60s middleware timeout fires.
 	movies, err := h.App.MovieService.GetAll(r.Context())
 	if err != nil {
-		Error(w, http.StatusInternalServerError, err.Error())
+		errs.InternalServerError(w, r, err)
 		return
 	}
 
@@ -38,7 +41,7 @@ func (h *MovieHandler) GetMovie(w http.ResponseWriter, r *http.Request) {
 
 	movies, err := h.App.MovieService.Get(r.Context(), id)
 	if err != nil {
-		Error(w, http.StatusInternalServerError, err.Error())
+		errs.InternalServerError(w, r, err)
 		return
 	}
 
@@ -54,7 +57,7 @@ func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
 	var payload repository.Movie
 
 	if err := Decode(w, r, &payload); err != nil {
-		Error(w, http.StatusBadRequest, err.Error())
+		errs.BadRequestError(w, r, err)
 		return
 	}
 
@@ -65,7 +68,7 @@ func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.App.MovieService.Create(r.Context(), *movie); err != nil {
-		Error(w, http.StatusInternalServerError, err.Error())
+		errs.InternalServerError(w, r, err)
 		return
 	}
 
@@ -78,7 +81,7 @@ func (h *MovieHandler) DeleteMovie(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "movieId")
 
 	if err := h.App.MovieService.Delete(r.Context(), id); err != nil {
-		Error(w, http.StatusNotFound, err.Error())
+		errs.NotFoundError(w, r, err)
 		return
 	}
 
