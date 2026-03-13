@@ -46,9 +46,12 @@ With [direnv](https://direnv.net/), copy your credentials into `.envrc` and run 
 | `POST`   | `/v1/movies`      | Create a new movie   |
 | `DELETE` | `/v1/movies/{id}` | Delete a movie by ID |
 
+Error responses are returned as JSON (including router-level `404` and `405`).
+Validation is enforced on `POST /v1/movies` before writes.
+
 ## Project Structure
 
-```
+```text
 cmd/
   api/          # Entry point — wires config, AWS clients, and the HTTP server
   migrate/      # Database migration runner (future use)
@@ -56,9 +59,12 @@ internal/
   app/          # Shared config struct and the Application container passed to handlers
   aws/          # AWS config loader and DynamoDB client setup
   env/          # Helpers for reading environment variables with fallback defaults
+  errs/         # Centralized HTTP error mapping + safe client error messages
   http/         # Router, middleware, request handlers, and JSON response utilities
   repository/   # DynamoDB data access — all reads and writes to the database live here
+  response/     # Shared response envelope and JSON writers used across packages
   service/      # Business logic layer between handlers and the repository
+  validation/   # go-playground/validator wrapper for request payload validation
 migrations/     # Migration files (future use)
 docs/           # Project documentation
   architecture.md   — how the 3 layers work and the full request flow
