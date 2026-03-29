@@ -72,13 +72,8 @@ func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	movie := &repository.Movie{
-		ID:    payload.ID,
-		Title: payload.Title,
-		Year:  payload.Year,
-	}
-
-	if err := h.App.MovieService.Create(r.Context(), *movie); err != nil {
+	movie, err := h.App.MovieService.Create(r.Context(), payload)
+	if err != nil {
 		if isConditionalCheckFailed(err) {
 			errs.ConflictError(w, r, err)
 			return

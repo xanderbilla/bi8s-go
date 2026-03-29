@@ -127,14 +127,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{movieId}}\",\n  \"title\": \"Interstellar\",\n  \"year\": 2014\n}"
+              "raw": "{\n  \"title\": \"Interstellar\",\n  \"description\": \"A team travels through a wormhole to ensure humanity's survival.\",\n  \"performer\": \"Matthew McConaughey\",\n  \"year\": 2014\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v1/movies",
               "host": ["{{baseUrl}}"],
               "path": ["v1", "movies"]
             },
-            "description": "Creates a movie. First run should return 201; repeated run may return 409."
+            "description": "Creates a movie. If ID is omitted, server generates it. On 201, generated ID is saved into {{movieId}} for subsequent requests."
           },
           "event": [
             {
@@ -144,7 +144,18 @@
                 "exec": [
                   "pm.test('Status code is 201 or 409', function () {",
                   "  pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
-                  "});"
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  const createdId = body?.data?.id;",
+                  "  pm.test('Created movie contains generated id', function () {",
+                  "    pm.expect(createdId).to.be.a('string').and.not.empty;",
+                  "  });",
+                  "  if (createdId) {",
+                  "    pm.collectionVariables.set('movieId', createdId);",
+                  "  }",
+                  "}"
                 ]
               }
             }

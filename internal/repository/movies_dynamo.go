@@ -17,9 +17,11 @@ import (
 //
 // `json` and `dynamodbav` are set to lowercase so keys stay consistent everywhere.
 type Movie struct {
-	ID    string `json:"id" dynamodbav:"id" validate:"required,min=1,max=64"`
-	Title string `json:"title" dynamodbav:"title" validate:"required,min=1,max=255"`
-	Year  int    `json:"year" dynamodbav:"year" validate:"required,gte=1888,lte=2100"`
+	ID          string `json:"id" dynamodbav:"id" validate:"omitempty,min=1,max=64"`
+	Title       string `json:"title" dynamodbav:"title" validate:"required,min=1,max=128"`
+	Description string `json:"decription" dynamodbav:"decription" validate:"required,min=1,max=255"`
+	Performer   string `json:"performer" dynamodbav:"performer" validate:"required,min=1,max=128"`
+	Year        int    `json:"year" dynamodbav:"year" validate:"required,gte=1888,lte=2100"`
 }
 
 // MovieRepository is an interface (a contract) that describes what operations
@@ -110,7 +112,6 @@ func (d *DynamoMovieRepository) Get(ctx context.Context, id string) (*Movie, err
 // then call PutItem to write it. The condition expression makes sure we never accidentally
 // overwrite a movie that already has the same ID.
 func (d *DynamoMovieRepository) Create(ctx context.Context, movie Movie) error {
-
 	item, err := attributevalue.MarshalMap(movie)
 	if err != nil {
 		return err

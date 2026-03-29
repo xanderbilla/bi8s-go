@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/xanderbilla/bi8s-go/internal/repository"
+	"github.com/xanderbilla/bi8s-go/internal/utils"
 )
 
 // MovieService sits between the HTTP handlers and the database layer.
@@ -34,8 +35,16 @@ func (s *MovieService) Get(ctx context.Context, id string) (*repository.Movie, e
 
 // Create saves a new movie to the database.
 // Add any validation or default-value logic here before passing it down to the repository.
-func (s *MovieService) Create(ctx context.Context, movie repository.Movie) error {
-	return s.repo.Create(ctx, movie)
+func (s *MovieService) Create(ctx context.Context, movie repository.Movie) (repository.Movie, error) {
+	if movie.ID == "" {
+		movie.ID = utils.GenerateID()
+	}
+
+	if err := s.repo.Create(ctx, movie); err != nil {
+		return repository.Movie{}, err
+	}
+
+	return movie, nil
 }
 
 // Delete removes a movie from the database by its ID.
