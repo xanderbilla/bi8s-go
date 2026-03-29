@@ -17,6 +17,8 @@ A REST API built with Go, [chi](https://github.com/go-chi/chi), and DynamoDB on 
 | `AWS_REGION`            | AWS region                                        | `us-east-1` |
 | `AWS_ACCESS_KEY_ID`     | AWS access key (optional, falls back to IAM role) | —           |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key (optional, falls back to IAM role) | —           |
+| `S3_BUCKET`             | S3 bucket used to store movie posters             | —           |
+| `S3_POSTER_PREFIX`      | Key prefix for poster objects in S3               | `movies`    |
 
 > If `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are not set, the AWS SDK falls back to the default credential chain (IAM role, `~/.aws/credentials`, etc.).
 
@@ -38,13 +40,13 @@ With [direnv](https://direnv.net/), copy your credentials into `.envrc` and run 
 
 ## API
 
-| Method   | Path              | Description          |
-| -------- | ----------------- | -------------------- |
-| `GET`    | `/v1/health`      | Liveness check       |
-| `GET`    | `/v1/movies`      | List all movies      |
-| `GET`    | `/v1/movies/{id}` | Get a movie by ID    |
-| `POST`   | `/v1/movies`      | Create a new movie   |
-| `DELETE` | `/v1/movies/{id}` | Delete a movie by ID |
+| Method   | Path              | Description                                             |
+| -------- | ----------------- | ------------------------------------------------------- |
+| `GET`    | `/v1/health`      | Liveness check                                          |
+| `GET`    | `/v1/movies`      | List all movies                                         |
+| `GET`    | `/v1/movies/{id}` | Get a movie by ID                                       |
+| `POST`   | `/v1/movies`      | Create a movie with poster upload (multipart/form-data) |
+| `DELETE` | `/v1/movies/{id}` | Delete a movie by ID                                    |
 
 Error responses are returned as JSON (including router-level `404` and `405`).
 Validation is enforced on `POST /v1/movies` before writes.

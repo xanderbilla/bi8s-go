@@ -19,11 +19,13 @@ type Config struct {
 	Addr      string // e.g. ":8080"
 	Env       string // e.g. "prod", "dev"
 	TableName string // DynamoDB table name, e.g. "bi8s-dev"
+	S3Bucket  string // S3 bucket for movie posters
+	S3Prefix  string // S3 key prefix for posters, e.g. "movies"
 	AWS       AWSConfig
 }
 
-// Application is the central dependency container.
-// Handlers receive a pointer to this so they can access config, AWS clients, and services.
+// Application is the central dependency container constructed natively at startup.
+// It acts solely as an aggregation registry for wiring explicit dependencies into specific handlers and services.
 type Application struct {
 	Config       Config
 	Clients      *awsinfra.Clients

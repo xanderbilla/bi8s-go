@@ -1,3 +1,5 @@
+// Package http contains all exterior service boundaries connecting web routing logic, request decoding validations, and dependency injection wiring.
+// HTTP handlers strictly relay formatted parameters down into domain services ensuring scalable separation of concerns generically.
 package http
 
 import (
@@ -49,8 +51,8 @@ func Mount(app *app.Application) http.Handler {
 
 	// Each handler is a struct that holds a pointer to the app, giving it access
 	// to config, DB, and any other shared dependencies without using globals.
-	healthHandler := &HealthHandler{App: app}
-	movieHandler := &MovieHandler{App: app}
+	healthHandler := &HealthHandler{env: app.Config.Env}
+	movieHandler := &MovieHandler{movieService: app.MovieService}
 
 	r.Route("/v1", func(r chi.Router) {
 		// GET /v1/health — liveness check, returns the current environment name.

@@ -4,12 +4,21 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 
+	"github.com/xanderbilla/bi8s-go/internal/domain"
 	"github.com/xanderbilla/bi8s-go/internal/response"
+	"github.com/xanderbilla/bi8s-go/internal/validation"
 )
 
 // Cap incoming request bodies at 1MB to protect against memory exhaustion attacks.
-const maxRequestBodySize = 1_048_576 // 1MB
+
+// Multipart form-data size limits
+const (
+	maxRequestBodySize   = 1_048_576  // 1MB
+	maxMultipartBodySize = 12_582_912 // 12MB total multipart body limit
+	maxMultipartFileSize = 10_485_760 // 10MB per file limit
+)
 
 // Response keeps backward compatibility for callers in this package while
 // delegating the actual envelope definition to internal/response.
@@ -52,4 +61,21 @@ func Decode(w http.ResponseWriter, r *http.Request, payload interface{}) error {
 	}
 
 	return nil
+}
+
+// ParseMultipartForm parses a multipart/form-data request.
+// Returns the raw form values so the caller can extract domain models and files.
+func ParseMultipartForm(r *http.Request) (url.Values, error) {
+	r.Body = http.MaxBytesReader(nil, r.Body, maxMultipartBodySize)
+
+	if err := r.ParseMultipartForm(maxMultipartBodySize); err != nil {
+		return nil, errors.New("body must be multipart/form-data")
+	}
+
+	return r.Form, nil
+}
+
+// ExtractFile simplifies extracting a file using the package's max file size limit.
+func ExtractFile(r *http.Request, fieldName string) (*domain.FileUploadInput, error) {
+	return validation.ExtractFile(r, fieldName, maxMultipartFileSize)
 }

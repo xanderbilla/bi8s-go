@@ -1,3 +1,4 @@
+// Package aws provides explicit bindings and initialization utilities for interacting with the AWS cloud infrastructure natively.
 package aws
 
 import (

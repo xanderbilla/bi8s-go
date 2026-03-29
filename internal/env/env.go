@@ -1,3 +1,4 @@
+// Package env supplies safe environment variable extraction utilities defaulting smoothly when components randomly omit configurations natively.
 package env
 
 import (

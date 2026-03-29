@@ -93,29 +93,55 @@ If no movie exists with that ID:
 
 ### POST /v1/movies
 
-Creates a new movie.
+Creates a new movie and uploads its poster to S3.
 
 #### Create Movie Request Body
 
+Content-Type: `multipart/form-data`
+
+Form fields:
+
+- `id` (optional string)
+- `title` (required string)
+- `description` (required string)
+- `performer` (required string)
+- `year` (required int)
+- `poster` (required file: jpeg, png, webp, gif, avif)
+
+If `id` is omitted, the service generates one.
+
+Poster object naming convention:
+
+- `movies/{movieId}/poster.{ext}`
+
 ```json
 {
-  "id": "3",
+  "id": "generated-or-provided-id",
   "title": "The Dark Knight",
-  "year": 2008
+  "description": "Batman faces the Joker in Gotham.",
+  "performer": "Christian Bale",
+  "year": 2008,
+  "poster": "movies/generated-or-provided-id/cover.jpg"
 }
 ```
 
-| Field   | Type   | Required | Description                 |
-| ------- | ------ | -------- | --------------------------- |
-| `id`    | string | yes      | Unique ID for the movie     |
-| `title` | string | yes      | Title of the movie          |
-| `year`  | int    | yes      | Year the movie was released |
+| Field         | Type   | Required | Description                                         |
+| ------------- | ------ | -------- | --------------------------------------------------- |
+| `id`          | string | no       | Unique ID for the movie (auto-generated if missing) |
+| `title`       | string | yes      | Title of the movie                                  |
+| `description` | string | yes      | Short movie description                             |
+| `performer`   | string | yes      | Main performer name                                 |
+| `year`        | int    | yes      | Year the movie was released                         |
+| `poster`      | file   | yes      | Poster image uploaded to S3                         |
 
 Validation rules:
 
-- `id`: required, 1-64 chars
+- `id`: optional, 1-64 chars when provided
 - `title`: required, 1-255 chars
+- `description`: required, 1-255 chars
+- `performer`: required, 1-128 chars
 - `year`: required, 1888-2100
+- `poster`: required, max 10MB, image types only
 
 #### Create Movie Response
 
@@ -128,7 +154,8 @@ Validation rules:
 ```
 
 Returns `400 Bad Request` if the body is malformed.
-Returns `400 Bad Request` for validation errors (including unknown fields and multiple JSON objects in a single body).
+Returns `400 Bad Request` for invalid multipart forms, invalid file types, or oversized poster files.
+Returns `400 Bad Request` for validation errors.
 Returns `409 Conflict` if a movie with the same ID already exists.
 
 ### DELETE /v1/movies/{id}

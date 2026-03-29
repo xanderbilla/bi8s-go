@@ -119,22 +119,48 @@
           "name": "POST /v1/movies",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Interstellar\",\n  \"description\": \"A team travels through a wormhole to ensure humanity's survival.\",\n  \"performer\": \"Matthew McConaughey\",\n  \"year\": 2014\n}"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Interstellar",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "A team travels through a wormhole to ensure humanity's survival.",
+                  "type": "text"
+                },
+                {
+                  "key": "performer",
+                  "value": "Matthew McConaughey",
+                  "type": "text"
+                },
+                {
+                  "key": "year",
+                  "value": "2014",
+                  "type": "text"
+                },
+                {
+                  "key": "poster",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "cover",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
             },
             "url": {
               "raw": "{{baseUrl}}/v1/movies",
               "host": ["{{baseUrl}}"],
               "path": ["v1", "movies"]
             },
-            "description": "Creates a movie. If ID is omitted, server generates it. On 201, generated ID is saved into {{movieId}} for subsequent requests."
+            "description": "Creates a movie via multipart/form-data and uploads poster and cover to S3. If ID is omitted, server generates it. On 201, generated ID is saved into {{movieId}} for subsequent requests."
           },
           "event": [
             {

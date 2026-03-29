@@ -6,28 +6,24 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/go-chi/chi/v5"
-	"github.com/xanderbilla/bi8s-go/internal/app"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
-	"github.com/xanderbilla/bi8s-go/internal/repository"
-	"github.com/xanderbilla/bi8s-go/internal/validation"
+	"github.com/xanderbilla/bi8s-go/internal/service"
 )
 
 // MovieHandler handles movie-related HTTP routes.
 // It keeps handler code focused on request/response flow, while shared packages
 // handle validation and error formatting consistently.
 type MovieHandler struct {
-	App *app.Application
+	movieService *service.MovieService
 }
 
 // GetAllMovies handles GET /v1/movies and returns all movies in the database.
 // It uses a DynamoDB Scan under the hood, which reads the whole table.
 // This is fine for small datasets but will slow down and get expensive as the table grows.
-// See docs/todo.md (Scalability section) for the plan to fix this.
 func (h *MovieHandler) GetAllMovies(w http.ResponseWriter, r *http.Request) {
-
 	// Passing r.Context() means the DB call will be automatically cancelled
 	// if the client disconnects or the 60s middleware timeout fires.
-	movies, err := h.App.MovieService.GetAll(r.Context())
+	movies, err := h.movieService.GetAll(r.Context())
 	if err != nil {
 		errs.InternalServerError(w, r, err)
 		return
@@ -41,7 +37,7 @@ func (h *MovieHandler) GetAllMovies(w http.ResponseWriter, r *http.Request) {
 func (h *MovieHandler) GetMovie(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "movieId")
 
-	movie, err := h.App.MovieService.Get(r.Context(), id)
+	movie, err := h.movieService.Get(r.Context(), id)
 	if err != nil {
 		errs.InternalServerError(w, r, err)
 		return
@@ -53,27 +49,43 @@ func (h *MovieHandler) GetMovie(w http.ResponseWriter, r *http.Request) {
 	}
 
 	Success(w, http.StatusOK, "movie fetched", movie)
-
 }
 
 // CreateMovie handles POST /v1/movies.
-// Flow: decode JSON -> validate payload -> create movie.
+// Flow: parse multipart form -> build movie -> map files via helper -> save to storage -> create database record.
 // Duplicate IDs are mapped to 409 Conflict for a clearer client contract.
 func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
-	var payload repository.Movie
-
-	if err := Decode(w, r, &payload); err != nil {
-		errs.BadRequestError(w, r, err)
-		return
-	}
-
-	if err := validation.ValidateStruct(payload); err != nil {
-		errs.BadRequestError(w, r, err)
-		return
-	}
-
-	movie, err := h.App.MovieService.Create(r.Context(), payload)
+	formValues, err := ParseMultipartForm(r)
 	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+
+	movie, err := ParseMovieFromForm(formValues)
+	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+
+	posterInput, err := ExtractFile(r, "poster")
+	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+
+	coverInput, err := ExtractFile(r, "cover")
+	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+
+	newMovie, err := h.movieService.Create(r.Context(), movie, posterInput, coverInput)
+	if err != nil {
+		if errors.Is(err, errs.ErrFileUploaderNotConfigured) {
+			errs.InternalServerError(w, r, err)
+			return
+		}
+
 		if isConditionalCheckFailed(err) {
 			errs.ConflictError(w, r, err)
 			return
@@ -83,8 +95,7 @@ func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	Success(w, http.StatusCreated, "movie created", movie)
-
+	Success(w, http.StatusCreated, "movie created", newMovie)
 }
 
 // DeleteMovie handles DELETE /v1/movies/{movieId}.
@@ -92,7 +103,7 @@ func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
 func (h *MovieHandler) DeleteMovie(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "movieId")
 
-	if err := h.App.MovieService.Delete(r.Context(), id); err != nil {
+	if err := h.movieService.Delete(r.Context(), id); err != nil {
 		if isConditionalCheckFailed(err) {
 			errs.NotFoundError(w, r, err)
 			return
@@ -103,8 +114,9 @@ func (h *MovieHandler) DeleteMovie(w http.ResponseWriter, r *http.Request) {
 	}
 
 	Success(w, http.StatusOK, "movie deleted", nil)
-
 }
+
+
 
 // isConditionalCheckFailed identifies DynamoDB conditional-write failures.
 // We use this to map domain-level conflicts/missing-resource cases to 409/404

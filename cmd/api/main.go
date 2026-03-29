@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -11,6 +12,7 @@ import (
 	transport "github.com/xanderbilla/bi8s-go/internal/http"
 	"github.com/xanderbilla/bi8s-go/internal/repository"
 	"github.com/xanderbilla/bi8s-go/internal/service"
+	"github.com/xanderbilla/bi8s-go/internal/storage"
 )
 
 func main() {
@@ -30,11 +32,17 @@ func run() error {
 		Addr:      ":8080",
 		Env:       env.GetString("ENV", "prod"),
 		TableName: env.GetString("DYNAMODB_TABLE", "bi8s-dev"),
+		S3Bucket:  env.GetString("S3_BUCKET", ""),
+		S3Prefix:  env.GetString("S3_POSTER_PREFIX", "movies"),
 		AWS: app.AWSConfig{
 			AccessKey:       env.GetString("AWS_ACCESS_KEY_ID", ""),
 			SecretAccessKey: env.GetString("AWS_SECRET_ACCESS_KEY", ""),
 			Region:          env.GetString("AWS_REGION", "us-east-1"),
 		},
+	}
+
+	if cfg.S3Bucket == "" {
+		return errors.New("S3_BUCKET is required for poster uploads")
 	}
 
 	// Connect to AWS using the credentials from config.
@@ -46,18 +54,20 @@ func run() error {
 	}
 
 	// Create all AWS clients (DynamoDB, and S3 when needed) from the AWS config.
-	dynamoClient := aws.NewClients(awsCfg)
+	awsClient := aws.NewClients(awsCfg)
 
 	// Build the repository and service layers.
 	// The repo talks directly to DynamoDB; the service sits on top and owns business logic.
-	movieRepo := repository.NewMovieRepository(dynamoClient.Dynamo, cfg.TableName)
-	movieService := service.NewMovieService(movieRepo)
+	// Use generic file uploader implementation backed by S3.
+	fileUploader := storage.NewS3FileUploader(awsClient.S3, cfg.S3Bucket)
+	movieRepo := repository.NewMovieRepository(awsClient.Dynamo, cfg.TableName)
+	movieService := service.NewMovieService(movieRepo, fileUploader)
 
-	// Wire everything together into a single Application struct.
-	// This gets passed around to handlers so they have access to config, AWS clients, and services.
+	// Wire everything together into a single Application structure acting as a central registry natively.
+	// It is passed only into the router Mount to orchestrate specific dependency injection bindings.
 	application := &app.Application{
 		Config:       cfg,
-		Clients:      dynamoClient,
+		Clients:      awsClient,
 		MovieService: movieService,
 	}
 

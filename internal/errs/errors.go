@@ -1,11 +1,14 @@
 package errs
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
 	"github.com/xanderbilla/bi8s-go/internal/response"
 )
+
+var ErrFileUploaderNotConfigured = errors.New("file uploader is not configured")
 
 // writeError sends a standardized JSON error envelope.
 // Keeping this in one place prevents response-shape drift between handlers.
