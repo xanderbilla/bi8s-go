@@ -4,7 +4,7 @@ SHELL := /bin/sh
 # Centralized variables keep commands DRY and easy to override.
 APP_NAME ?= bi8s-go
 DOCKER_REGISTRY ?= docker.io
-IMAGE_REPO ?= xanderbilla/go/bi8s
+IMAGE_REPO ?= xanderbilla/my-project
 IMAGE_NAME ?= $(DOCKER_REGISTRY)/$(IMAGE_REPO)
 IMAGE_TAG ?= latest
 PLATFORM ?= linux/amd64
