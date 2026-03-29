@@ -44,7 +44,7 @@ Build and push multi-platform image:
 make publish IMAGE_TAG=v1.0.0
 ```
 
-Default image name is `docker.io/go/bi8s`, and default platforms are `linux/amd64,linux/arm64`.
+Default image name is `docker.io/xanderbilla/go/bi8s`, and default platforms are `linux/amd64,linux/arm64`.
 
 ## GitHub Actions Workflow
 
@@ -58,8 +58,8 @@ Trigger conditions:
 
 The workflow builds and pushes:
 
-- `docker.io/go/bi8s:latest`
-- `docker.io/go/bi8s:<commit-sha>`
+- `docker.io/xanderbilla/go/bi8s:latest`
+- `docker.io/xanderbilla/go/bi8s:<commit-sha>`
 
 ## Required Repository Secrets
 

@@ -22,7 +22,7 @@ jobs:
         name: Build and Push Multi-Platform Image
         runs-on: ubuntu-latest
         env:
-            IMAGE_NAME: docker.io/${{ secrets.DOCKER_USERNAME }}/bi8s
+            IMAGE_NAME: docker.io/xanderbilla/go/bi8s
 
         steps:
             # Pull repository code at the commit that triggered this workflow.

@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    image: docker.io/go/bi8s:local
+    image: docker.io/xanderbilla/go/bi8s:local
     ports:
       - "8080:8080"
     environment:
