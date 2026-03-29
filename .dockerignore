@@ -1,0 +1,17 @@
+# Keep the Docker build context small and reproducible.
+.git
+.gitignore
+.github
+.vscode
+bin
+docs
+migrations
+scripts
+web
+*.md
+*.log
+.env
+.env.*
+.envrc
+.air.toml
+postman

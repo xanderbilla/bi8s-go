@@ -1,0 +1,19 @@
+# Compose setup for running the API in a container while using live AWS DynamoDB.
+services:
+  api:
+    container_name: bi8s-go-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: docker.io/go/bi8s:local
+    ports:
+      - "8080:8080"
+    environment:
+      # App configuration values. Override from shell or an .env file.
+      ENV: ${ENV:-dev}
+      DYNAMODB_TABLE: ${DYNAMODB_TABLE:-bi8s-dev}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    restart: unless-stopped
