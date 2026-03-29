@@ -21,6 +21,8 @@ jobs:
     docker:
         name: Build and Push Multi-Platform Image
         runs-on: ubuntu-latest
+        env:
+            IMAGE_NAME: docker.io/${{ secrets.DOCKER_USERNAME }}/bi8s
 
         steps:
             # Pull repository code at the commit that triggered this workflow.
@@ -52,7 +54,7 @@ jobs:
                   push: true
                   platforms: linux/amd64,linux/arm64
                   tags: |
-                      docker.io/go/bi8s:latest
-                      docker.io/go/bi8s:${{ github.sha }}
+                      ${{ env.IMAGE_NAME }}:latest
+                      ${{ env.IMAGE_NAME }}:${{ github.sha }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
