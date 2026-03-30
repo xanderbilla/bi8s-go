@@ -125,33 +125,140 @@
               "formdata": [
                 {
                   "key": "title",
-                  "value": "Interstellar",
+                  "value": "Inception",
                   "type": "text"
                 },
                 {
-                  "key": "description",
-                  "value": "A team travels through a wormhole to ensure humanity's survival.",
+                  "key": "overview",
+                  "value": "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.",
                   "type": "text"
                 },
                 {
-                  "key": "performer",
-                  "value": "Matthew McConaughey",
+                  "key": "release_date",
+                  "value": "2010-07-16",
+                  "type": "text",
+                  "description": "Format: YYYY-MM-DD (between 2006-01-01 and today)"
+                },
+                {
+                  "key": "first_air_date",
+                  "value": "2010-07-16",
+                  "type": "text",
+                  "description": "Format: YYYY-MM-DD (between 2006-01-01 and today)"
+                },
+                {
+                  "key": "vote_average",
+                  "value": "8.8",
                   "type": "text"
                 },
                 {
-                  "key": "year",
-                  "value": "2014",
+                  "key": "vote_count",
+                  "value": "35000",
                   "type": "text"
+                },
+                {
+                  "key": "popularity",
+                  "value": "95.5",
+                  "type": "text"
+                },
+                {
+                  "key": "adult",
+                  "value": "false",
+                  "type": "text"
+                },
+                {
+                  "key": "content_rating",
+                  "value": "18_PLUS",
+                  "type": "text",
+                  "description": "Options: 18_PLUS, 21_PLUS"
+                },
+                {
+                  "key": "original_language",
+                  "value": "en",
+                  "type": "text",
+                  "description": "Options: en, hi, ja, ko, fr, es"
+                },
+                {
+                  "key": "genres",
+                  "value": "Action,Science Fiction,Thriller",
+                  "type": "text",
+                  "description": "Comma-separated. Format: 'name' or 'id:name'"
+                },
+                {
+                  "key": "casts",
+                  "value": "200001:Leonardo DiCaprio,200002:Tom Hardy,200003:Ellen Page",
+                  "type": "text",
+                  "description": "Comma-separated. Format: 'id:name'"
+                },
+                {
+                  "key": "tags",
+                  "value": "Mind Bending,Heist,Dreams",
+                  "type": "text",
+                  "description": "Comma-separated. Format: 'name' or 'id:name'"
+                },
+                {
+                  "key": "content_type",
+                  "value": "MOVIE",
+                  "type": "text",
+                  "description": "Options: MOVIE, TV, PERSON"
+                },
+                {
+                  "key": "origin_country",
+                  "value": "US,UK",
+                  "type": "text",
+                  "description": "Comma-separated country codes"
+                },
+                {
+                  "key": "mood_tags",
+                  "value": "Intense,Suspenseful,Thought Provoking",
+                  "type": "text",
+                  "description": "Comma-separated. Format: 'name' or 'id:name'"
+                },
+                {
+                  "key": "runtime",
+                  "value": "148",
+                  "type": "text",
+                  "description": "Runtime in minutes"
+                },
+                {
+                  "key": "status",
+                  "value": "RELEASED",
+                  "type": "text",
+                  "description": "Options: RUMORED, PLANNED, IN_PRODUCTION, POST_PRODUCTION, RELEASED, ENDED, RETURNING_SERIES, CANCELED, PILOT"
+                },
+                {
+                  "key": "tagline",
+                  "value": "Your mind is the scene of the crime",
+                  "type": "text"
+                },
+                {
+                  "key": "studios",
+                  "value": "600001:Warner Bros. Pictures,600002:Legendary Pictures,600003:Syncopy",
+                  "type": "text",
+                  "description": "Comma-separated. Format: 'id:name'"
                 },
                 {
                   "key": "poster",
                   "type": "file",
-                  "src": ""
+                  "src": "",
+                  "description": "Movie poster image"
                 },
                 {
                   "key": "cover",
                   "type": "file",
-                  "src": ""
+                  "src": "",
+                  "description": "Movie backdrop/cover image"
+                },
+                {
+                  "key": "cast_image_200001",
+                  "type": "file",
+                  "src": "",
+                  "description": "Cast member image (format: cast_image_{cast_id})"
+                },
+                {
+                  "key": "studio_image_600001",
+                  "type": "file",
+                  "src": "",
+                  "description": "Studio logo image (format: studio_image_{studio_id})"
                 }
               ]
             },
@@ -160,7 +267,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "movies"]
             },
-            "description": "Creates a movie via multipart/form-data and uploads poster and cover to S3. If ID is omitted, server generates it. On 201, generated ID is saved into {{movieId}} for subsequent requests."
+            "description": "Creates a movie with all fields via multipart/form-data. Uploads poster, cover, cast images, and studio images to S3. Movie ID is auto-generated. Entity IDs (genres, tags, etc.) are auto-generated if not provided. Date format: YYYY-MM-DD (stored as YYYY-MM-DD, validated between 2006-01-01 and today)."
           },
           "event": [
             {
@@ -181,7 +288,21 @@
                   "  if (createdId) {",
                   "    pm.collectionVariables.set('movieId', createdId);",
                   "  }",
-                  "}"
+                  "}",
+                  "",
+                  "pm.test('Response contains all expected fields', function () {",
+                  "  if (pm.response.code === 201) {",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data).to.have.property('title');",
+                  "    pm.expect(data).to.have.property('overview');",
+                  "    pm.expect(data).to.have.property('release_date');",
+                  "    pm.expect(data).to.have.property('content_rating');",
+                  "    pm.expect(data).to.have.property('content_type');",
+                  "    pm.expect(data).to.have.property('studios');",
+                  "    pm.expect(data).to.have.property('casts');",
+                  "    pm.expect(data).to.have.property('audit');",
+                  "  }",
+                  "});"
                 ]
               }
             }
