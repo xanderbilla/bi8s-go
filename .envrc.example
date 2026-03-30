@@ -5,3 +5,5 @@ export AWS_REGION=us-east-1
 export DYNAMODB_TABLE=table-name
 export S3_BUCKET=your-s3-bucket-name
 export S3_POSTER_PREFIX=movies
+export CORS_ALLOWED_ORIGINS="http://localhost:3000,https://your-domain.com"
+export CORS_ALLOW_PRIVATE_NETWORK="true"

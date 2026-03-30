@@ -27,7 +27,7 @@ func main() {
 // run contains all startup logic and returns an error if anything goes wrong.
 // Keeping it separate from main() makes it easy to test and reason about.
 func run() error {
-	defaultCORSOrigins := "http://localhost:3000,http://localhost:8443,https://localhost:8443,http://127.0.0.1:8443,https://127.0.0.1:8443"
+	defaultCORSOrigins := "http://localhost:3000,http://localhost:8443,https://localhost:8443,http://127.0.0.1:8443,https://127.0.0.1:8443,http://13.217.109.221:8443,https://13.217.109.221:8443"
 
 	// Build the app config from environment variables.
 	// If a variable isn't set, we fall back to safe defaults.

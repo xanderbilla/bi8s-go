@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/xanderbilla/bi8s-go/internal/domain"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
+	"github.com/xanderbilla/bi8s-go/internal/model"
 	"github.com/xanderbilla/bi8s-go/internal/repository"
 	"github.com/xanderbilla/bi8s-go/internal/storage"
 	"github.com/xanderbilla/bi8s-go/internal/utils"
@@ -29,41 +31,48 @@ func NewMovieService(repo repository.MovieRepository, fileUploader storage.FileU
 // GetAll returns every movie in the database.
 // If you ever need filtering, sorting, or pagination, add that logic here
 // rather than in the handler or the repository.
-func (s *MovieService) GetAll(ctx context.Context) ([]repository.Movie, error) {
+func (s *MovieService) GetAll(ctx context.Context) ([]model.Movie, error) {
 	return s.repo.GetAll(ctx)
 }
 
 // Get returns a single movie by its ID.
 // Returns nil (with no error) if no movie with that ID exists.
-func (s *MovieService) Get(ctx context.Context, id string) (*repository.Movie, error) {
+func (s *MovieService) Get(ctx context.Context, id string) (*model.Movie, error) {
 	return s.repo.Get(ctx, id)
 }
 
 // Create saves a new movie to the database with optional poster and cover upload.
 // If file inputs are provided, they will be uploaded to storage before saving.
-func (s *MovieService) Create(ctx context.Context, movie repository.Movie, posterInput, coverInput *domain.FileUploadInput) (repository.Movie, error) {
+func (s *MovieService) Create(ctx context.Context, movie model.Movie, posterInput, coverInput *domain.FileUploadInput) (model.Movie, error) {
 	if movie.ID == "" {
 		movie.ID = utils.GenerateID()
+	}
+
+	// Set audit timestamps
+	now := time.Now()
+	movie.Audit = model.Audit{
+		CreatedAt: now,
+		IsDeleted: false,
 	}
 
 	if posterInput != nil {
 		posterKey, err := s.uploadFileToStorage(ctx, movie.ID, "poster", posterInput)
 		if err != nil {
-			return repository.Movie{}, err
+			return model.Movie{}, err
 		}
-		movie.Poster = posterKey
+		movie.PosterPath = posterKey
 	}
 
 	if coverInput != nil {
 		coverKey, err := s.uploadFileToStorage(ctx, movie.ID, "cover", coverInput)
 		if err != nil {
-			return repository.Movie{}, err
+			return model.Movie{}, err
 		}
-		movie.Cover = coverKey
+		movie.BackdropPath = coverKey
 	}
 
 	if err := s.repo.Create(ctx, movie); err != nil {
-		return repository.Movie{}, err
+		return model.Movie{}, err
 	}
 
 	return movie, nil

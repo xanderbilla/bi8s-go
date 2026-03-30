@@ -1,5 +1,5 @@
 // Package repository contains all database access structures.
-// Separating database logic natively creates a scalable clean architecture 
+// Separating database logic natively creates a scalable clean architecture
 // enabling swapouts without polluting handler/service tiers.
 package repository
 
@@ -10,29 +10,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/xanderbilla/bi8s-go/internal/model"
 )
-
-// Movie provides the domain schema mapping for DynamoDB storage representations.
-// Employs structure tags specifying exact routing paths across endpoints and generic maps.
-//   - json defines REST delivery representations.
-//   - dynamodbav connects fields smoothly to corresponding Dynamo columns natively.
-//   - validate establishes strict validation bounds intercepting bad payloads promptly.
-type Movie struct {
-	ID          string `json:"id" dynamodbav:"id" validate:"omitempty,min=1,max=64"`
-	Title       string `json:"title" dynamodbav:"title" validate:"required,min=1,max=128"`
-	Description string `json:"description" dynamodbav:"description" validate:"required,min=1,max=255"`
-	Poster      string `json:"poster,omitempty" dynamodbav:"poster,omitempty"`
-	Cover       string `json:"cover,omitempty" dynamodbav:"cover,omitempty"`
-	Performer   string `json:"performer" dynamodbav:"performer" validate:"required,min=1,max=128"`
-	Year        int    `json:"year" dynamodbav:"year" validate:"required,gte=1888,lte=2100"`
-}
 
 // MovieRepository signifies a data-agnostic boundary.
 // It serves as the single source of truth for Movie operations avoiding tight couplings towards DynamoDB explicitly.
 type MovieRepository interface {
-	GetAll(ctx context.Context) ([]Movie, error)
-	Get(ctx context.Context, id string) (*Movie, error)
-	Create(ctx context.Context, movie Movie) error
+	GetAll(ctx context.Context) ([]model.Movie, error)
+	Get(ctx context.Context, id string) (*model.Movie, error)
+	Create(ctx context.Context, movie model.Movie) error
 	Delete(ctx context.Context, id string) error
 }
 
@@ -45,7 +31,7 @@ type DynamoMovieRepository struct {
 // GetAll iterates the configured table returning the collection.
 // WARNING: Scans execute expensive broad sweeps over whole distributions.
 // For scaled applications consider constructing targeted Queries via secondary index bounds mapping keys explicitly over unconstrained sequential scanning!
-func (d *DynamoMovieRepository) GetAll(ctx context.Context) ([]Movie, error) {
+func (d *DynamoMovieRepository) GetAll(ctx context.Context) ([]model.Movie, error) {
 	input := &dynamodb.ScanInput{
 		TableName: &d.table,
 	}
@@ -59,7 +45,7 @@ func (d *DynamoMovieRepository) GetAll(ctx context.Context) ([]Movie, error) {
 		return nil, nil
 	}
 
-	var movies []Movie
+	var movies []model.Movie
 	err = attributevalue.UnmarshalListOfMaps(result.Items, &movies)
 	if err != nil {
 		return nil, err
@@ -69,7 +55,7 @@ func (d *DynamoMovieRepository) GetAll(ctx context.Context) ([]Movie, error) {
 }
 
 // Get extracts singular records constrained entirely by specific unique partition identifers ensuring maximum speeds.
-func (d *DynamoMovieRepository) Get(ctx context.Context, id string) (*Movie, error) {
+func (d *DynamoMovieRepository) Get(ctx context.Context, id string) (*model.Movie, error) {
 	input := &dynamodb.GetItemInput{
 		TableName: &d.table,
 		Key: map[string]types.AttributeValue{
@@ -87,7 +73,7 @@ func (d *DynamoMovieRepository) Get(ctx context.Context, id string) (*Movie, err
 		return nil, nil
 	}
 
-	var movie Movie
+	var movie model.Movie
 	err = attributevalue.UnmarshalMap(result.Item, &movie)
 	if err != nil {
 		return nil, err
@@ -97,7 +83,7 @@ func (d *DynamoMovieRepository) Get(ctx context.Context, id string) (*Movie, err
 }
 
 // Create provisions a newly submitted map structure within the database securely targeting missing IDs strictly avoiding overwrites!
-func (d *DynamoMovieRepository) Create(ctx context.Context, movie Movie) error {
+func (d *DynamoMovieRepository) Create(ctx context.Context, movie model.Movie) error {
 	item, err := attributevalue.MarshalMap(movie)
 	if err != nil {
 		return err

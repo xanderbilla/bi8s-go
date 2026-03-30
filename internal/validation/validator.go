@@ -1,10 +1,52 @@
 package validation
 
-import "github.com/go-playground/validator/v10"
+import (
+	"time"
 
-// validate is a shared validator instance used across request validation.
+	"github.com/go-playground/validator/v10"
+	"github.com/xanderbilla/bi8s-go/internal/utils"
+)
+
 // WithRequiredStructEnabled enforces required tags on nested struct values.
 var validate = validator.New(validator.WithRequiredStructEnabled())
+
+func init() {
+	// customdate confirms util.Date correctly unwraps time payloads securely natively.
+	_ = validate.RegisterValidation("customdate", func(fl validator.FieldLevel) bool {
+		date, ok := fl.Field().Interface().(utils.Date)
+		if !ok {
+			return false // Abort poorly cast validation attempts aggressively.
+		}
+		// Require custom dates be actual configured dates and not standard zeroed structures.
+		return !date.IsZero()
+	})
+
+	// daterange validates that dates are between 2006-01-01 and today
+	_ = validate.RegisterValidation("daterange", func(fl validator.FieldLevel) bool {
+		date, ok := fl.Field().Interface().(utils.Date)
+		if !ok {
+			return false
+		}
+
+		if date.Time.IsZero() {
+			return true // Allow empty dates
+		}
+
+		minDate := time.Date(2006, 1, 1, 0, 0, 0, 0, time.UTC)
+		today := time.Now().UTC().Truncate(24 * time.Hour)
+		input := date.Time.UTC().Truncate(24 * time.Hour)
+
+		if input.Before(minDate) {
+			return false
+		}
+
+		if input.After(today) {
+			return false
+		}
+
+		return true
+	})
+}
 
 // ValidateStruct runs tag-based validation rules on a struct value.
 func ValidateStruct(value interface{}) error {
