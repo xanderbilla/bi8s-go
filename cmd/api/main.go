@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/xanderbilla/bi8s-go/internal/app"
@@ -26,14 +27,18 @@ func main() {
 // run contains all startup logic and returns an error if anything goes wrong.
 // Keeping it separate from main() makes it easy to test and reason about.
 func run() error {
+	defaultCORSOrigins := "http://localhost:3000,http://localhost:8443,https://localhost:8443,http://127.0.0.1:8443,https://127.0.0.1:8443"
+
 	// Build the app config from environment variables.
 	// If a variable isn't set, we fall back to safe defaults.
 	cfg := app.Config{
-		Addr:      ":8080",
-		Env:       env.GetString("ENV", "prod"),
-		TableName: env.GetString("DYNAMODB_TABLE", "bi8s-dev"),
-		S3Bucket:  env.GetString("S3_BUCKET", ""),
-		S3Prefix:  env.GetString("S3_POSTER_PREFIX", "movies"),
+		Addr:                    ":8080",
+		Env:                     env.GetString("ENV", "prod"),
+		TableName:               env.GetString("DYNAMODB_TABLE", "bi8s-dev"),
+		S3Bucket:                env.GetString("S3_BUCKET", ""),
+		S3Prefix:                env.GetString("S3_POSTER_PREFIX", "movies"),
+		CORSAllowedOrigins:      parseCommaSeparated(env.GetString("CORS_ALLOWED_ORIGINS", defaultCORSOrigins)),
+		CORSAllowPrivateNetwork: strings.EqualFold(env.GetString("CORS_ALLOW_PRIVATE_NETWORK", "true"), "true"),
 		AWS: app.AWSConfig{
 			AccessKey:       env.GetString("AWS_ACCESS_KEY_ID", ""),
 			SecretAccessKey: env.GetString("AWS_SECRET_ACCESS_KEY", ""),
@@ -86,4 +91,16 @@ func run() error {
 	log.Printf("server started on %s", application.Config.Addr)
 
 	return srv.ListenAndServe()
+}
+
+func parseCommaSeparated(val string) []string {
+	parts := strings.Split(val, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }

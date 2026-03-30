@@ -16,12 +16,14 @@ type AWSConfig struct {
 // Config is the top-level configuration for the entire application.
 // It holds the server address, the runtime environment name, and AWS settings.
 type Config struct {
-	Addr      string // e.g. ":8080"
-	Env       string // e.g. "prod", "dev"
-	TableName string // DynamoDB table name, e.g. "bi8s-dev"
-	S3Bucket  string // S3 bucket for movie posters
-	S3Prefix  string // S3 key prefix for posters, e.g. "movies"
-	AWS       AWSConfig
+	Addr                    string   // e.g. ":8080"
+	Env                     string   // e.g. "prod", "dev"
+	TableName               string   // DynamoDB table name, e.g. "bi8s-dev"
+	S3Bucket                string   // S3 bucket for movie posters
+	S3Prefix                string   // S3 key prefix for posters, e.g. "movies"
+	CORSAllowedOrigins      []string // list of allowed CORS origins
+	CORSAllowPrivateNetwork bool     // whether to allow private network preflight requests
+	AWS                     AWSConfig
 }
 
 // Application is the central dependency container constructed natively at startup.

@@ -30,15 +30,19 @@ func Mount(app *app.Application) http.Handler {
 
 	// --- Middleware stack (runs on every request, in order) ---
 
-	// Apply official chi CORS middleware targeting the local application host natively.
+	// Apply official chi CORS middleware using environment-driven allowed origins.
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:8443", "https://localhost:8443", "http://127.0.0.1:8443", "https://127.0.0.1:8443"},
+		AllowedOrigins:   app.Config.CORSAllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "Access-Control-Request-Private-Network"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+
+	if app.Config.CORSAllowPrivateNetwork {
+		r.Use(allowPrivateNetworkPreflight)
+	}
 
 	// Attaches a unique X-Request-Id to each request so you can trace it through logs.
 	r.Use(middleware.RequestID)
@@ -79,4 +83,14 @@ func Mount(app *app.Application) http.Handler {
 	})
 
 	return r
+}
+
+func allowPrivateNetworkPreflight(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Private-Network") == "true" {
+			w.Header().Set("Access-Control-Allow-Private-Network", "true")
+			w.Header().Add("Vary", "Access-Control-Request-Private-Network")
+		}
+		next.ServeHTTP(w, r)
+	})
 }
