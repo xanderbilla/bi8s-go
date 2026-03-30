@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  # The Backend API Service
+  api:
+    image: xanderbilla/my-project:latest
+    container_name: bi8s_api_prod
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.docker
+
+  # The Frontend UI Application
+  ui:
+    image: xanderbilla/ui-my-project:latest
+    container_name: bi8s_ui_prod
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    ports:
+      - "8443:8443"
+    depends_on:
+      - api

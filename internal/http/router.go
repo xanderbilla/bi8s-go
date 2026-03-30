@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/xanderbilla/bi8s-go/internal/app"
 )
 
@@ -28,6 +29,16 @@ func Mount(app *app.Application) http.Handler {
 	})
 
 	// --- Middleware stack (runs on every request, in order) ---
+
+	// Apply official chi CORS middleware targeting the local application host natively.
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:8443", "https://localhost:8443", "http://127.0.0.1:8443", "https://127.0.0.1:8443"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
 
 	// Attaches a unique X-Request-Id to each request so you can trace it through logs.
 	r.Use(middleware.RequestID)
