@@ -17,6 +17,7 @@ import (
 func ParseMovieFromForm(formValues url.Values) (model.Movie, error) {
 	var releaseDate utils.Date
 	if rd := strings.TrimSpace(formValues.Get("release_date")); rd != "" {
+		// Parse YYYY-MM-DD
 		t, err := time.Parse("2006-01-02", rd)
 		if err != nil {
 			return model.Movie{}, errors.New("release_date must be in YYYY-MM-DD format")
@@ -26,6 +27,7 @@ func ParseMovieFromForm(formValues url.Values) (model.Movie, error) {
 
 	var firstAirDate utils.Date
 	if fad := strings.TrimSpace(formValues.Get("first_air_date")); fad != "" {
+		// Parse YYYY-MM-DD
 		t, err := time.Parse("2006-01-02", fad)
 		if err != nil {
 			return model.Movie{}, errors.New("first_air_date must be in YYYY-MM-DD format")
@@ -44,31 +46,31 @@ func ParseMovieFromForm(formValues url.Values) (model.Movie, error) {
 	casts := parseEntityRefsWithImage(formValues, "casts")
 	tags := parseEntityRefs(formValues, "tags")
 	moodTags := parseEntityRefs(formValues, "mood_tags")
-	productionCompanies := parseCompanies(formValues, "production_companies")
+	studios := parseCompanies(formValues, "studios")
 	originCountry := parseStringArray(formValues, "origin_country")
 
 	movie := model.Movie{
-		ID:                  strings.TrimSpace(formValues.Get("id")),
-		Title:               strings.TrimSpace(formValues.Get("title")),
-		Overview:            strings.TrimSpace(formValues.Get("overview")),
-		ReleaseDate:         releaseDate,
-		FirstAirDate:        firstAirDate,
-		VoteAverage:         voteAverage,
-		VoteCount:           voteCount,
-		Popularity:          popularity,
-		Adult:               adult,
-		Ratings:             model.Rating(strings.TrimSpace(formValues.Get("ratings"))),
-		OriginalLanguage:    model.OriginalLanguage(strings.TrimSpace(formValues.Get("original_language"))),
-		MediaType:           model.MediaType(strings.TrimSpace(formValues.Get("media_type"))),
-		Runtime:             runtime,
-		Status:              model.Status(strings.TrimSpace(formValues.Get("status"))),
-		Tagline:             strings.TrimSpace(formValues.Get("tagline")),
-		Genres:              genres,
-		Casts:               casts,
-		Tags:                tags,
-		MoodTags:            moodTags,
-		ProductionCompanies: productionCompanies,
-		OriginCountry:       originCountry,
+		ID:               strings.TrimSpace(formValues.Get("id")),
+		Title:            strings.TrimSpace(formValues.Get("title")),
+		Overview:         strings.TrimSpace(formValues.Get("overview")),
+		ReleaseDate:      releaseDate,
+		FirstAirDate:     firstAirDate,
+		VoteAverage:      voteAverage,
+		VoteCount:        voteCount,
+		Popularity:       popularity,
+		Adult:            adult,
+		ContentRating:    model.Rating(strings.TrimSpace(formValues.Get("content_rating"))),
+		OriginalLanguage: model.OriginalLanguage(strings.TrimSpace(formValues.Get("original_language"))),
+		ContentType:      model.MediaType(strings.TrimSpace(formValues.Get("content_type"))),
+		Runtime:          runtime,
+		Status:           model.Status(strings.TrimSpace(formValues.Get("status"))),
+		Tagline:          strings.TrimSpace(formValues.Get("tagline")),
+		Genres:           genres,
+		Casts:            casts,
+		Tags:             tags,
+		MoodTags:         moodTags,
+		Studios:          studios,
+		OriginCountry:    originCountry,
 	}
 
 	if err := validation.ValidateStruct(movie); err != nil {

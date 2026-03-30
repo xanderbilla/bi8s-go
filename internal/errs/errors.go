@@ -8,7 +8,20 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/response"
 )
 
-var ErrFileUploaderNotConfigured = errors.New("file uploader is not configured")
+var (
+	ErrFileUploaderNotConfigured = errors.New("file uploader is not configured")
+	ErrInvalidReleaseDateFormat  = errors.New("release_date must be in YYYY-MM-DD format")
+	ErrInvalidFirstAirDateFormat = errors.New("first_air_date must be in YYYY-MM-DD format")
+	ErrAWSRegionRequired         = errors.New("aws region is required")
+	ErrMultipleJSONObjects       = errors.New("body must contain only one JSON object")
+	ErrNotMultipartForm          = errors.New("body must be multipart/form-data")
+	ErrMovieNotFound             = errors.New("movie not found")
+	ErrS3BucketNotConfigured     = errors.New("s3 bucket is not configured")
+	ErrResourceIDRequired        = errors.New("resource id is required for file upload")
+	ErrFileEmpty                 = errors.New("file is empty")
+	ErrUnsupportedFileExtension  = errors.New("unsupported file type; allowed: jpeg, png, webp, gif, avif")
+	ErrUnsupportedContentType    = errors.New("unsupported file content type")
+)
 
 // writeError sends a standardized JSON error envelope.
 // Keeping this in one place prevents response-shape drift between handlers.

@@ -23,18 +23,22 @@ func init() {
 
 	// daterange validates that dates are between 2006-01-01 and today
 	_ = validate.RegisterValidation("daterange", func(fl validator.FieldLevel) bool {
-		date, ok := fl.Field().Interface().(utils.Date)
-		if !ok {
+		var t time.Time
+		if d, ok := fl.Field().Interface().(utils.Date); ok {
+			t = d.Time
+		} else if tVal, ok := fl.Field().Interface().(time.Time); ok {
+			t = tVal
+		} else {
 			return false
 		}
 
-		if date.Time.IsZero() {
-			return true // Allow empty dates
+		if t.IsZero() {
+			return true // Allow empty dates, omitempty will handle it
 		}
 
 		minDate := time.Date(2006, 1, 1, 0, 0, 0, 0, time.UTC)
 		today := time.Now().UTC().Truncate(24 * time.Hour)
-		input := date.Time.UTC().Truncate(24 * time.Hour)
+		input := t.UTC().Truncate(24 * time.Hour)
 
 		if input.Before(minDate) {
 			return false

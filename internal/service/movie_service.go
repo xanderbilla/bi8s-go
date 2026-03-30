@@ -86,15 +86,15 @@ func (s *MovieService) Create(ctx context.Context, movie model.Movie, posterInpu
 		}
 	}
 
-	// Upload company images
+	// Upload studio images
 	if len(companyImages) > 0 {
-		for i := range movie.ProductionCompanies {
-			if img, ok := companyImages[movie.ProductionCompanies[i].ID]; ok && img != nil {
-				key, err := s.uploadCompanyImage(ctx, movie.ProductionCompanies[i].ID, img)
+		for i := range movie.Studios {
+			if img, ok := companyImages[movie.Studios[i].ID]; ok && img != nil {
+				key, err := s.uploadCompanyImage(ctx, movie.Studios[i].ID, img)
 				if err != nil {
 					return model.Movie{}, err
 				}
-				movie.ProductionCompanies[i].CoverPicture = key
+				movie.Studios[i].CoverPicture = key
 			}
 		}
 	}

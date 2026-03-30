@@ -89,12 +89,12 @@ func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Extract company images (company_image_{id})
+	// Extract studio images (studio_image_{id})
 	companyImages := make(map[string]*domain.FileUploadInput)
-	for _, company := range movie.ProductionCompanies {
-		fieldName := "company_image_" + company.ID
+	for _, studio := range movie.Studios {
+		fieldName := "studio_image_" + studio.ID
 		if img, err := ExtractFile(r, fieldName); err == nil && img != nil {
-			companyImages[company.ID] = img
+			companyImages[studio.ID] = img
 		}
 	}
 
