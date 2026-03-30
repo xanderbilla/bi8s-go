@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/go-chi/chi/v5"
+	"github.com/xanderbilla/bi8s-go/internal/domain"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
 	"github.com/xanderbilla/bi8s-go/internal/service"
 )
@@ -79,7 +80,25 @@ func (h *MovieHandler) CreateMovie(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newMovie, err := h.movieService.Create(r.Context(), movie, posterInput, coverInput)
+	// Extract cast images (cast_image_{id})
+	castImages := make(map[string]*domain.FileUploadInput)
+	for _, cast := range movie.Casts {
+		fieldName := "cast_image_" + cast.ID
+		if img, err := ExtractFile(r, fieldName); err == nil && img != nil {
+			castImages[cast.ID] = img
+		}
+	}
+
+	// Extract company images (company_image_{id})
+	companyImages := make(map[string]*domain.FileUploadInput)
+	for _, company := range movie.ProductionCompanies {
+		fieldName := "company_image_" + company.ID
+		if img, err := ExtractFile(r, fieldName); err == nil && img != nil {
+			companyImages[company.ID] = img
+		}
+	}
+
+	newMovie, err := h.movieService.Create(r.Context(), movie, posterInput, coverInput, castImages, companyImages)
 	if err != nil {
 		if errors.Is(err, errs.ErrFileUploaderNotConfigured) {
 			errs.InternalServerError(w, r, err)

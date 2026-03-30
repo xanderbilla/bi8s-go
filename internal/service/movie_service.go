@@ -41,9 +41,9 @@ func (s *MovieService) Get(ctx context.Context, id string) (*model.Movie, error)
 	return s.repo.Get(ctx, id)
 }
 
-// Create saves a new movie to the database with optional poster and cover upload.
+// Create saves a new movie to the database with optional poster, cover, cast, and company image uploads.
 // If file inputs are provided, they will be uploaded to storage before saving.
-func (s *MovieService) Create(ctx context.Context, movie model.Movie, posterInput, coverInput *domain.FileUploadInput) (model.Movie, error) {
+func (s *MovieService) Create(ctx context.Context, movie model.Movie, posterInput, coverInput *domain.FileUploadInput, castImages map[string]*domain.FileUploadInput, companyImages map[string]*domain.FileUploadInput) (model.Movie, error) {
 	if movie.ID == "" {
 		movie.ID = utils.GenerateID()
 	}
@@ -55,6 +55,7 @@ func (s *MovieService) Create(ctx context.Context, movie model.Movie, posterInpu
 		IsDeleted: false,
 	}
 
+	// Upload movie poster
 	if posterInput != nil {
 		posterKey, err := s.uploadFileToStorage(ctx, movie.ID, "poster", posterInput)
 		if err != nil {
@@ -63,12 +64,39 @@ func (s *MovieService) Create(ctx context.Context, movie model.Movie, posterInpu
 		movie.PosterPath = posterKey
 	}
 
+	// Upload movie cover/backdrop
 	if coverInput != nil {
 		coverKey, err := s.uploadFileToStorage(ctx, movie.ID, "cover", coverInput)
 		if err != nil {
 			return model.Movie{}, err
 		}
 		movie.BackdropPath = coverKey
+	}
+
+	// Upload cast images
+	if len(castImages) > 0 {
+		for i := range movie.Casts {
+			if img, ok := castImages[movie.Casts[i].ID]; ok && img != nil {
+				key, err := s.uploadCastImage(ctx, movie.Casts[i].ID, img)
+				if err != nil {
+					return model.Movie{}, err
+				}
+				movie.Casts[i].CoverPicture = key
+			}
+		}
+	}
+
+	// Upload company images
+	if len(companyImages) > 0 {
+		for i := range movie.ProductionCompanies {
+			if img, ok := companyImages[movie.ProductionCompanies[i].ID]; ok && img != nil {
+				key, err := s.uploadCompanyImage(ctx, movie.ProductionCompanies[i].ID, img)
+				if err != nil {
+					return model.Movie{}, err
+				}
+				movie.ProductionCompanies[i].CoverPicture = key
+			}
+		}
 	}
 
 	if err := s.repo.Create(ctx, movie); err != nil {
@@ -89,6 +117,40 @@ func (s *MovieService) uploadFileToStorage(ctx context.Context, movieID, purpose
 		"movies",
 		movieID,
 		purpose,
+		input.FileName,
+		input.ContentType,
+		input.Data,
+	)
+}
+
+// uploadCastImage uploads a cast member's image to S3 with path: casts/{cast_id}/cover.{ext}
+func (s *MovieService) uploadCastImage(ctx context.Context, castID string, input *domain.FileUploadInput) (string, error) {
+	if s.fileUploader == nil {
+		return "", errs.ErrFileUploaderNotConfigured
+	}
+
+	return s.fileUploader.UploadFile(
+		ctx,
+		"casts",
+		castID,
+		"cover",
+		input.FileName,
+		input.ContentType,
+		input.Data,
+	)
+}
+
+// uploadCompanyImage uploads a production company's image to S3 with path: studios/{company_id}/media/cover.{ext}
+func (s *MovieService) uploadCompanyImage(ctx context.Context, companyID string, input *domain.FileUploadInput) (string, error) {
+	if s.fileUploader == nil {
+		return "", errs.ErrFileUploaderNotConfigured
+	}
+
+	return s.fileUploader.UploadFile(
+		ctx,
+		"studios",
+		companyID,
+		"media/cover",
 		input.FileName,
 		input.ContentType,
 		input.Data,
