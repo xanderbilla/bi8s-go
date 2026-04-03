@@ -24,6 +24,6 @@ func GenerateID() string {
 func GenerateNumericID() string {
 	ts := time.Now().UnixMilli() % 100000
 	c := atomic.AddUint64(&counter, 1) % 10
-	id := ((ts * 10) + int64(c)) % 900000 + 100000
+	id := ((ts*10)+int64(c))%900000 + 100000
 	return strconv.FormatInt(id, 10)
 }

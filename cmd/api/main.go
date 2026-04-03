@@ -33,10 +33,11 @@ func run() error {
 	// If a variable isn't set, we fall back to safe defaults.
 	cfg := app.Config{
 		Addr:                    ":8080",
-		Env:                     env.GetString("ENV", "prod"),
-		TableName:               env.GetString("DYNAMODB_TABLE", "bi8s-dev"),
+		Env:                     env.GetString("APP_ENV", "prod"),
+		TableName:               env.GetString("DYNAMODB_MOVIE_TABLE", "bi8s-dev"),
+		PersonTableName:         env.GetString("DYNAMODB_PERSON_TABLE", "bi8s-person-dev"),
+		AttributeTableName:      env.GetString("DYNAMODB_ATTRIBUTE_TABLE", "bi8s-attribute-dev"),
 		S3Bucket:                env.GetString("S3_BUCKET", ""),
-		S3Prefix:                env.GetString("S3_POSTER_PREFIX", "movies"),
 		CORSAllowedOrigins:      parseCommaSeparated(env.GetString("CORS_ALLOWED_ORIGINS", defaultCORSOrigins)),
 		CORSAllowPrivateNetwork: strings.EqualFold(env.GetString("CORS_ALLOW_PRIVATE_NETWORK", "true"), "true"),
 		AWS: app.AWSConfig{
@@ -65,15 +66,24 @@ func run() error {
 	// The repo talks directly to DynamoDB; the service sits on top and owns business logic.
 	// Use generic file uploader implementation backed by S3.
 	fileUploader := storage.NewS3FileUploader(awsClient.S3, cfg.S3Bucket)
+
+	attributeRepo := repository.NewAttributeDynamoRepository(awsClient.Dynamo, cfg.AttributeTableName)
+	attributeService := service.NewAttributeService(attributeRepo)
+
+	personRepo := repository.NewPersonDynamoRepository(awsClient.Dynamo, cfg.PersonTableName)
+	personService := service.NewPersonService(personRepo, attributeRepo, fileUploader)
+
 	movieRepo := repository.NewMovieRepository(awsClient.Dynamo, cfg.TableName)
-	movieService := service.NewMovieService(movieRepo, fileUploader)
+	movieService := service.NewMovieService(movieRepo, personRepo, attributeRepo, fileUploader)
 
 	// Wire everything together into a single Application structure acting as a central registry natively.
 	// It is passed only into the router Mount to orchestrate specific dependency injection bindings.
 	application := &app.Application{
-		Config:       cfg,
-		Clients:      awsClient,
-		MovieService: movieService,
+		Config:           cfg,
+		Clients:          awsClient,
+		MovieService:     movieService,
+		PersonService:    personService,
+		AttributeService: attributeService,
 	}
 
 	// Build the HTTP router with all routes and middleware attached.

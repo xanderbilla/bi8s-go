@@ -1,37 +1,20 @@
 // Package model contains domain models and business entities.
-// These models are independent of storage implementation and can be used
-// across different layers of the application.
+// This file contains movie-specific types that use the shared Content struct.
 package model
 
-import (
-	"github.com/xanderbilla/bi8s-go/internal/utils"
-)
+// Movie is a type alias for Content, used for movie-specific operations.
+// Currently uses all fields from Content. In the future, this can be extended
+// with movie-specific fields if needed.
+type Movie = Content
 
-// Movie represents the complete movie/TV show domain model.
-// It includes all metadata, relationships, and content information.
-type Movie struct {
-	ID                  string               `json:"id" dynamodbav:"id" validate:"omitempty,min=1,max=64"`
-	Title               string               `json:"title,omitempty" dynamodbav:"title,omitempty" validate:"omitempty,min=1,max=128"`
-	Overview            string               `json:"overview" dynamodbav:"overview" validate:"required,min=1,max=1000"`
-	BackdropPath        string               `json:"backdrop_path,omitempty" dynamodbav:"backdrop_path,omitempty" validate:"omitempty,max=512"`
-	PosterPath          string               `json:"poster_path,omitempty" dynamodbav:"poster_path,omitempty" validate:"omitempty,max=512"`
-	ReleaseDate         utils.Date           `json:"release_date,omitempty" dynamodbav:"release_date,omitempty" validate:"omitempty,daterange"`
-	FirstAirDate        utils.Date           `json:"first_air_date,omitempty" dynamodbav:"first_air_date,omitempty" validate:"omitempty,daterange"`
-	VoteAverage         float64              `json:"vote_average" dynamodbav:"vote_average" validate:"gte=0,lte=10"`
-	VoteCount           int                  `json:"vote_count" dynamodbav:"vote_count" validate:"gte=0"`
-	Popularity          float64              `json:"popularity" dynamodbav:"popularity" validate:"gte=0"`
-	Adult            bool             `json:"adult,omitempty" dynamodbav:"adult,omitempty"`
-	ContentRating    Rating           `json:"content_rating,omitempty" dynamodbav:"content_rating,omitempty" validate:"omitempty,oneof=18_PLUS 21_PLUS"`
-	OriginalLanguage OriginalLanguage `json:"original_language" dynamodbav:"original_language" validate:"required,oneof=en hi ja ko fr es"`
-	Genres           []EntityRef      `json:"genres,omitempty" dynamodbav:"genres,omitempty" validate:"omitempty,dive"`
-	Casts            []EntityRefImg   `json:"casts,omitempty" dynamodbav:"casts,omitempty" validate:"omitempty,dive"`
-	Tags             []EntityRef      `json:"tags,omitempty" dynamodbav:"tags,omitempty" validate:"omitempty,dive"`
-	ContentType      MediaType        `json:"content_type,omitempty" dynamodbav:"content_type,omitempty" validate:"omitempty,oneof=MOVIE TV PERSON"`
-	OriginCountry    []string         `json:"origin_country,omitempty" dynamodbav:"origin_country,omitempty" validate:"omitempty,dive,min=2,max=8"`
-	MoodTags         []EntityRef      `json:"mood_tags,omitempty" dynamodbav:"mood_tags,omitempty" validate:"omitempty,dive"`
-	Runtime          int              `json:"runtime,omitempty" dynamodbav:"runtime,omitempty" validate:"omitempty,gte=0"`
-	Status           Status           `json:"status,omitempty" dynamodbav:"status,omitempty" validate:"omitempty,oneof=RUMORED PLANNED IN_PRODUCTION POST_PRODUCTION RELEASED ENDED RETURNING_SERIES CANCELED PILOT"`
-	Tagline          string           `json:"tagline,omitempty" dynamodbav:"tagline,omitempty" validate:"omitempty,max=255"`
-	Studios          []Company        `json:"studios,omitempty" dynamodbav:"studios,omitempty" validate:"omitempty,dive"`
-	Audit            Audit            `json:"audit" dynamodbav:"audit"`
-}
+// MovieStats is a type alias for ContentStats.
+type MovieStats = ContentStats
+
+// MoviePublicList is a type alias for ContentPublicList.
+type MoviePublicList = ContentPublicList
+
+// MoviePublicDetail is a type alias for ContentPublicDetail.
+type MoviePublicDetail = ContentPublicDetail
+
+// MoviesByPersonList is a type alias for ContentsByPersonList.
+type MoviesByPersonList = ContentsByPersonList

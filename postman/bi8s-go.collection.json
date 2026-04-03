@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "f4b0870c-a801-4b5b-a312-38a5d4af8d77",
     "name": "bi8s-go API",
-    "description": "Postman collection for all currently available bi8s-go routes.",
+    "description": "Postman collection for bi8s-go API with public (/v1/c/*) and admin (/v1/a/*) endpoints.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -20,103 +20,179 @@
               "path": ["v1", "health"]
             },
             "description": "Checks if the API is running and returns environment version details."
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "// Store request start time for optional debugging in Postman runner.",
-                  "pm.variables.set('requestStartTime', Date.now());"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Response contains expected envelope fields', function () {",
-                  "  const body = pm.response.json();",
-                  "  pm.expect(body).to.have.property('status');",
-                  "  pm.expect(body).to.have.property('message');",
-                  "  pm.expect(body).to.have.property('data');",
-                  "});"
-                ]
-              }
-            }
-          ]
+          }
         }
       ]
     },
     {
-      "name": "Movies",
+      "name": "Customer/Public Endpoints",
+      "description": "Public-facing endpoints under /v1/c/* that filter by visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.",
       "item": [
         {
-          "name": "GET /v1/movies",
+          "name": "GET /v1/c/content",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/movies",
+              "raw": "{{baseUrl}}/v1/c/content?type=all",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "movies"]
+              "path": ["v1", "c", "content"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "all",
+                  "description": "Content type filter: all (default), movie, or tv"
+                }
+              ]
             },
-            "description": "Returns all movies from DynamoDB."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Response envelope exists', function () {",
-                  "  const body = pm.response.json();",
-                  "  pm.expect(body).to.have.property('status');",
-                  "  pm.expect(body).to.have.property('message');",
-                  "});"
-                ]
-              }
-            }
-          ]
+            "description": "Returns recent content sorted by creation date. Query params: type=all|movie|tv (default: all)"
+          }
         },
         {
-          "name": "GET /v1/movies/{movieId}",
+          "name": "GET /v1/c/content/{contentId}",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/movies/{{movieId}}",
+              "raw": "{{baseUrl}}/v1/c/content/{{movieId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "movies", "{{movieId}}"]
+              "path": ["v1", "c", "content", "{{movieId}}"]
             },
-            "description": "Returns a single movie by ID."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200 or 404', function () {",
-                  "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
-                  "});"
-                ]
-              }
-            }
-          ]
+            "description": "Returns a single content by ID. Excludes stats, audit, and visibility fields."
+          }
         },
         {
-          "name": "POST /v1/movies",
+          "name": "GET /v1/c/people/{peopleId}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/c/people/{{personId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "c", "people", "{{personId}}"]
+            },
+            "description": "Returns a single person by ID with public fields."
+          }
+        },
+        {
+          "name": "GET /v1/c/people/{peopleId}/content",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/c/people/{{personId}}/content?type=all",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "c", "people", "{{personId}}", "content"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "all",
+                  "description": "Content type filter: all (default), movie, or tv"
+                }
+              ]
+            },
+            "description": "Returns all content where the person is in the cast. Query params: type=all|movie|tv (default: all). Returns: id, title, backdropPath"
+          }
+        },
+        {
+          "name": "GET /v1/c/banner",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/c/banner?type=all",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "c", "banner"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "all",
+                  "description": "Content type filter: all (default), movie, or tv"
+                }
+              ]
+            },
+            "description": "Returns random banner content. Query params: type=all|movie|tv (default: all). Response: id, backdropPath, title, overview, contentRating"
+          }
+        },
+        {
+          "name": "GET /v1/c/discover",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/c/discover?type=latest&content=all",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "c", "discover"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "latest",
+                  "description": "Discovery type: latest (default), popular (TODO), trending (TODO)"
+                },
+                {
+                  "key": "content",
+                  "value": "all",
+                  "description": "Content type filter: all (default), movie, or tv"
+                }
+              ]
+            },
+            "description": "Discovers content. Query params: type=latest|popular|trending (default: latest), content=all|movie|tv (default: all)"
+          }
+        },
+        {
+          "name": "GET /v1/c/attributes/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/c/attributes/{{attributeId}}?content=all",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "c", "attributes", "{{attributeId}}"],
+              "query": [
+                {
+                  "key": "content",
+                  "value": "all",
+                  "description": "Content type filter: all (default), movie, or tv"
+                }
+              ]
+            },
+            "description": "Returns content by attribute ID. Query params: content=all|movie|tv (default: all). Returns: id, title, backdropPath"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Movies",
+      "description": "Admin endpoints for movies under /v1/a/movies. Returns all fields without filtering.",
+      "item": [
+        {
+          "name": "GET /v1/a/movies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/movies",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "movies"]
+            },
+            "description": "Returns ALL movies without filtering. Includes stats, audit, visibility fields."
+          }
+        },
+        {
+          "name": "GET /v1/a/movies/{movieId}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/movies/{{movieId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "movies", "{{movieId}}"]
+            },
+            "description": "Returns a single movie by ID with ALL fields. No filtering."
+          }
+        },
+        {
+          "name": "POST /v1/a/movies",
           "request": {
             "method": "POST",
             "header": [],
@@ -125,39 +201,17 @@
               "formdata": [
                 {
                   "key": "title",
-                  "value": "Inception",
+                  "value": "Iron Man",
                   "type": "text"
                 },
                 {
                   "key": "overview",
-                  "value": "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.",
+                  "value": "After being held captive in an Afghan cave, billionaire engineer Tony Stark creates a unique weaponized suit of armor to fight evil.",
                   "type": "text"
                 },
                 {
                   "key": "release_date",
-                  "value": "2010-07-16",
-                  "type": "text",
-                  "description": "Format: YYYY-MM-DD (between 2006-01-01 and today)"
-                },
-                {
-                  "key": "first_air_date",
-                  "value": "2010-07-16",
-                  "type": "text",
-                  "description": "Format: YYYY-MM-DD (between 2006-01-01 and today)"
-                },
-                {
-                  "key": "vote_average",
-                  "value": "8.8",
-                  "type": "text"
-                },
-                {
-                  "key": "vote_count",
-                  "value": "35000",
-                  "type": "text"
-                },
-                {
-                  "key": "popularity",
-                  "value": "95.5",
+                  "value": "2008-05-02",
                   "type": "text"
                 },
                 {
@@ -168,171 +222,235 @@
                 {
                   "key": "content_rating",
                   "value": "18_PLUS",
-                  "type": "text",
-                  "description": "Options: 18_PLUS, 21_PLUS"
+                  "type": "text"
                 },
                 {
                   "key": "original_language",
                   "value": "en",
-                  "type": "text",
-                  "description": "Options: en, hi, ja, ko, fr, es"
+                  "type": "text"
                 },
                 {
                   "key": "genres",
-                  "value": "Action,Science Fiction,Thriller",
-                  "type": "text",
-                  "description": "Comma-separated. Format: 'name' or 'id:name'"
+                  "value": "Action,Adventure,Science Fiction",
+                  "type": "text"
                 },
                 {
                   "key": "casts",
-                  "value": "200001:Leonardo DiCaprio,200002:Tom Hardy,200003:Ellen Page",
-                  "type": "text",
-                  "description": "Comma-separated. Format: 'id:name'"
+                  "value": "751679",
+                  "type": "text"
                 },
                 {
                   "key": "tags",
-                  "value": "Mind Bending,Heist,Dreams",
-                  "type": "text",
-                  "description": "Comma-separated. Format: 'name' or 'id:name'"
+                  "value": "Superhero,Marvel,MCU",
+                  "type": "text"
                 },
                 {
                   "key": "content_type",
                   "value": "MOVIE",
-                  "type": "text",
-                  "description": "Options: MOVIE, TV, PERSON"
-                },
-                {
-                  "key": "origin_country",
-                  "value": "US,UK",
-                  "type": "text",
-                  "description": "Comma-separated country codes"
-                },
-                {
-                  "key": "mood_tags",
-                  "value": "Intense,Suspenseful,Thought Provoking",
-                  "type": "text",
-                  "description": "Comma-separated. Format: 'name' or 'id:name'"
+                  "type": "text"
                 },
                 {
                   "key": "runtime",
-                  "value": "148",
-                  "type": "text",
-                  "description": "Runtime in minutes"
+                  "value": "126",
+                  "type": "text"
                 },
                 {
                   "key": "status",
                   "value": "RELEASED",
-                  "type": "text",
-                  "description": "Options: RUMORED, PLANNED, IN_PRODUCTION, POST_PRODUCTION, RELEASED, ENDED, RETURNING_SERIES, CANCELED, PILOT"
-                },
-                {
-                  "key": "tagline",
-                  "value": "Your mind is the scene of the crime",
                   "type": "text"
                 },
                 {
-                  "key": "studios",
-                  "value": "600001:Warner Bros. Pictures,600002:Legendary Pictures,600003:Syncopy",
-                  "type": "text",
-                  "description": "Comma-separated. Format: 'id:name'"
+                  "key": "visibility",
+                  "value": "PUBLIC",
+                  "type": "text"
                 },
                 {
                   "key": "poster",
                   "type": "file",
-                  "src": "",
-                  "description": "Movie poster image"
+                  "src": ""
                 },
                 {
                   "key": "cover",
                   "type": "file",
-                  "src": "",
-                  "description": "Movie backdrop/cover image"
-                },
-                {
-                  "key": "cast_image_200001",
-                  "type": "file",
-                  "src": "",
-                  "description": "Cast member image (format: cast_image_{cast_id})"
-                },
-                {
-                  "key": "studio_image_600001",
-                  "type": "file",
-                  "src": "",
-                  "description": "Studio logo image (format: studio_image_{studio_id})"
+                  "src": ""
                 }
               ]
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/movies",
+              "raw": "{{baseUrl}}/v1/a/movies",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "movies"]
+              "path": ["v1", "a", "movies"]
             },
-            "description": "Creates a movie with all fields via multipart/form-data. Uploads poster, cover, cast images, and studio images to S3. Movie ID is auto-generated. Entity IDs (genres, tags, etc.) are auto-generated if not provided. Date format: YYYY-MM-DD (stored as YYYY-MM-DD, validated between 2006-01-01 and today)."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 201 or 409', function () {",
-                  "  pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
-                  "});",
-                  "",
-                  "if (pm.response.code === 201) {",
-                  "  const body = pm.response.json();",
-                  "  const createdId = body?.data?.id;",
-                  "  pm.test('Created movie contains generated id', function () {",
-                  "    pm.expect(createdId).to.be.a('string').and.not.empty;",
-                  "  });",
-                  "  if (createdId) {",
-                  "    pm.collectionVariables.set('movieId', createdId);",
-                  "  }",
-                  "}",
-                  "",
-                  "pm.test('Response contains all expected fields', function () {",
-                  "  if (pm.response.code === 201) {",
-                  "    const data = pm.response.json().data;",
-                  "    pm.expect(data).to.have.property('title');",
-                  "    pm.expect(data).to.have.property('overview');",
-                  "    pm.expect(data).to.have.property('release_date');",
-                  "    pm.expect(data).to.have.property('content_rating');",
-                  "    pm.expect(data).to.have.property('content_type');",
-                  "    pm.expect(data).to.have.property('studios');",
-                  "    pm.expect(data).to.have.property('casts');",
-                  "    pm.expect(data).to.have.property('audit');",
-                  "  }",
-                  "});"
-                ]
-              }
-            }
-          ]
+            "description": "Creates a movie with poster and cover uploads."
+          }
         },
         {
-          "name": "DELETE /v1/movies/{movieId}",
+          "name": "DELETE /v1/a/movies/{movieId}",
           "request": {
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/movies/{{movieId}}",
+              "raw": "{{baseUrl}}/v1/a/movies/{{movieId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "movies", "{{movieId}}"]
+              "path": ["v1", "a", "movies", "{{movieId}}"]
             },
             "description": "Deletes a movie by ID."
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200 or 404', function () {",
-                  "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
-                  "});"
-                ]
-              }
-            }
-          ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - People",
+      "description": "Admin endpoints for people under /v1/a/people. Returns all fields without filtering.",
+      "item": [
+        {
+          "name": "GET /v1/a/people",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/people",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "people"]
+            },
+            "description": "Returns ALL people without filtering."
+          }
+        },
+        {
+          "name": "GET /v1/a/people/{peopleId}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/people/{{personId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "people", "{{personId}}"]
+            },
+            "description": "Returns a single person by ID with ALL fields."
+          }
+        },
+        {
+          "name": "GET /v1/a/people/{peopleId}/content",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/people/{{personId}}/content?type=all",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "people", "{{personId}}", "content"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "all",
+                  "description": "Content type filter: all (default), movie, or tv"
+                }
+              ]
+            },
+            "description": "Returns all content where the person is in the cast. Admin endpoint - no filtering by visibility or status. Query params: type=all|movie|tv (default: all). Returns: id, title, backdropPath"
+          }
+        },
+        {
+          "name": "POST /v1/a/people",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Robert Downey Jr.",
+                  "type": "text"
+                },
+                {
+                  "key": "roles",
+                  "value": "PERFORMER",
+                  "type": "text"
+                },
+                {
+                  "key": "bio",
+                  "value": "Academy Award-nominated actor known for his role as Tony Stark/Iron Man.",
+                  "type": "text"
+                },
+                {
+                  "key": "birth_date",
+                  "value": "1965-04-04",
+                  "type": "text"
+                },
+                {
+                  "key": "gender",
+                  "value": "Male",
+                  "type": "text"
+                },
+                {
+                  "key": "career_status",
+                  "value": "Active",
+                  "type": "text"
+                },
+                {
+                  "key": "profile",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "backdrop",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/people",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "people"]
+            },
+            "description": "Creates a person with profile and backdrop uploads."
+          }
+        },
+        {
+          "name": "DELETE /v1/a/people/{peopleId}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/people/{{personId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "people", "{{personId}}"]
+            },
+            "description": "Deletes a person by ID."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Attributes",
+      "description": "Admin endpoints for attributes under /v1/a/attributes.",
+      "item": [
+        {
+          "name": "GET /v1/a/attributes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/attributes",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "attributes"]
+            },
+            "description": "Returns ALL attributes."
+          }
+        },
+        {
+          "name": "GET /v1/a/attributes/{attributeId}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/attributes/{{attributeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "attributes", "{{attributeId}}"]
+            },
+            "description": "Returns a single attribute by ID."
+          }
         }
       ]
     }
@@ -344,7 +462,15 @@
     },
     {
       "key": "movieId",
-      "value": "movie-1"
+      "value": ""
+    },
+    {
+      "key": "personId",
+      "value": ""
+    },
+    {
+      "key": "attributeId",
+      "value": ""
     }
   ]
 }

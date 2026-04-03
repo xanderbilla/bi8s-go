@@ -8,13 +8,26 @@ const (
 	Rating21Plus Rating = "21_PLUS"
 )
 
-// MediaType represents the type of media content.
-type MediaType string
+// ContentType represents the type of content.
+type ContentType string
 
 const (
-	MediaTypeMovie  MediaType = "MOVIE"
-	MediaTypeTV     MediaType = "TV"
-	MediaTypePerson MediaType = "PERSON"
+	ContentTypeMovie      ContentType = "MOVIE"
+	ContentTypeTV         ContentType = "TV"
+	ContentTypePerson     ContentType = "PERSON"
+	ContentTypeAttribute  ContentType = "ATTRIBUTE"
+)
+
+// AttributeType represents the type of attribute.
+type AttributeType string
+
+const (
+	AttributeTypeTag        AttributeType = "TAG"
+	AttributeTypeMood       AttributeType = "MOOD"
+	AttributeTypeGenre      AttributeType = "GENRE"
+	AttributeTypeCategory   AttributeType = "CATEGORY"
+	AttributeTypeSpeciality AttributeType = "SPECIALITY"
+	AttributeTypeStudio     AttributeType = "STUDIO"
 )
 
 // Status represents the production/release status of content.
@@ -30,6 +43,14 @@ const (
 	StatusReturningSeries Status = "RETURNING_SERIES"
 	StatusCanceled        Status = "CANCELED"
 	StatusPilot           Status = "PILOT"
+)
+
+// Visibility represents the visibility status of content.
+type Visibility string
+
+const (
+	VisibilityPublic  Visibility = "PUBLIC"
+	VisibilityPrivate Visibility = "PRIVATE"
 )
 
 // OriginalLanguage represents supported language codes.

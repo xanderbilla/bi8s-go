@@ -28,6 +28,15 @@ func init() {
 			t = d.Time
 		} else if tVal, ok := fl.Field().Interface().(time.Time); ok {
 			t = tVal
+		} else if sVal, ok := fl.Field().Interface().(string); ok {
+			if sVal == "" {
+				return true
+			}
+			parsedTime, err := time.Parse("2006-01-02", sVal)
+			if err != nil {
+				return false
+			}
+			t = parsedTime
 		} else {
 			return false
 		}
@@ -49,6 +58,37 @@ func init() {
 		}
 
 		return true
+	})
+
+	// age18plus validates that the person is at least 18 years old
+	_ = validate.RegisterValidation("age18plus", func(fl validator.FieldLevel) bool {
+		var birthDate time.Time
+		if sVal, ok := fl.Field().Interface().(string); ok {
+			if sVal == "" {
+				return true // Allow empty, omitempty will handle it
+			}
+			parsedTime, err := time.Parse("2006-01-02", sVal)
+			if err != nil {
+				return false
+			}
+			birthDate = parsedTime
+		} else {
+			return false
+		}
+
+		if birthDate.IsZero() {
+			return true
+		}
+
+		today := time.Now().UTC()
+		age := today.Year() - birthDate.Year()
+
+		// Adjust age if birthday hasn't occurred this year
+		if today.Month() < birthDate.Month() || (today.Month() == birthDate.Month() && today.Day() < birthDate.Day()) {
+			age--
+		}
+
+		return age >= 18
 	})
 }
 

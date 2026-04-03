@@ -68,17 +68,58 @@ func Mount(app *app.Application) http.Handler {
 	// to config, DB, and any other shared dependencies without using globals.
 	healthHandler := &HealthHandler{env: app.Config.Env}
 	movieHandler := &MovieHandler{movieService: app.MovieService}
+	personHandler := NewPersonHandler(app.PersonService)
+	attributeHandler := NewAttributeHandler(app.AttributeService)
 
 	r.Route("/v1", func(r chi.Router) {
 		// GET /v1/health — liveness check, returns the current environment name.
 		r.Get("/health", healthHandler.HealthCheck)
 
-		// GET /v1/movies — returns all movies from DynamoDB.
-		r.Route("/movies", func(r chi.Router) {
-			r.Get("/", movieHandler.GetAllMovies)
-			r.Get("/{movieId}", movieHandler.GetMovie)
-			r.Post("/", movieHandler.CreateMovie)
-			r.Delete("/{movieId}", movieHandler.DeleteMovie)
+		// Content routes
+		r.Route("/c", func(r chi.Router) {
+			// GET /v1/c/content?type=all — returns recent content sorted by creation date
+			r.Get("/content", movieHandler.GetRecentContent)
+			// GET /v1/c/content/{contentId} — returns single content by ID
+			r.Get("/content/{contentId}", movieHandler.GetMovie)
+			// GET /v1/c/people/{peopleId} — returns single person by ID
+			r.Get("/people/{peopleId}", personHandler.GetPerson)
+			// GET /v1/c/people/{peopleId}/content?type=all — returns content by person ID
+			r.Get("/people/{peopleId}/content", movieHandler.GetContentByPersonId)
+			// GET /v1/c/banner?type=all — returns random banner
+			r.Get("/banner", movieHandler.GetBanner)
+			// GET /v1/c/attributes/{id}?content=all — returns content by attribute ID
+			r.Get("/attributes/{id}", movieHandler.GetContentByAttributeId)
+			// GET /v1/c/discover?type=latest&content=all — discover content (latest, popular, trending)
+			r.Get("/discover", movieHandler.GetDiscoverContent)
+		})
+
+		// Admin routes (no filtering, returns all fields including stats and audit)
+		r.Route("/a", func(r chi.Router) {
+			// Movie admin routes
+			r.Route("/movies", func(r chi.Router) {
+				r.Get("/", movieHandler.GetAllMoviesAdmin)
+				r.Get("/{movieId}", movieHandler.GetMovieAdmin)
+				r.Post("/", movieHandler.CreateMovie)
+				r.Delete("/{movieId}", movieHandler.DeleteMovie)
+			})
+
+			// People admin routes
+			r.Route("/people", func(r chi.Router) {
+				r.Get("/", personHandler.GetAllPeople)
+				r.Get("/{peopleId}", personHandler.GetPerson)
+				r.Post("/", personHandler.CreatePerson)
+				r.Delete("/{peopleId}", personHandler.DeletePerson)
+				// Get content by person ID with type filter
+				r.Get("/{peopleId}/content", movieHandler.GetContentByPersonIdAdmin)
+			})
+
+			// Attribute admin routes
+			r.Route("/attributes", func(r chi.Router) {
+				r.Get("/", attributeHandler.GetAllAttributes)
+				r.Get("/{attributeId}", attributeHandler.GetAttribute)
+				r.Post("/", attributeHandler.CreateAttribute)
+				r.Delete("/{attributeId}", attributeHandler.DeleteAttribute)
+			})
 		})
 	})
 

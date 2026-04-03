@@ -19,8 +19,9 @@ type Config struct {
 	Addr                    string   // e.g. ":8080"
 	Env                     string   // e.g. "prod", "dev"
 	TableName               string   // DynamoDB table name, e.g. "bi8s-dev"
+	PersonTableName         string   // DynamoDB table name for persons, e.g. "bi8s-person-dev"
+	AttributeTableName      string   // DynamoDB table name for attributes, e.g. "bi8s-attribute-dev"
 	S3Bucket                string   // S3 bucket for movie posters
-	S3Prefix                string   // S3 key prefix for posters, e.g. "movies"
 	CORSAllowedOrigins      []string // list of allowed CORS origins
 	CORSAllowPrivateNetwork bool     // whether to allow private network preflight requests
 	AWS                     AWSConfig
@@ -29,7 +30,9 @@ type Config struct {
 // Application is the central dependency container constructed natively at startup.
 // It acts solely as an aggregation registry for wiring explicit dependencies into specific handlers and services.
 type Application struct {
-	Config       Config
-	Clients      *awsinfra.Clients
-	MovieService *service.MovieService
+	Config           Config
+	Clients          *awsinfra.Clients
+	MovieService     *service.MovieService
+	PersonService    *service.PersonService
+	AttributeService *service.AttributeService
 }

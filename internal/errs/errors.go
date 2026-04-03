@@ -23,6 +23,11 @@ var (
 	ErrUnsupportedContentType    = errors.New("unsupported file content type")
 )
 
+// ErrPerformerNotFound returns an error when a performer with the given ID is not found.
+func ErrPerformerNotFound(id string) error {
+	return errors.New("performer with id '" + id + "' not found")
+}
+
 // writeError sends a standardized JSON error envelope.
 // Keeping this in one place prevents response-shape drift between handlers.
 func writeError(w http.ResponseWriter, status int, msg string) {

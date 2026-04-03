@@ -11,7 +11,7 @@ import (
 // Add new clients here (e.g. S3) as the app grows — avoids passing multiple clients separately.
 type Clients struct {
 	Dynamo *dynamodb.Client
-	S3 *s3.Client
+	S3     *s3.Client
 }
 
 // NewClients initialises all AWS service clients from the given config.
@@ -19,6 +19,6 @@ type Clients struct {
 func NewClients(cfg aws.Config) *Clients {
 	return &Clients{
 		Dynamo: dynamodb.NewFromConfig(cfg),
-		S3: s3.NewFromConfig(cfg),
+		S3:     s3.NewFromConfig(cfg),
 	}
 }
