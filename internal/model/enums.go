@@ -18,6 +18,18 @@ const (
 	ContentTypeAttribute  ContentType = "ATTRIBUTE"
 )
 
+// ToPath converts ContentType to its storage path representation
+func (ct ContentType) ToPath() string {
+	switch ct {
+	case ContentTypeMovie:
+		return "movies"
+	case ContentTypeTV:
+		return "tv"
+	default:
+		return "movies"
+	}
+}
+
 // AttributeType represents the type of attribute.
 type AttributeType string
 
@@ -63,4 +75,15 @@ const (
 	LanguageKO OriginalLanguage = "ko"
 	LanguageFR OriginalLanguage = "fr"
 	LanguageES OriginalLanguage = "es"
+)
+
+// AssetType represents the type of video asset.
+type AssetType string
+
+const (
+	AssetTypeTrailer AssetType = "TRAILER"
+	AssetTypeTeaser  AssetType = "TEASER"
+	AssetTypeClip    AssetType = "CLIP"
+	AssetTypePromo   AssetType = "PROMO"
+	AssetTypeBTS     AssetType = "BTS"
 )

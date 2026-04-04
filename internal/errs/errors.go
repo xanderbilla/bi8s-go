@@ -21,6 +21,12 @@ var (
 	ErrFileEmpty                 = errors.New("file is empty")
 	ErrUnsupportedFileExtension  = errors.New("unsupported file type; allowed: jpeg, png, webp, gif, avif")
 	ErrUnsupportedContentType    = errors.New("unsupported file content type")
+	
+	// Content and encoding errors
+	ErrContentNotFound         = errors.New("content not found")
+	ErrNoEncodingFound         = errors.New("no encoding found for this content")
+	ErrNoCompletedEncoding     = errors.New("no completed encoding found for this content")
+	ErrPlaybackNotAvailable    = errors.New("playback information not available")
 )
 
 // ErrPerformerNotFound returns an error when a performer with the given ID is not found.

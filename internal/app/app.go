@@ -21,6 +21,7 @@ type Config struct {
 	TableName               string   // DynamoDB table name, e.g. "bi8s-dev"
 	PersonTableName         string   // DynamoDB table name for persons, e.g. "bi8s-person-dev"
 	AttributeTableName      string   // DynamoDB table name for attributes, e.g. "bi8s-attribute-dev"
+	EncoderTableName        string   // DynamoDB table name for encoder jobs, e.g. "bi8s-video-dev"
 	S3Bucket                string   // S3 bucket for movie posters
 	CORSAllowedOrigins      []string // list of allowed CORS origins
 	CORSAllowPrivateNetwork bool     // whether to allow private network preflight requests
@@ -35,4 +36,5 @@ type Application struct {
 	MovieService     *service.MovieService
 	PersonService    *service.PersonService
 	AttributeService *service.AttributeService
+	EncoderService   *service.EncoderService
 }

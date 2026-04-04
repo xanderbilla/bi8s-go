@@ -28,8 +28,15 @@ type Content struct {
 	Tagline          string           `json:"tagline,omitempty" dynamodbav:"tagline,omitempty" validate:"omitempty,max=255"`
 	Studios          []EntityRef      `json:"studios,omitempty" dynamodbav:"studios,omitempty" validate:"omitempty,dive"`
 	Visibility       Visibility       `json:"visibility,omitempty" dynamodbav:"visibility,omitempty" validate:"omitempty,oneof=PUBLIC PRIVATE"`
+	Assets           []Asset          `json:"assets,omitempty" dynamodbav:"assets,omitempty" validate:"omitempty,dive"`
 	Stats            ContentStats     `json:"stats,omitempty" dynamodbav:"stats,omitempty"`
 	Audit            Audit            `json:"audit,omitempty" dynamodbav:"audit,omitempty"`
+}
+
+// Asset represents a video asset (trailer, teaser, clip, etc.)
+type Asset struct {
+	Type AssetType `json:"asset" dynamodbav:"asset" validate:"required,oneof=TRAILER TEASER CLIP PROMO BTS"`
+	Keys []string  `json:"key" dynamodbav:"key" validate:"required,min=1,dive,min=1"`
 }
 
 // ContentStats represents statistics for content (movies/TV shows).
@@ -49,6 +56,7 @@ type ContentPublicList struct {
 	Tags          []EntityRef `json:"tags,omitempty"`
 	ContentRating Rating      `json:"contentRating,omitempty"`
 	ContentType   ContentType `json:"contentType,omitempty"`
+	Assets        []Asset     `json:"assets,omitempty"`
 }
 
 // ContentPublicDetail represents the public fields returned in GET single content endpoint.
@@ -73,6 +81,7 @@ type ContentPublicDetail struct {
 	Status           Status           `json:"status,omitempty"`
 	Tagline          string           `json:"tagline,omitempty"`
 	Studios          []EntityRef      `json:"studios,omitempty"`
+	Assets           []Asset          `json:"assets,omitempty"`
 }
 
 // ContentsByPersonList represents content returned when querying by person ID.
@@ -84,9 +93,10 @@ type ContentsByPersonList struct {
 
 // BannerContent represents content returned for banner display.
 type BannerContent struct {
-	ID            string `json:"id"`
-	BackdropPath  string `json:"backdropPath,omitempty"`
-	Title         string `json:"title,omitempty"`
-	Overview      string `json:"overview,omitempty"`
-	ContentRating Rating `json:"contentRating,omitempty"`
+	ID            string  `json:"id"`
+	BackdropPath  string  `json:"backdropPath,omitempty"`
+	Title         string  `json:"title,omitempty"`
+	Overview      string  `json:"overview,omitempty"`
+	ContentRating Rating  `json:"contentRating,omitempty"`
+	Assets        []Asset `json:"assets,omitempty"`
 }

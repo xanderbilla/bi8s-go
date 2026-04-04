@@ -70,6 +70,7 @@ func Mount(app *app.Application) http.Handler {
 	movieHandler := &MovieHandler{movieService: app.MovieService}
 	personHandler := NewPersonHandler(app.PersonService)
 	attributeHandler := NewAttributeHandler(app.AttributeService)
+	encoderHandler := NewEncoderHandler(app.EncoderService)
 
 	r.Route("/v1", func(r chi.Router) {
 		// GET /v1/health — liveness check, returns the current environment name.
@@ -91,10 +92,23 @@ func Mount(app *app.Application) http.Handler {
 			r.Get("/attributes/{id}", movieHandler.GetContentByAttributeId)
 			// GET /v1/c/discover?type=latest&content=all — discover content (latest, popular, trending)
 			r.Get("/discover", movieHandler.GetDiscoverContent)
+			// GET /v1/c/play/{contentType}/{contentId} — get playback information
+			r.Get("/play/{contentType}/{contentId}", movieHandler.GetPlayback)
+			
+			// Encoder routes
+			r.Route("/encoder", func(r chi.Router) {
+				// POST /v1/c/encoder/new — create new video encoding job
+				r.Post("/new", encoderHandler.CreateEncodingJob)
+				// GET /v1/c/encoder/{jobId} — get encoding job details
+				r.Get("/{jobId}", encoderHandler.GetEncodingJob)
+			})
 		})
 
 		// Admin routes (no filtering, returns all fields including stats and audit)
 		r.Route("/a", func(r chi.Router) {
+			// Content asset upload
+			r.Post("/content/{contentId}", movieHandler.UploadAssets)
+			
 			// Movie admin routes
 			r.Route("/movies", func(r chi.Router) {
 				r.Get("/", movieHandler.GetAllMoviesAdmin)

@@ -24,6 +24,7 @@ type MovieRepository interface {
 	Get(ctx context.Context, id string) (*model.Movie, error)
 	GetAdmin(ctx context.Context, id string) (*model.Movie, error)
 	Create(ctx context.Context, movie model.Movie) error
+	Update(ctx context.Context, movie model.Movie) error
 	Delete(ctx context.Context, id string) error
 	GetMoviesByPersonId(ctx context.Context, personId string) ([]model.Movie, error)
 	GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string) ([]model.Movie, error)
@@ -196,6 +197,22 @@ func (d *DynamoMovieRepository) Create(ctx context.Context, movie model.Movie) e
 		TableName:           &d.table,
 		Item:                item,
 		ConditionExpression: aws.String("attribute_not_exists(id)"),
+	}
+
+	_, err = d.client.PutItem(ctx, input)
+	return err
+}
+
+// Update updates an existing movie in the database
+func (d *DynamoMovieRepository) Update(ctx context.Context, movie model.Movie) error {
+	item, err := attributevalue.MarshalMap(movie)
+	if err != nil {
+		return err
+	}
+
+	input := &dynamodb.PutItemInput{
+		TableName: &d.table,
+		Item:      item,
 	}
 
 	_, err = d.client.PutItem(ctx, input)

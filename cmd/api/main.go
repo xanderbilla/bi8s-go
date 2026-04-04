@@ -37,6 +37,7 @@ func run() error {
 		TableName:               env.GetString("DYNAMODB_MOVIE_TABLE", "bi8s-dev"),
 		PersonTableName:         env.GetString("DYNAMODB_PERSON_TABLE", "bi8s-person-dev"),
 		AttributeTableName:      env.GetString("DYNAMODB_ATTRIBUTE_TABLE", "bi8s-attribute-dev"),
+		EncoderTableName:        env.GetString("DYNAMODB_ENCODER_TABLE", "bi8s-video-dev"),
 		S3Bucket:                env.GetString("S3_BUCKET", ""),
 		CORSAllowedOrigins:      parseCommaSeparated(env.GetString("CORS_ALLOWED_ORIGINS", defaultCORSOrigins)),
 		CORSAllowPrivateNetwork: strings.EqualFold(env.GetString("CORS_ALLOW_PRIVATE_NETWORK", "true"), "true"),
@@ -74,7 +75,9 @@ func run() error {
 	personService := service.NewPersonService(personRepo, attributeRepo, fileUploader)
 
 	movieRepo := repository.NewMovieRepository(awsClient.Dynamo, cfg.TableName)
-	movieService := service.NewMovieService(movieRepo, personRepo, attributeRepo, fileUploader)
+	encoderRepo := repository.NewEncoderRepository(awsClient.Dynamo, cfg.EncoderTableName)
+	movieService := service.NewMovieService(movieRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
+	encoderService := service.NewEncoderService(encoderRepo, fileUploader)
 
 	// Wire everything together into a single Application structure acting as a central registry natively.
 	// It is passed only into the router Mount to orchestrate specific dependency injection bindings.
@@ -84,6 +87,7 @@ func run() error {
 		MovieService:     movieService,
 		PersonService:    personService,
 		AttributeService: attributeService,
+		EncoderService:   encoderService,
 	}
 
 	// Build the HTTP router with all routes and middleware attached.

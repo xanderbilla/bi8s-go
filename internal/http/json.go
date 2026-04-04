@@ -15,9 +15,11 @@ import (
 
 // Multipart form-data size limits
 const (
-	maxRequestBodySize   = 1_048_576  // 1MB
-	maxMultipartBodySize = 12_582_912 // 12MB total multipart body limit
-	maxMultipartFileSize = 10_485_760 // 10MB per file limit
+	maxRequestBodySize      = 1_048_576     // 1MB
+	maxMultipartBodySize    = 12_582_912    // 12MB total multipart body limit
+	maxMultipartFileSize    = 10_485_760    // 10MB per file limit
+	maxVideoMultipartBody   = 10_737_418_240 // 10GB for video uploads
+	maxVideoFileSize        = 10_737_418_240 // 10GB per video file
 )
 
 // Response keeps backward compatibility for callers in this package while
@@ -79,3 +81,20 @@ func ParseMultipartForm(r *http.Request) (url.Values, error) {
 func ExtractFile(r *http.Request, fieldName string) (*domain.FileUploadInput, error) {
 	return validation.ExtractFile(r, fieldName, maxMultipartFileSize)
 }
+
+// ParseMultipartFormForVideo parses a multipart/form-data request for video uploads (up to 10GB).
+func ParseMultipartFormForVideo(r *http.Request) (url.Values, error) {
+	r.Body = http.MaxBytesReader(nil, r.Body, maxVideoMultipartBody)
+
+	if err := r.ParseMultipartForm(maxVideoMultipartBody); err != nil {
+		return nil, errors.New("body must be multipart/form-data")
+	}
+
+	return r.Form, nil
+}
+
+// ExtractVideoFile extracts a video file with 10GB size limit.
+func ExtractVideoFile(r *http.Request, fieldName string) (*domain.FileUploadInput, error) {
+	return validation.ExtractFile(r, fieldName, maxVideoFileSize)
+}
+

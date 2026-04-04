@@ -33,6 +33,7 @@ func convertToPublicList(movies []model.Movie) []model.MoviePublicList {
 			Tags:          movie.Tags,
 			ContentRating: movie.ContentRating,
 			ContentType:   movie.ContentType,
+			Assets:        movie.Assets,
 		}
 	}
 	return publicMovies
@@ -123,6 +124,7 @@ func (h *MovieHandler) GetMovie(w http.ResponseWriter, r *http.Request) {
 		Status:           movie.Status,
 		Tagline:          movie.Tagline,
 		Studios:          movie.Studios,
+		Assets:           movie.Assets,
 	}
 
 	Success(w, http.StatusOK, "movie fetched", publicMovie)
@@ -328,6 +330,7 @@ func (h *MovieHandler) GetBanner(w http.ResponseWriter, r *http.Request) {
 		Title:         banner.Title,
 		Overview:      banner.Overview,
 		ContentRating: banner.ContentRating,
+		Assets:        banner.Assets,
 	}
 
 	Success(w, http.StatusOK, "banner fetched", bannerContent)
@@ -364,4 +367,88 @@ func (h *MovieHandler) GetDiscoverContent(w http.ResponseWriter, r *http.Request
 func isConditionalCheckFailed(err error) bool {
 	var conditionErr *types.ConditionalCheckFailedException
 	return errors.As(err, &conditionErr)
+}
+
+
+// UploadAssets handles POST /v1/a/content/{contentId} to upload video assets
+func (h *MovieHandler) UploadAssets(w http.ResponseWriter, r *http.Request) {
+	contentID := chi.URLParam(r, "contentId")
+	
+	// Parse multipart form
+	if err := r.ParseMultipartForm(10 << 30); err != nil { // 10GB max
+		errs.BadRequestError(w, r, err)
+		return
+	}
+	
+	// Get asset type from form
+	assetType := r.FormValue("assetType")
+	if assetType == "" {
+		errs.BadRequestError(w, r, errors.New("assetType is required"))
+		return
+	}
+	
+	// Validate asset type
+	validAssetTypes := map[string]bool{
+		string(model.AssetTypeTrailer): true,
+		string(model.AssetTypeTeaser):  true,
+		string(model.AssetTypeClip):    true,
+		string(model.AssetTypePromo):   true,
+		string(model.AssetTypeBTS):     true,
+	}
+	
+	if !validAssetTypes[assetType] {
+		errs.BadRequestError(w, r, errors.New("invalid assetType. Must be one of: TRAILER, TEASER, CLIP, PROMO, BTS"))
+		return
+	}
+	
+	// Get all video files from the form
+	files := r.MultipartForm.File["videos"]
+	if len(files) == 0 {
+		errs.BadRequestError(w, r, errors.New("at least one video file is required"))
+		return
+	}
+	
+	// Upload assets
+	uploadedPaths, err := h.movieService.UploadAssets(r.Context(), contentID, model.AssetType(assetType), files)
+	if err != nil {
+		errs.InternalServerError(w, r, err)
+		return
+	}
+	
+	Success(w, http.StatusCreated, "assets uploaded successfully", map[string]interface{}{
+		"contentId":  contentID,
+		"assetType":  assetType,
+		"uploadedCount": len(uploadedPaths),
+		"paths":      uploadedPaths,
+	})
+}
+
+
+// GetPlayback handles GET /v1/c/play/{contentType}/{contentId} to get playback information
+func (h *MovieHandler) GetPlayback(w http.ResponseWriter, r *http.Request) {
+	contentType := chi.URLParam(r, "contentType")
+	contentID := chi.URLParam(r, "contentId")
+	
+	// Validate content type (should be "movie" or "tv")
+	if contentType != "movie" && contentType != "tv" {
+		errs.BadRequestError(w, r, errors.New("invalid content type. Must be 'movie' or 'tv'"))
+		return
+	}
+	
+	// Get playback information
+	playbackData, err := h.movieService.GetPlaybackInfo(r.Context(), contentID)
+	if err != nil {
+		if errors.Is(err, errs.ErrContentNotFound) {
+			errs.NotFoundError(w, r, err)
+			return
+		}
+		if errors.Is(err, errs.ErrNoEncodingFound) || errors.Is(err, errs.ErrNoCompletedEncoding) {
+			errs.NotFoundError(w, r, errors.New("playback not available for this content"))
+			return
+		}
+		errs.InternalServerError(w, r, err)
+		return
+	}
+	
+	Success(w, http.StatusOK, "playback information fetched", playbackData)
 }

@@ -18,3 +18,4 @@ type MoviePublicDetail = ContentPublicDetail
 
 // MoviesByPersonList is a type alias for ContentsByPersonList.
 type MoviesByPersonList = ContentsByPersonList
+
