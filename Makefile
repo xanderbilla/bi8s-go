@@ -50,8 +50,6 @@ validate-env:
 		printf "$(YELLOW)Use:$(RESET) ENV=dev or ENV=prod\n"; \
 		exit 1; \
 	fi
-		exit 1; \
-	fi
 
 help:
 	@printf "\n$(BOLD)$(CYAN)Bi8s Project Makefile$(RESET)\n\n"
