@@ -14,19 +14,53 @@ The main things to know:
 
 ## Table Design
 
-Table name: `bi8s-dev` (configurable via the `DYNAMODB_TABLE` environment variable)
+This project uses 4 DynamoDB tables:
+
+### 1. Movies/Content Table
+
+**Name:** `bi8s-content-table-{env}` (e.g., `bi8s-content-table-dev`)
 
 | Attribute | Type   | Role          |
 | --------- | ------ | ------------- |
 | `id`      | String | Partition key |
 | `title`   | String | Regular field |
 | `year`    | Number | Regular field |
+| ...       | ...    | Other fields  |
 
-There is no sort key. Each movie is looked up directly by its `id`.
+### 2. Persons Table
+
+**Name:** `bi8s-person-table-{env}` (e.g., `bi8s-person-table-dev`)
+
+| Attribute | Type   | Role          |
+| --------- | ------ | ------------- |
+| `id`      | String | Partition key |
+| `name`    | String | Regular field |
+| ...       | ...    | Other fields  |
+
+### 3. Attributes Table
+
+**Name:** `bi8s-attributes-table-{env}` (e.g., `bi8s-attributes-table-dev`)
+
+| Attribute | Type   | Role          |
+| --------- | ------ | ------------- |
+| `id`      | String | Partition key |
+| `name`    | String | Regular field |
+| `type`    | String | Regular field |
+
+### 4. Video Encoder Table
+
+**Name:** `bi8s-video-table-{env}` (e.g., `bi8s-video-table-dev`)
+
+| Attribute | Type   | Role          |
+| --------- | ------ | ------------- |
+| `id`      | String | Partition key |
+| ...       | ...    | Other fields  |
+
+All tables use a simple partition key design with no sort key. Each item is looked up directly by its `id`.
 
 ## How the Code Talks to DynamoDB
 
-All DynamoDB operations live in `internal/repository/movies_dynamo.go`. No other layer knows or cares that DynamoDB is being used.
+All DynamoDB operations live in `internal/repository/*_dynamo.go`. No other layer knows or cares that DynamoDB is being used.
 
 | Operation | DynamoDB API call | Notes                                                                   |
 | --------- | ----------------- | ----------------------------------------------------------------------- |
@@ -37,9 +71,13 @@ All DynamoDB operations live in `internal/repository/movies_dynamo.go`. No other
 
 ## Consistent Reads
 
-When reading a single movie (`GetItem`), the code uses `ConsistentRead: true`. This means DynamoDB will always return the most up-to-date version of the item, even if it was just written a millisecond ago. Without this, DynamoDB might return slightly stale data from a replica.
+When reading a single item (`GetItem`), the code uses `ConsistentRead: true`. This means DynamoDB will always return the most up-to-date version of the item, even if it was just written a millisecond ago. Without this, DynamoDB might return slightly stale data from a replica.
 
 Consistent reads cost twice as many read capacity units, but for a small app this is not a concern.
+
+## AWS Credentials
+
+The application uses **IAM roles** when running on EC2. No AWS access keys are needed in environment variables. The AWS SDK automatically uses the instance profile credentials.
 
 ## Known Limitations
 
@@ -48,18 +86,33 @@ Consistent reads cost twice as many read capacity units, but for a small app thi
 `GetAll` uses a `Scan` operation, which reads every item in the table from start to finish. This works fine when the table is small, but has two problems at scale:
 
 1. DynamoDB returns at most 1MB of data per Scan call. If the table is larger than 1MB, you only get the first page back.
-2. Scan consumes read capacity proportional to the total size of the table, which becomes expensive.
 
-The fix is to use pagination with `ExclusiveStartKey` and `LastEvaluatedKey`, or to redesign the access pattern to use a `Query` instead of a `Scan`.
+2. Scan reads every single item in the table, even if you only need a few. This wastes read capacity and costs money.
 
-This is tracked in [todo.md](todo.md).
+The solution is to add pagination support using `ExclusiveStartKey` and `LastEvaluatedKey`. See [todo.md](todo.md) for details.
 
-## Running Locally
+### No secondary indexes
 
-You do not need a real AWS account to develop locally. You can run a local version of DynamoDB using Docker:
+Right now you can only look up items by their `id`. If you want to query movies by title or year, you would need to add a Global Secondary Index (GSI).
 
-```sh
-docker run -p 8000:8000 amazon/dynamodb-local
-```
+## Table Configuration
 
-Then point the app at it by setting `AWS_ENDPOINT_URL=http://localhost:8000` (requires adding endpoint override support to `internal/aws/config.go`).
+Tables are created and managed by Terraform/OpenTofu. See `infra/tofu/modules/dynamodb/` for the infrastructure code.
+
+Configuration:
+
+- **Billing Mode:** PAY_PER_REQUEST (on-demand)
+- **Encryption:** Enabled (server-side)
+- **Point-in-time Recovery:** Enabled
+- **Backups:** Managed by AWS
+
+## Environment Variables
+
+Table names are set via environment variables:
+
+- `DYNAMODB_MOVIE_TABLE` - Movies/content table
+- `DYNAMODB_PERSON_TABLE` - Persons table
+- `DYNAMODB_ATTRIBUTE_TABLE` - Attributes table
+- `DYNAMODB_ENCODER_TABLE` - Video encoder table
+
+These are automatically configured by Terraform during deployment.

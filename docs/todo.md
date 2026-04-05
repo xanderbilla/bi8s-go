@@ -1,6 +1,6 @@
 # TODO
 
-A list of known issues, missing features, and ideas for improvement. Not everything here needs to be done — treat this as a backlog.
+A list of known issues, missing features, and ideas for improvement.
 
 ## Bugs / Issues
 
@@ -8,7 +8,8 @@ A list of known issues, missing features, and ideas for improvement. Not everyth
 
 ## Missing Features
 
-- `PUT /v1/movies/{id}` — update an existing movie's title or year.
+- `PUT /v1/movies/{id}` — update an existing movie's title or metadata.
+- `PUT /v1/persons/{id}` — update an existing person's information.
 
 - Graceful shutdown — the server currently stops immediately when killed.
   It should finish handling in-flight requests before shutting down.
@@ -18,10 +19,6 @@ A list of known issues, missing features, and ideas for improvement. Not everyth
 
 - Replace `Scan` in `GetAll` with a paginated approach using `ExclusiveStartKey` and `LastEvaluatedKey`.
   Right now only the first 1MB of data is returned. See [dynamodb.md](dynamodb.md) for details.
-
-- Current DynamoDB latency is 300-400ms when running locally against AWS. This is a deployment
-  problem, not a code problem. See [performance.md](performance.md) for a full explanation and
-  how to bring it down to 1-5ms once deployed on AWS.
 
 - Add a DynamoDB Global Secondary Index (GSI) if you need to query movies by title or year.
 
@@ -46,14 +43,6 @@ A list of known issues, missing features, and ideas for improvement. Not everyth
   multiple copies behind a load balancer (e.g. AWS ALB). The app is stateless so this would work
   today, but there is no deployment setup for it yet.
 
-## Developer Experience
-
-- Add a `docker-compose.yml` that starts a local DynamoDB instance so you can develop without a real AWS account.
-
-- Add a `Dockerfile` so the app can be built and run as a container.
-
-- Add endpoint override support to `internal/aws/config.go` so you can point the app at `dynamodb-local`.
-
 ## Testing
 
 - Add unit tests for the service layer. Because the repository is an interface, you can write a fake in-memory implementation and test the service without hitting DynamoDB at all.
@@ -69,3 +58,21 @@ A list of known issues, missing features, and ideas for improvement. Not everyth
 - Propagate the request ID (set by `middleware.RequestID`) through the service and repository layers so every log line for a single request shares the same ID.
 
 - Add basic metrics (request count, error rate, latency) — even a simple `/v1/metrics` endpoint would help.
+
+- Add distributed tracing (e.g., AWS X-Ray) to track requests across services.
+
+## Security
+
+- Add rate limiting per IP address to prevent abuse.
+- Add authentication/authorization (JWT tokens, API keys, etc.).
+- Add input sanitization and validation for all endpoints.
+- Implement HTTPS-only in production (already done via Nginx).
+- Add security headers (already done via Nginx).
+
+## Infrastructure
+
+- Add auto-scaling for EC2 instances based on CPU/memory usage.
+- Add CloudWatch alarms for monitoring.
+- Add automated backups for DynamoDB tables.
+- Add disaster recovery plan and documentation.
+- Consider multi-region deployment for high availability.

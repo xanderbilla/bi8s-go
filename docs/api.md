@@ -22,6 +22,13 @@ On errors:
 }
 ```
 
+## API Structure
+
+The API is organized into two main sections:
+
+- `/v1/c/` - Content routes (public-facing, filtered content)
+- `/v1/a/` - Admin routes (full access, all fields including stats and audit)
+
 ## Health
 
 ### GET /v1/health
@@ -40,11 +47,17 @@ Returns the current runtime environment. Use this to check the server is running
 }
 ```
 
-## Movies
+## Content Routes (Public - /v1/c/)
 
-### GET /v1/movies
+### GET /v1/c/content
 
-Returns all movies with public fields only (no stats or audit information). Only returns movies with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.
+Returns recent content sorted by creation date. Only returns content with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.
+
+**Query Parameters:**
+
+| Parameter | Type   | Required | Description                                             |
+| --------- | ------ | -------- | ------------------------------------------------------- |
+| `type`    | string | no       | Filter by contentType (movie, tv, all). Defaults to all |
 
 **Response:**
 
@@ -67,15 +80,15 @@ Returns all movies with public fields only (no stats or audit information). Only
 }
 ```
 
-### GET /v1/movies/{id}
+### GET /v1/c/content/{contentId}
 
-Returns a single movie by ID with all fields except stats and audit. Only returns movies with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.
+Returns a single content by ID. Only returns content with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.
 
 **URL Parameters:**
 
-| Parameter | Type   | Description         |
-| --------- | ------ | ------------------- |
-| `id`      | string | The ID of the movie |
+| Parameter   | Type   | Description           |
+| ----------- | ------ | --------------------- |
+| `contentId` | string | The ID of the content |
 
 **Response:**
 
@@ -117,7 +130,125 @@ Returns a single movie by ID with all fields except stats and audit. Only return
 }
 ```
 
-### POST /v1/movies
+### GET /v1/c/people/{peopleId}
+
+Returns a single person by ID.
+
+**URL Parameters:**
+
+| Parameter  | Type   | Description          |
+| ---------- | ------ | -------------------- |
+| `peopleId` | string | The ID of the person |
+
+### GET /v1/c/people/{peopleId}/content
+
+Returns all content where the person is in the cast. Only returns content with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.
+
+**URL Parameters:**
+
+| Parameter  | Type   | Required | Description          |
+| ---------- | ------ | -------- | -------------------- |
+| `peopleId` | string | yes      | The ID of the person |
+
+**Query Parameters:**
+
+| Parameter | Type   | Required | Description                            |
+| --------- | ------ | -------- | -------------------------------------- |
+| `type`    | string | no       | Filter by contentType (movie, tv, all) |
+
+### GET /v1/c/banner
+
+Returns a random banner content for display. Only returns content with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.
+
+**Query Parameters:**
+
+| Parameter | Type   | Required | Description                            |
+| --------- | ------ | -------- | -------------------------------------- |
+| `type`    | string | no       | Filter by contentType (movie, tv, all) |
+
+### GET /v1/c/attributes/{id}
+
+Returns all content that have the specified attribute (genre, tag, or mood tag). Only returns content with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.
+
+**URL Parameters:**
+
+| Parameter | Type   | Description                                   |
+| --------- | ------ | --------------------------------------------- |
+| `id`      | string | The ID of the attribute (genre, tag, or mood) |
+
+**Query Parameters:**
+
+| Parameter | Type   | Required | Description                            |
+| --------- | ------ | -------- | -------------------------------------- |
+| `content` | string | no       | Filter by contentType (movie, tv, all) |
+
+### GET /v1/c/discover
+
+Discover content by type (latest, popular, trending). Only returns content with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.
+
+**Query Parameters:**
+
+| Parameter | Type   | Required | Description                                             |
+| --------- | ------ | -------- | ------------------------------------------------------- |
+| `type`    | string | yes      | Discovery type (latest, popular, trending)              |
+| `content` | string | no       | Filter by contentType (movie, tv, all). Defaults to all |
+
+### GET /v1/c/play/{contentType}/{contentId}
+
+Get playback information for a specific content.
+
+**URL Parameters:**
+
+| Parameter     | Type   | Description                 |
+| ------------- | ------ | --------------------------- |
+| `contentType` | string | Type of content (movie, tv) |
+| `contentId`   | string | The ID of the content       |
+
+## Encoder Routes
+
+### POST /v1/c/encoder/new
+
+Create a new video encoding job.
+
+### GET /v1/c/encoder/{jobId}
+
+Get encoding job details.
+
+**URL Parameters:**
+
+| Parameter | Type   | Description       |
+| --------- | ------ | ----------------- |
+| `jobId`   | string | The ID of the job |
+
+## Admin Routes (/v1/a/)
+
+Admin routes provide full access to all fields including stats and audit information, without filtering by visibility or status.
+
+### POST /v1/a/content/{contentId}
+
+Upload content assets (video files, images, etc.).
+
+**URL Parameters:**
+
+| Parameter   | Type   | Description           |
+| ----------- | ------ | --------------------- |
+| `contentId` | string | The ID of the content |
+
+### GET /v1/a/movies
+
+Returns all movies (admin view with all fields including stats and audit).
+
+### GET /v1/a/movies/{movieId}
+
+Returns a single movie by ID (admin view with all fields).
+
+**URL Parameters:**
+
+| Parameter | Type   | Description         |
+| --------- | ------ | ------------------- |
+| `movieId` | string | The ID of the movie |
+
+### POST /v1/a/movies
 
 Creates a new movie with poster and cover image uploads.
 
@@ -224,7 +355,7 @@ curl -X POST http://localhost:8080/v1/movies \
 }
 ```
 
-### DELETE /v1/movies/{id}
+### DELETE /v1/a/movies/{movieId}
 
 Deletes a movie by ID.
 
@@ -232,7 +363,7 @@ Deletes a movie by ID.
 
 | Parameter | Type   | Description         |
 | --------- | ------ | ------------------- |
-| `id`      | string | The ID of the movie |
+| `movieId` | string | The ID of the movie |
 
 **Response (200):**
 
@@ -253,11 +384,9 @@ Deletes a movie by ID.
 }
 ```
 
-## Persons
+### GET /v1/a/people
 
-### GET /v1/persons
-
-Returns all persons.
+Returns all people (admin view with all fields).
 
 **Response:**
 
@@ -279,15 +408,15 @@ Returns all persons.
 }
 ```
 
-### GET /v1/persons/{id}
+### GET /v1/a/people/{peopleId}
 
-Returns a single person by ID.
+Returns a single person by ID (admin view with all fields).
 
 **URL Parameters:**
 
-| Parameter | Type   | Description          |
-| --------- | ------ | -------------------- |
-| `id`      | string | The ID of the person |
+| Parameter  | Type   | Description          |
+| ---------- | ------ | -------------------- |
+| `peopleId` | string | The ID of the person |
 
 **Response:**
 
@@ -329,7 +458,7 @@ Returns a single person by ID.
 }
 ```
 
-### POST /v1/persons
+### POST /v1/a/people
 
 Creates a new person with profile and backdrop image uploads.
 
@@ -417,15 +546,15 @@ curl -X POST http://localhost:8080/v1/persons \
 }
 ```
 
-### DELETE /v1/persons/{id}
+### DELETE /v1/a/people/{peopleId}
 
 Deletes a person by ID.
 
 **URL Parameters:**
 
-| Parameter | Type   | Description          |
-| --------- | ------ | -------------------- |
-| `id`      | string | The ID of the person |
+| Parameter  | Type   | Description          |
+| ---------- | ------ | -------------------- |
+| `peopleId` | string | The ID of the person |
 
 **Response (200):**
 
@@ -436,147 +565,49 @@ Deletes a person by ID.
 }
 ```
 
-### GET /v1/persons/{id}/movies
+### GET /v1/a/people/{peopleId}/content
 
-Returns all movies where the person is in the cast. Uses DynamoDB Scan with FilterExpression for querying. Only returns movies with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.
-
-**URL Parameters:**
-
-| Parameter | Type   | Description          |
-| --------- | ------ | -------------------- |
-| `id`      | string | The ID of the person |
-
-**Response:**
-
-```json
-{
-  "status": 200,
-  "message": "movies fetched",
-  "data": [
-    {
-      "id": "c47e7aeb-f372-409a-ace6-339b00fbce23",
-      "title": "Thor: The Dark World",
-      "backdropPath": "movies/c47e7aeb-f372-409a-ace6-339b00fbce23/cover.jpg"
-    }
-  ]
-}
-```
-
-**Notes:**
-
-- Returns minimal movie information (id, title, backdropPath only)
-- Uses Scan with FilterExpression to check if personId exists in castIds array
-- Returns empty array if person has no movies
-- Does not validate if person exists (returns empty array for non-existent persons)
-- For large datasets, consider using a separate movie-cast relationship table for better performance
-
-## Discover
-
-### GET /v1/discover/{attributeId}
-
-Discovers all movies that have the specified attribute (genre, tag, or mood tag). Returns minimal movie data for browsing and discovery. Only returns movies with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.
+Returns all content where the person is in the cast (admin view, no filtering).
 
 **URL Parameters:**
 
-| Parameter     | Type   | Description                                   |
-| ------------- | ------ | --------------------------------------------- |
-| `attributeId` | string | The ID of the attribute (genre, tag, or mood) |
-
-**Response:**
-
-```json
-{
-  "status": 200,
-  "message": "movies fetched",
-  "data": [
-    {
-      "id": "453a8895-e0f1-4109-a33c-f59170941d4f",
-      "title": "Eternals",
-      "backdropPath": "movies/453a8895-e0f1-4109-a33c-f59170941d4f/cover.jpg"
-    },
-    {
-      "id": "f967a981-873c-44c3-9653-43c727ff5a5c",
-      "title": "Iron Man 2",
-      "backdropPath": "movies/f967a981-873c-44c3-9653-43c727ff5a5c/cover.jpg"
-    }
-  ]
-}
-```
-
-**Example Requests:**
-
-```bash
-# Discover movies by genre (Action)
-curl http://localhost:8080/v1/discover/769581
-
-# Discover movies by tag (Marvel)
-curl http://localhost:8080/v1/discover/915637
-
-# Discover movies by mood tag (Exciting)
-curl http://localhost:8080/v1/discover/138771
-```
-
-**Notes:**
-
-- Returns minimal movie information (id, title, backdropPath only)
-- Uses DynamoDB Scan with FilterExpression on attributeIds array
-- Searches across all attribute types (genres, tags, moodTags)
-- Returns empty array if no movies have the specified attribute
-- Does not validate if attribute exists (returns empty array for non-existent attributes)
-- For production with large datasets, consider implementing GSI for better performance
-
-**How It Works:**
-
-When a movie is created, all attribute IDs from genres, tags, and moodTags are combined into an `attributeIds` array. This endpoint queries that array to find all movies containing the specified attribute ID, enabling fast discovery across all attribute types.
-
-## Banner
-
-### GET /v1/banner
-
-Returns a random banner content for display. Optionally filter by contentType using the `pg` query parameter. Only returns movies with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.
+| Parameter  | Type   | Description          |
+| ---------- | ------ | -------------------- |
+| `peopleId` | string | The ID of the person |
 
 **Query Parameters:**
 
-| Parameter | Type   | Required | Description                                                              |
-| --------- | ------ | -------- | ------------------------------------------------------------------------ |
-| `pg`      | string | no       | Filter by contentType (MOVIE or TV). If omitted, returns random from all |
+| Parameter | Type   | Required | Description                            |
+| --------- | ------ | -------- | -------------------------------------- |
+| `type`    | string | no       | Filter by contentType (movie, tv, all) |
 
-**Response:**
+### GET /v1/a/attributes
 
-```json
-{
-  "status": 200,
-  "message": "banner fetched",
-  "data": {
-    "id": "deb1f6e5-cc3d-4e55-80f6-3043a1b98692",
-    "backdropPath": "movies/deb1f6e5-cc3d-4e55-80f6-3043a1b98692/cover.jpg",
-    "title": "Inception",
-    "overview": "A thief who steals corporate secrets through the use of dream-sharing technology...",
-    "contentRating": "18_PLUS"
-  }
-}
-```
+Returns all attributes (admin view).
 
-**Example Requests:**
+### GET /v1/a/attributes/{attributeId}
 
-```bash
-# Get random banner from all content
-curl http://localhost:8080/v1/banner
+Returns a single attribute by ID (admin view).
 
-# Get random banner filtered by MOVIE contentType
-curl http://localhost:8080/v1/banner?pg=MOVIE
+**URL Parameters:**
 
-# Get random banner filtered by TV contentType
-curl http://localhost:8080/v1/banner?pg=TV
-```
+| Parameter     | Type   | Description             |
+| ------------- | ------ | ----------------------- |
+| `attributeId` | string | The ID of the attribute |
 
-**Notes:**
+### POST /v1/a/attributes
 
-- Returns a single random banner content
-- If `pg` parameter is provided, filters by that contentType
-- Returns 404 if no matching content is found
-- Only returns content with visibility=PUBLIC and status=RELEASED or IN_PRODUCTION
-- Response includes: id, backdropPath, title, overview, contentRating
+Creates a new attribute.
+
+### DELETE /v1/a/attributes/{attributeId}
+
+Deletes an attribute by ID.
+
+**URL Parameters:**
+
+| Parameter     | Type   | Description             |
+| ------------- | ------ | ----------------------- |
+| `attributeId` | string | The ID of the attribute |
 
 ## Router-Level Errors
 
