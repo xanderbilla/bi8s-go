@@ -42,7 +42,7 @@ func (r *DynamoEncoderRepository) Create(ctx context.Context, job model.EncoderJ
 	input := &dynamodb.PutItemInput{
 		TableName:           aws.String(r.tableName),
 		Item:                item,
-		ConditionExpression: aws.String("attribute_not_exists(jobId)"),
+		ConditionExpression: aws.String("attribute_not_exists(id)"),
 	}
 
 	_, err = r.client.PutItem(ctx, input)
@@ -54,7 +54,7 @@ func (r *DynamoEncoderRepository) Get(ctx context.Context, jobID string) (*model
 	input := &dynamodb.GetItemInput{
 		TableName: aws.String(r.tableName),
 		Key: map[string]types.AttributeValue{
-			"jobId": &types.AttributeValueMemberS{Value: jobID},
+			"id": &types.AttributeValueMemberS{Value: jobID},
 		},
 		ConsistentRead: aws.Bool(true),
 	}

@@ -21,6 +21,12 @@ variable "block_public_access" {
   default     = true
 }
 
+variable "enable_public_read" {
+  description = "Enable public read access via bucket policy"
+  type        = bool
+  default     = false
+}
+
 variable "cors_rules" {
   description = "List of CORS rules"
   type = list(object({

@@ -12,7 +12,7 @@ type Content struct {
 	PosterPath       string           `json:"posterPath,omitempty" dynamodbav:"posterPath,omitempty" validate:"omitempty,max=512"`
 	ReleaseDate      string           `json:"releaseDate,omitempty" dynamodbav:"releaseDate,omitempty" validate:"omitempty,daterange"`
 	FirstAirDate     string           `json:"firstAirDate,omitempty" dynamodbav:"firstAirDate,omitempty" validate:"omitempty,daterange"`
-	Adult            bool             `json:"adult,omitempty" dynamodbav:"adult,omitempty"`
+	Adult            bool             `json:"adult" dynamodbav:"adult"`
 	ContentRating    Rating           `json:"contentRating,omitempty" dynamodbav:"contentRating,omitempty" validate:"omitempty,oneof=18_PLUS 21_PLUS"`
 	OriginalLanguage OriginalLanguage `json:"originalLanguage" dynamodbav:"originalLanguage" validate:"required,oneof=en hi ja ko fr es"`
 	Genres           []EntityRef      `json:"genres,omitempty" dynamodbav:"genres,omitempty" validate:"omitempty,dive"`

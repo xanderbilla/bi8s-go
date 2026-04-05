@@ -16,7 +16,7 @@ const (
 
 // EncoderJob represents a video encoding job
 type EncoderJob struct {
-	JobID       string            `json:"jobId" dynamodbav:"jobId"`
+	JobID       string            `json:"jobId" dynamodbav:"id"`
 	ContentType ContentType       `json:"contentType" dynamodbav:"contentType"`
 	ContentID   string            `json:"contentId" dynamodbav:"contentId"`
 	Status      EncoderJobStatus  `json:"status" dynamodbav:"status"`

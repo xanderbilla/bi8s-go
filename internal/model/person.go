@@ -66,9 +66,9 @@ type Person struct {
 	ProfilePath  string       `json:"profilePath,omitempty" dynamodbav:"profilePath,omitempty" validate:"omitempty,max=512"`
 	BackdropPath string       `json:"backdropPath,omitempty" dynamodbav:"backdropPath,omitempty" validate:"omitempty,max=512"`
 	Measurements Measurements `json:"measurements,omitempty" dynamodbav:"measurements,omitempty"`
-	Tags         []EntityRef  `json:"tags,omitempty" dynamodbav:"tags,omitempty" validate:"omitempty,dive"`
-	Categories   []EntityRef  `json:"categories,omitempty" dynamodbav:"categories,omitempty" validate:"omitempty,dive"`
-	Specialties  []EntityRef  `json:"specialties,omitempty" dynamodbav:"specialties,omitempty" validate:"omitempty,dive"`
+	Tags         []EntityRef  `json:"tags" dynamodbav:"tags"`
+	Categories   []EntityRef  `json:"categories" dynamodbav:"categories"`
+	Specialties  []EntityRef  `json:"specialties" dynamodbav:"specialties"`
 	Stats        Stats        `json:"stats" dynamodbav:"stats"`
 	Audit        Audit        `json:"audit" dynamodbav:"audit"`
 }
@@ -93,7 +93,7 @@ type PersonPublicDetail struct {
 	ProfilePath  string       `json:"profilePath,omitempty"`
 	BackdropPath string       `json:"backdropPath,omitempty"`
 	Measurements Measurements `json:"measurements,omitempty"`
-	Tags         []EntityRef  `json:"tags,omitempty"`
-	Categories   []EntityRef  `json:"categories,omitempty"`
-	Specialties  []EntityRef  `json:"specialties,omitempty"`
+	Tags         []EntityRef  `json:"tags"`
+	Categories   []EntityRef  `json:"categories"`
+	Specialties  []EntityRef  `json:"specialties"`
 }

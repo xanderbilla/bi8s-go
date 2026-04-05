@@ -167,13 +167,23 @@ module "s3" {
   bucket_name           = local.s3_bucket
   enable_versioning     = var.enable_versioning
   enable_encryption     = var.enable_encryption
-  block_public_access   = true
+  block_public_access   = false
+  enable_public_read    = true
 
   cors_rules = [
     {
       allowed_headers = ["*"]
       allowed_methods = ["GET", "PUT", "POST", "DELETE", "HEAD"]
-      allowed_origins = ["*"]
+      allowed_origins = [
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://localhost:8443",
+        "https://localhost:8443",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8080",
+        "http://127.0.0.1:8443",
+        "https://127.0.0.1:8443"
+      ]
       expose_headers  = ["ETag"]
       max_age_seconds = 3000
     }
