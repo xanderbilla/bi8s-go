@@ -1,60 +1,61 @@
 name: Build and Push Docker Image
 
 on:
-    push:
-        branches:
-            - master
-        paths:
-            - cmd/**
-            - internal/**
-            - .air.toml
-    workflow_dispatch:
+  push:
+    branches:
+      - dev
+    paths:
+      - cmd/**
+      - internal/**
+      - .air.toml
+  workflow_dispatch:
 
 permissions:
-    contents: read
+  contents: read
 
 concurrency:
-    group: docker-publish-${{ github.ref }}
-    cancel-in-progress: true
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_IMAGE: ${{ secrets.DOCKER_IMAGE }}
 
 jobs:
-    docker:
-        name: Build and Push Multi-Platform Image
-        runs-on: ubuntu-latest
-        env:
-            IMAGE_NAME: docker.io/xanderbilla/my-project
+  docker:
+    name: Build and Push Multi-Platform Image
+    runs-on: ubuntu-latest
 
-        steps:
-            # Pull repository code at the commit that triggered this workflow.
-            - name: Checkout source
-              uses: actions/checkout@v4
+    steps:
+      # Pull repository code at the commit that triggered this workflow.
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-            # Enable emulation so we can build for multiple CPU architectures.
-            - name: Set up QEMU
-              uses: docker/setup-qemu-action@v3
+      # Enable emulation so we can build for multiple CPU architectures.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-            # Configure Docker Buildx for modern multi-platform builds.
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v3
+      # Configure Docker Buildx for modern multi-platform builds.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-            # Authenticate to Docker Hub with repository secrets.
-            - name: Log in to Docker Hub
-              uses: docker/login-action@v3
-              with:
-                  registry: ${{ secrets.DOCKER_REGISTRY }}
-                  username: ${{ secrets.DOCKER_USERNAME }}
-                  password: ${{ secrets.DOCKER_PASSWORD }}
+      # Authenticate to Docker Hub with repository secrets.
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-            # Build and push image manifests for linux/amd64 and linux/arm64.
-            - name: Build and push image
-              uses: docker/build-push-action@v6
-              with:
-                  context: .
-                  file: ./Dockerfile
-                  push: true
-                  platforms: linux/amd64,linux/arm64
-                  tags: |
-                      ${{ env.IMAGE_NAME }}:latest
-                      ${{ env.IMAGE_NAME }}:${{ github.sha }}
-                  cache-from: type=gha
-                  cache-to: type=gha,mode=max
+      # Build and push image manifests for linux/amd64 and linux/arm64.
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
