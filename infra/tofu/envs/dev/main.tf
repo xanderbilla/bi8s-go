@@ -242,7 +242,7 @@ module "ec2" {
   key_name             = var.key_name
   create_eip           = true
 
-  user_data = base64encode(templatefile("${path.module}/user-data.sh", {
+  user_data = base64gzip(templatefile("${path.module}/user-data.sh", {
     project_name              = var.project_name
     environment               = var.environment
     aws_region                = var.aws_region

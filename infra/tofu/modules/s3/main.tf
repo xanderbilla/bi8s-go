@@ -70,7 +70,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
       status = rule.value.status
 
       dynamic "noncurrent_version_transition" {
-        for_each = lookup(rule.value, "noncurrent_version_transitions", [])
+        for_each = lookup(rule.value, "noncurrent_version_transitions", null) != null ? lookup(rule.value, "noncurrent_version_transitions", []) : []
         content {
           noncurrent_days = noncurrent_version_transition.value.noncurrent_days
           storage_class   = noncurrent_version_transition.value.storage_class
