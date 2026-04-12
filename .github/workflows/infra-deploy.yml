@@ -87,6 +87,7 @@ jobs:
     name: Terraform Plan
     runs-on: ubuntu-latest
     needs: detect-environment
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.action != 'destroy'
     environment: ${{ needs.detect-environment.outputs.environment }}
     permissions:
       contents: read
@@ -306,7 +307,10 @@ jobs:
       - name: Terraform Destroy
         run: |
           cd infra/tofu/envs/${{ needs.detect-environment.outputs.environment }}
-          tofu destroy -auto-approve
+          tofu destroy -auto-approve \
+            -var="project_name=${{ env.PROJECT_NAME }}" \
+            -var="ami_id=${{ env.EC2_AMI_ID }}" \
+            -var="key_name=${{ env.EC2_KEY_NAME }}"
 
           echo "### Infrastructure Destroyed 💥" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
