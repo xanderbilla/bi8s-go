@@ -31,3 +31,12 @@ export TRUSTED_PROXIES=""
 
 # --- Encoder ----------------------------------------------------------------
 export ENCODER_MAX_CONCURRENT="2"
+# Per-job ffmpeg parallelism (0 = let ffmpeg decide based on CPU count).
+export ENCODER_FFMPEG_PARALLELISM="0"
+# Job context timeout in seconds; default 1800 (30 min).
+export ENCODER_JOB_TIMEOUT_SECONDS="1800"
+
+# --- Filesystem -------------------------------------------------------------
+# Override the directory used for transient upload/encode temp files.
+# Defaults to the OS temp dir (os.TempDir()).
+export BI8S_TMP_DIR=""

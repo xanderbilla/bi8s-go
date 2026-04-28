@@ -138,13 +138,13 @@ deploy-app: validate-env check-ec2-ip
 # Development
 test:
 	@printf "\n$(BOLD)$(BLUE)Running tests...$(RESET)\n\n"
-	@cd app && go test -v ./...
+	@cd appl && go test -v ./...
 	@printf "\n$(BOLD)$(GREEN)Tests complete$(RESET)\n\n"
 
 lint:
 	@printf "\n$(BOLD)$(BLUE)Running linter...$(RESET)\n\n"
 	@if command -v golangci-lint > /dev/null; then \
-		cd app && golangci-lint run; \
+		cd appl && golangci-lint run; \
 		printf "\n$(BOLD)$(GREEN)Linting complete$(RESET)\n\n"; \
 	else \
 		printf "$(YELLOW)golangci-lint not installed$(RESET)\n\n"; \
@@ -152,23 +152,23 @@ lint:
 
 format:
 	@printf "\n$(BOLD)$(BLUE)Formatting code...$(RESET)\n\n"
-	@cd app && go fmt ./...
-	@cd app && gofmt -s -w .
+	@cd appl && go fmt ./...
+	@cd appl && gofmt -s -w .
 	@printf "$(BOLD)$(GREEN)Code formatted$(RESET)\n\n"
 
 build:
 	@printf "\n$(BOLD)$(BLUE)Building application...$(RESET)\n\n"
-	@cd app && go build -o bin/api ./cmd/api
-	@printf "$(BOLD)$(GREEN)Build complete:$(RESET) $(CYAN)app/bin/api$(RESET)\n\n"
+	@cd appl && go build -o bin/api ./cmd/api
+	@printf "$(BOLD)$(GREEN)Build complete:$(RESET) $(CYAN)appl/bin/api$(RESET)\n\n"
 
 run:
 	@printf "\n$(BOLD)$(BLUE)Running application...$(RESET)\n\n"
-	@cd app && go run ./cmd/api
+	@cd appl && go run ./cmd/api
 
 # Utilities
 clean:
 	@printf "\n$(BOLD)$(BLUE)Cleaning build artifacts...$(RESET)\n\n"
-	@rm -f app/bin/api app/bin/api-linux app/bin/main
+	@rm -f appl/bin/api appl/bin/api-linux appl/bin/main
 	@rm -f coverage.out coverage.html
 	@rm -f *.tar.gz
 	@find . -name "*.tfplan" -delete
