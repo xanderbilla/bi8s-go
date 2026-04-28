@@ -2,6 +2,26 @@
 
 Complete guide for deploying the bi8s application to AWS using OpenTofu and GitHub Actions.
 
+## Health & readiness
+
+The service exposes three probes under `/v1`:
+
+- `GET /v1/livez` — process liveness; no dependencies, no environment metadata.
+- `GET /v1/readyz` — returns `503 NOT_READY` until `main.go` flips the readiness
+  flag once the listener is bound, and `503 SERVICE_UNAVAILABLE` (with a
+  `details.checks` map) if any registered dependency probe fails. Wire this to
+  your load balancer / Kubernetes readiness probe.
+- `GET /v1/health` — full dependency check; safe for dashboards.
+
+On `SIGINT`/`SIGTERM` the service first marks itself **not ready** so the load
+balancer drains traffic before `Server.Shutdown` is called.
+
+## API documentation
+
+After deploying, the OpenAPI spec is served at `GET /v1/openapi.yaml` and a
+Swagger UI viewer at `GET /v1/docs`. Both are public — restrict at the network
+layer if you need to hide them.
+
 ## Scripts Overview
 
 ### Workspace Scripts (scripts/)

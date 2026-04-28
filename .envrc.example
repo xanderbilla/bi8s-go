@@ -1,9 +1,33 @@
-export ENV="dev"
+# --- Runtime ----------------------------------------------------------------
+export APP_ENV="dev"                      # dev | prod
+export PORT=":8080"
+export LOG_LEVEL="info"                   # debug | info | warn | error
+export LOG_ADD_SOURCE="false"
+
+# --- AWS --------------------------------------------------------------------
+# Prefer IAM roles in production; these are only for local dev.
 export AWS_ACCESS_KEY_ID=AKXXXXXXXXXXXXXX
 export AWS_SECRET_ACCESS_KEY=5EXXXXXXXXXXXXXXXXX
-export AWS_REGION=us-east-1
-export DYNAMODB_TABLE=table-name
-export S3_BUCKET=your-s3-bucket-name
-export S3_POSTER_PREFIX=movies
+export AWS_REGION="us-east-1"
+
+# --- DynamoDB tables --------------------------------------------------------
+export DYNAMODB_MOVIE_TABLE="bi8s-dev"
+export DYNAMODB_PERSON_TABLE="bi8s-person-dev"
+export DYNAMODB_ATTRIBUTE_TABLE="bi8s-attribute-dev"
+export DYNAMODB_ENCODER_TABLE="bi8s-video-dev"
+export DYNAMODB_ENCODER_CONTENT_ID_INDEX="contentId-index"
+
+# --- S3 ---------------------------------------------------------------------
+export S3_BUCKET="your-s3-bucket-name"
+
+# --- CORS -------------------------------------------------------------------
 export CORS_ALLOWED_ORIGINS="http://localhost:3000,https://your-domain.com"
 export CORS_ALLOW_PRIVATE_NETWORK="true"
+
+# --- Networking / Proxies ---------------------------------------------------
+# Comma-separated CIDRs of trusted reverse proxies. When set, the server
+# honours X-Forwarded-For for client-IP extraction (rate limiting, logs).
+export TRUSTED_PROXIES=""
+
+# --- Encoder ----------------------------------------------------------------
+export ENCODER_MAX_CONCURRENT="2"

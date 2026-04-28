@@ -11,19 +11,50 @@ A REST API built with Go, [chi](https://github.com/go-chi/chi), and DynamoDB on 
 
 ## Environment Variables
 
-| Variable                     | Description                                  | Default     |
-| ---------------------------- | -------------------------------------------- | ----------- |
-| `APP_ENV`                    | Runtime environment (`dev`, `prod`)          | `dev`       |
-| `AWS_REGION`                 | AWS region                                   | `us-east-1` |
-| `DYNAMODB_MOVIE_TABLE`       | DynamoDB table name for movies               | Auto-set    |
-| `DYNAMODB_PERSON_TABLE`      | DynamoDB table name for persons              | Auto-set    |
-| `DYNAMODB_ATTRIBUTE_TABLE`   | DynamoDB table name for attributes           | Auto-set    |
-| `DYNAMODB_ENCODER_TABLE`     | DynamoDB table name for video encoder        | Auto-set    |
-| `S3_BUCKET`                  | S3 bucket for file storage                   | Auto-set    |
-| `CORS_ALLOWED_ORIGINS`       | Comma-separated list of allowed CORS origins | `*`         |
-| `CORS_ALLOW_PRIVATE_NETWORK` | Allow private network preflight requests     | `true`      |
+| Variable                                      | Description                                                          | Default              |
+| --------------------------------------------- | -------------------------------------------------------------------- | -------------------- |
+| `APP_ENV`                                     | Runtime environment (`dev`, `prod`)                                  | `prod`               |
+| `PORT`                                        | Listen address                                                       | `:8080`              |
+| `LOG_LEVEL`                                   | `debug` \| `info` \| `warn` \| `error`                               | `info`               |
+| `LOG_ADD_SOURCE`                              | Include source file:line in logs                                     | `false`              |
+| `AWS_REGION`                                  | AWS region                                                           | `us-east-1`          |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Local-dev only — prefer IAM roles in prod                            | _from IAM_           |
+| `DYNAMODB_MOVIE_TABLE`                        | DynamoDB table name for movies                                       | `bi8s-dev`           |
+| `DYNAMODB_PERSON_TABLE`                       | DynamoDB table name for persons                                      | `bi8s-person-dev`    |
+| `DYNAMODB_ATTRIBUTE_TABLE`                    | DynamoDB table name for attributes                                   | `bi8s-attribute-dev` |
+| `DYNAMODB_ENCODER_TABLE`                      | DynamoDB table name for encoder jobs                                 | `bi8s-video-dev`     |
+| `DYNAMODB_ENCODER_CONTENT_ID_INDEX`           | GSI used to look up encoder jobs by `contentId`                      | `contentId-index`    |
+| `S3_BUCKET`                                   | S3 bucket for source uploads and HLS output                          | _required_           |
+| `CORS_ALLOWED_ORIGINS`                        | Comma-separated list of allowed CORS origins                         | `*`                  |
+| `CORS_ALLOW_PRIVATE_NETWORK`                  | Allow private-network preflight requests                             | `true`               |
+| `TRUSTED_PROXIES`                             | Comma-separated CIDRs of trusted proxies (enables `X-Forwarded-For`) | _empty_              |
+| `ENCODER_MAX_CONCURRENT`                      | Max concurrent ffmpeg jobs                                           | `2`                  |
 
 > AWS credentials are managed via IAM roles on EC2. No keys needed in environment variables.
+
+## Response Envelope
+
+All JSON responses follow the same envelope:
+
+```json
+{
+  "success": true,
+  "status": 200,
+  "message": "ok",
+  "data": {},
+  "request_id": "0e8f...",
+  "timestamp": "2026-04-25T12:00:00.000Z"
+}
+```
+
+On failure, `success=false`, `data` is omitted and `error` carries the
+machine-readable reason.
+
+## Authentication
+
+Admin endpoints (`/v1/a/*`) are not protected at the application layer. Restrict
+access at the network/infrastructure layer (VPC, private load balancer, security
+group, or IP allow-list) before exposing the service.
 
 ## Local Development
 

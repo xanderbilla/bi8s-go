@@ -23,14 +23,14 @@ provider "aws" {
 
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
-  
+
   # Resource names
   dynamodb_movie_table     = "${var.project_name}-content-table-${var.environment}"
   dynamodb_person_table    = "${var.project_name}-person-table-${var.environment}"
   dynamodb_attribute_table = "${var.project_name}-attributes-table-${var.environment}"
   dynamodb_encoder_table   = "${var.project_name}-video-table-${var.environment}"
   s3_bucket                = "${var.project_name}-storage-${var.environment}"
-  
+
   common_tags = merge(
     var.tags,
     {
@@ -149,10 +149,20 @@ module "dynamodb_attribute" {
 module "dynamodb_encoder" {
   source = "../../modules/dynamodb"
 
-  table_name                    = local.dynamodb_encoder_table
-  billing_mode                  = var.dynamodb_billing_mode
-  hash_key                      = "id"
-  attributes                    = [{ name = "id", type = "S" }]
+  table_name   = local.dynamodb_encoder_table
+  billing_mode = var.dynamodb_billing_mode
+  hash_key     = "id"
+  attributes = [
+    { name = "id", type = "S" },
+    { name = "contentId", type = "S" },
+  ]
+  global_secondary_indexes = [
+    {
+      name            = "contentId-index"
+      hash_key        = "contentId"
+      projection_type = "ALL"
+    },
+  ]
   read_capacity                 = var.dynamodb_read_capacity
   write_capacity                = var.dynamodb_write_capacity
   enable_point_in_time_recovery = true
@@ -164,11 +174,11 @@ module "dynamodb_encoder" {
 module "s3" {
   source = "../../modules/s3"
 
-  bucket_name           = local.s3_bucket
-  enable_versioning     = var.enable_versioning
-  enable_encryption     = var.enable_encryption
-  block_public_access   = false
-  enable_public_read    = true
+  bucket_name         = local.s3_bucket
+  enable_versioning   = var.enable_versioning
+  enable_encryption   = var.enable_encryption
+  block_public_access = false
+  enable_public_read  = true
 
   cors_rules = [
     {
@@ -223,19 +233,19 @@ module "s3" {
 module "iam" {
   source = "../../modules/iam"
 
-  role_name       = "${local.name_prefix}-ec2-role"
-  project_name    = var.project_name
-  aws_region      = var.aws_region
-  
+  role_name    = "${local.name_prefix}-ec2-role"
+  project_name = var.project_name
+  aws_region   = var.aws_region
+
   dynamodb_table_arns = [
     module.dynamodb_movie.table_arn,
     module.dynamodb_person.table_arn,
     module.dynamodb_attribute.table_arn,
     module.dynamodb_encoder.table_arn
   ]
-  
+
   s3_bucket_arns = [module.s3.bucket_arn]
-  
+
   tags = local.common_tags
 }
 
@@ -253,14 +263,14 @@ module "ec2" {
   create_eip           = true
 
   user_data = base64gzip(templatefile("${path.module}/user-data.sh", {
-    project_name              = var.project_name
-    environment               = var.environment
-    aws_region                = var.aws_region
-    dynamodb_movie_table      = local.dynamodb_movie_table
-    dynamodb_person_table     = local.dynamodb_person_table
-    dynamodb_attribute_table  = local.dynamodb_attribute_table
-    dynamodb_encoder_table    = local.dynamodb_encoder_table
-    s3_bucket                 = local.s3_bucket
+    project_name             = var.project_name
+    environment              = var.environment
+    aws_region               = var.aws_region
+    dynamodb_movie_table     = local.dynamodb_movie_table
+    dynamodb_person_table    = local.dynamodb_person_table
+    dynamodb_attribute_table = local.dynamodb_attribute_table
+    dynamodb_encoder_table   = local.dynamodb_encoder_table
+    s3_bucket                = local.s3_bucket
   }))
 
   tags = local.common_tags

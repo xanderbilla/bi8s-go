@@ -98,10 +98,13 @@ Standardized API response format:
 
 ```go
 type Envelope struct {
-    Status  int         `json:"status"`
-    Message string      `json:"message,omitempty"`
-    Data    interface{} `json:"data,omitempty"`
-    Error   string      `json:"error,omitempty"`
+    Success   bool        `json:"success"`
+    Status    int         `json:"status"`
+    Message   string      `json:"message,omitempty"`
+    Data      interface{} `json:"data,omitempty"`
+    Error     string      `json:"error,omitempty"`
+    RequestID string      `json:"request_id,omitempty"`
+    Timestamp string      `json:"timestamp"`
 }
 ```
 

@@ -5,9 +5,9 @@ on:
     branches:
       - dev
     paths:
-      - cmd/**
-      - internal/**
-      - .air.toml
+      - app/cmd/**
+      - app/internal/**
+      - app/.air.toml
   workflow_dispatch:
 
 permissions:
@@ -50,8 +50,8 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./app
+          file: ./app/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |

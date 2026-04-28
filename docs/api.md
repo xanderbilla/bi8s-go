@@ -6,9 +6,12 @@ All responses follow the same envelope shape:
 
 ```json
 {
+  "success": true,
   "status": 200,
   "message": "some message",
-  "data": { ... }
+  "data": {},
+  "request_id": "<uuid>",
+  "timestamp": "2026-04-25T12:00:00.000Z"
 }
 ```
 
@@ -16,11 +19,19 @@ On errors:
 
 ```json
 {
+  "success": false,
   "status": 400,
-  "message": "request failed",
-  "error": "description of what went wrong"
+  "message": "description of what went wrong",
+  "request_id": "<uuid>",
+  "timestamp": "2026-04-25T12:00:00.000Z"
 }
 ```
+
+### Authentication
+
+Admin routes (`/v1/a/*`) are not authenticated at the application layer. Restrict
+access via network controls (private VPC, internal load balancer, IP allow-list)
+before exposing the service.
 
 ## API Structure
 
@@ -125,8 +136,7 @@ Returns a single content by ID. Only returns content with visibility=PUBLIC and 
 ```json
 {
   "status": 404,
-  "message": "request failed",
-  "error": "The requested resource was not found"
+  "message": "The requested resource was not found"
 }
 ```
 
@@ -336,22 +346,19 @@ curl -X POST http://localhost:8080/v1/movies \
 // 400 - Performer not found
 {
   "status": 400,
-  "message": "request failed",
-  "error": "performer with id '999999' not found"
+  "message": "performer with id '999999' not found"
 }
 
 // 400 - Invalid date
 {
   "status": 400,
-  "message": "request failed",
-  "error": "Key: 'Movie.ReleaseDate' Error:Field validation for 'ReleaseDate' failed on the 'daterange' tag"
+  "message": "Key: 'Movie.ReleaseDate' Error:Field validation for 'ReleaseDate' failed on the 'daterange' tag"
 }
 
 // 409 - Duplicate ID
 {
   "status": 409,
-  "message": "request failed",
-  "error": "The resource already exists"
+  "message": "The resource already exists"
 }
 ```
 
@@ -379,8 +386,7 @@ Deletes a movie by ID.
 ```json
 {
   "status": 404,
-  "message": "request failed",
-  "error": "The requested resource was not found"
+  "message": "The requested resource was not found"
 }
 ```
 
@@ -541,8 +547,7 @@ curl -X POST http://localhost:8080/v1/persons \
 ```json
 {
   "status": 400,
-  "message": "request failed",
-  "error": "Key: 'Person.BirthDate' Error:Field validation for 'BirthDate' failed on the 'age18plus' tag"
+  "message": "Key: 'Person.BirthDate' Error:Field validation for 'BirthDate' failed on the 'age18plus' tag"
 }
 ```
 
@@ -754,8 +759,7 @@ This ensures that only publicly available and released/in-production content is 
 ```json
 {
   "status": 400,
-  "message": "request failed",
-  "error": "Key: 'Movie.ReleaseDate' Error:Field validation for 'ReleaseDate' failed on the 'daterange' tag"
+  "message": "Key: 'Movie.ReleaseDate' Error:Field validation for 'ReleaseDate' failed on the 'daterange' tag"
 }
 ```
 
@@ -764,8 +768,7 @@ This ensures that only publicly available and released/in-production content is 
 ```json
 {
   "status": 400,
-  "message": "request failed",
-  "error": "performer with id '999999' not found"
+  "message": "performer with id '999999' not found"
 }
 ```
 
@@ -774,8 +777,7 @@ This ensures that only publicly available and released/in-production content is 
 ```json
 {
   "status": 400,
-  "message": "request failed",
-  "error": "Key: 'Person.BirthDate' Error:Field validation for 'BirthDate' failed on the 'age18plus' tag"
+  "message": "Key: 'Person.BirthDate' Error:Field validation for 'BirthDate' failed on the 'age18plus' tag"
 }
 ```
 
@@ -784,8 +786,7 @@ This ensures that only publicly available and released/in-production content is 
 ```json
 {
   "status": 400,
-  "message": "request failed",
-  "error": "release_date must be in YYYY-MM-DD format"
+  "message": "release_date must be in YYYY-MM-DD format"
 }
 ```
 
@@ -794,8 +795,7 @@ This ensures that only publicly available and released/in-production content is 
 ```json
 {
   "status": 400,
-  "message": "request failed",
-  "error": "poster file exceeds max size limit"
+  "message": "poster file exceeds max size limit"
 }
 ```
 
@@ -804,8 +804,7 @@ This ensures that only publicly available and released/in-production content is 
 ```json
 {
   "status": 409,
-  "message": "request failed",
-  "error": "The resource already exists"
+  "message": "The resource already exists"
 }
 ```
 
