@@ -15,7 +15,6 @@ import (
 	transport "github.com/xanderbilla/bi8s-go/internal/http"
 )
 
-// newHTTPServer constructs a *http.Server with timeouts sourced from env.
 func newHTTPServer(addr string, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              addr,
@@ -29,9 +28,6 @@ func newHTTPServer(addr string, handler http.Handler) *http.Server {
 	}
 }
 
-// serve mounts the router, starts the HTTP server, blocks until a shutdown
-// signal arrives or the server fails, then performs graceful shutdown and
-// drains any in-flight encoding jobs.
 func serve(application *app.Application) error {
 	mux, closeRouter := transport.Mount(application)
 	defer closeRouter()
@@ -60,8 +56,6 @@ func serve(application *app.Application) error {
 	return shutdown(srv, application)
 }
 
-// shutdown stops accepting new connections, waits for in-flight requests, and
-// then drains the encoder service so background jobs can finish.
 func shutdown(srv *http.Server, application *app.Application) error {
 	transport.SetReady(false)
 
@@ -82,6 +76,7 @@ func shutdown(srv *http.Server, application *app.Application) error {
 	defer encoderCancel()
 
 	slog.Info("draining encoding jobs...")
+	application.EncoderService.Shutdown()
 	if err := application.EncoderService.Wait(encoderCtx); err != nil {
 		slog.Warn("encoding jobs did not complete within timeout, forcing shutdown", "error", err)
 	} else {
