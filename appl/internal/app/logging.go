@@ -5,11 +5,13 @@ import (
 	"os"
 
 	"github.com/xanderbilla/bi8s-go/internal/env"
+	"github.com/xanderbilla/bi8s-go/internal/observability"
 )
 
 func SetupLogger() {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	base := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     env.ParseLogLevel(env.GetString("LOG_LEVEL", "info")),
 		AddSource: env.GetBool("LOG_ADD_SOURCE", false),
-	})))
+	})
+	slog.SetDefault(slog.New(observability.NewSlogHandler(base)))
 }

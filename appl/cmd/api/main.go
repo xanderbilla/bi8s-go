@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/app"
 	"github.com/xanderbilla/bi8s-go/internal/env"
 	httpkg "github.com/xanderbilla/bi8s-go/internal/http"
+	"github.com/xanderbilla/bi8s-go/internal/observability"
 )
 
 func main() {
@@ -54,10 +56,28 @@ func run() error {
 	)
 	defer cancel()
 
+	// Initialize OpenTelemetry BEFORE building AWS clients so otelaws
+	// middleware has live providers to record startup health-check traces.
+	obsCfg := observability.LoadConfig(
+		env.GetString("OTEL_SERVICE_NAME", "bi8s-api"),
+		env.GetString("BUILD_VERSION", "dev"),
+		cfg.Env,
+	)
+	obsProvider, err := observability.Init(initCtx, obsCfg)
+	if err != nil {
+		slog.Warn("observability init failed; continuing without telemetry", "error", err)
+	}
+
 	application, err := app.Build(initCtx, cfg)
 	if err != nil {
-		return err
+		return errors.Join(err, shutdownObs(obsProvider, obsCfg.ShutdownTimeout))
 	}
+
+	httpMetrics, err := observability.NewHTTPMetrics()
+	if err != nil {
+		return errors.Join(err, shutdownObs(obsProvider, obsCfg.ShutdownTimeout))
+	}
+	application.HTTPMetrics = httpMetrics
 
 	probeCtx, probeCancel := context.WithTimeout(
 		context.Background(),
@@ -65,8 +85,24 @@ func run() error {
 	)
 	defer probeCancel()
 	if err := app.RunStartupHealthChecks(probeCtx, application); err != nil {
-		return err
+		return errors.Join(err, shutdownObs(obsProvider, obsCfg.ShutdownTimeout))
 	}
 
-	return serve(application)
+	serveErr := serve(application)
+	if shutErr := shutdownObs(obsProvider, obsCfg.ShutdownTimeout); shutErr != nil {
+		serveErr = errors.Join(serveErr, shutErr)
+	}
+	return serveErr
+}
+
+func shutdownObs(p *observability.Provider, timeout time.Duration) error {
+	if p == nil {
+		return nil
+	}
+	if timeout <= 0 {
+		timeout = 5 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return p.Shutdown(ctx)
 }

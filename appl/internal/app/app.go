@@ -4,6 +4,7 @@ import (
 	"context"
 
 	awsinfra "github.com/xanderbilla/bi8s-go/internal/aws"
+	"github.com/xanderbilla/bi8s-go/internal/observability"
 	"github.com/xanderbilla/bi8s-go/internal/service"
 )
 
@@ -17,4 +18,5 @@ type Application struct {
 	AttributeService *service.AttributeService
 	EncoderService   *service.EncoderService
 	HealthChecks     map[string]HealthCheck
+	HTTPMetrics      *observability.HTTPMetrics
 }

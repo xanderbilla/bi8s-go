@@ -1,14 +1,14 @@
 package http
 
 import (
-	"expvar"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/xanderbilla/bi8s-go/internal/app"
 	"github.com/xanderbilla/bi8s-go/internal/env"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
@@ -43,7 +43,9 @@ func Mount(application *app.Application) (http.Handler, func()) {
 	}
 
 	r.Use(RequestIDMiddleware)
-	r.Use(MetricsMiddleware)
+	if application.HTTPMetrics != nil {
+		r.Use(application.HTTPMetrics.Middleware)
+	}
 	r.Use(RequestLogger)
 	r.Use(middleware.Recoverer)
 	r.Use(SecureHeaders)
@@ -84,10 +86,6 @@ func Mount(application *app.Application) (http.Handler, func()) {
 
 		r.Get("/openapi.yaml", ServeOpenAPISpec)
 		r.Get("/docs", ServeSwaggerUI)
-
-		if !strings.EqualFold(application.Config.Env, "prod") {
-			r.Handle("/debug/vars", expvar.Handler())
-		}
 
 		r.Route("/c", func(r chi.Router) {
 			r.Use(stdTimeout)
@@ -145,7 +143,18 @@ func Mount(application *app.Application) (http.Handler, func()) {
 		movieWriteLimiter.Close()
 		personWriteLimiter.Close()
 	}
-	return r, cleanup
+
+	handler := otelhttp.NewHandler(r, "bi8s-api",
+		otelhttp.WithSpanNameFormatter(func(_ string, req *http.Request) string {
+			if rctx := chi.RouteContext(req.Context()); rctx != nil {
+				if pattern := rctx.RoutePattern(); pattern != "" {
+					return req.Method + " " + pattern
+				}
+			}
+			return req.Method + " " + req.URL.Path
+		}),
+	)
+	return handler, cleanup
 }
 
 func allowPrivateNetworkPreflight(next http.Handler) http.Handler {
