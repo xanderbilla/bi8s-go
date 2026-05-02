@@ -1,39 +1,259 @@
-version: "3.8"
+name: bi8s-local
+
+# Local development stack: API + UI + full observability pipeline.
+#
+# Telemetry flow (strict):
+#   Go app  ─OTLP/gRPC:4317─►  otel-collector  ──►  prometheus / tempo / loki
+#                                          ▲
+#                              promtail (docker logs) ┘
+#
+# All services share `bi8s-net`. Sensitive values come from `.env` (see
+# `.env.example`); never hard-code credentials in this file.
+
+x-restart-policy: &restart-policy
+  restart: unless-stopped
+
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
 
 services:
-  # Backend API Service
+  # ────────────────────────────── Application ─────────────────────────────
   api:
+    <<: [ *restart-policy, *default-logging ]
     build:
       context: ./appl
       dockerfile: Dockerfile
       target: runtime
     container_name: bi8s_api_local
-    ports:
-      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
     environment:
-      ENV: dev
-      DYNAMODB_TABLE: ${DYNAMODB_TABLE:-bi8s-dev}
+      APP_ENV: ${APP_ENV:-dev}
+      PORT: ${PORT:-:8080}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DYNAMODB_MOVIE_TABLE: ${DYNAMODB_MOVIE_TABLE:-bi8s-content-table-dev}
+      DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE:-bi8s-person-table-dev}
+      DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE:-bi8s-attributes-table-dev}
+      DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE:-bi8s-video-table-dev}
+      DYNAMODB_ENCODER_CONTENT_ID_INDEX: ${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      S3_BUCKET: ${S3_BUCKET:-bi8s}
-      S3_POSTER_PREFIX: ${S3_POSTER_PREFIX:-movies}
-      CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:8443,http://127.0.0.1:8443"
-      CORS_ALLOW_PRIVATE_NETWORK: "true"
-    restart: unless-stopped
+      S3_BUCKET: ${S3_BUCKET:-bi8s-storage-dev}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8443,http://127.0.0.1:8443}
+      CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api}
+      OTEL_ENABLED: ${OTEL_ENABLED:-true}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-otel-collector:4317}
+      OTEL_EXPORTER_OTLP_INSECURE: ${OTEL_EXPORTER_OTLP_INSECURE:-true}
+      OTEL_TRACES_ENABLED: ${OTEL_TRACES_ENABLED:-true}
+      OTEL_METRICS_ENABLED: ${OTEL_METRICS_ENABLED:-true}
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-1.0}
+      OTEL_METRIC_EXPORT_INTERVAL_SECONDS: ${OTEL_METRIC_EXPORT_INTERVAL_SECONDS:-15}
+      OTEL_SHUTDOWN_TIMEOUT_SECONDS: ${OTEL_SHUTDOWN_TIMEOUT_SECONDS:-5}
+      BUILD_VERSION: ${BUILD_VERSION:-dev}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8080/v1/livez" ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - bi8s-net
 
-  # Frontend UI Application
   ui:
+    <<: [ *restart-policy, *default-logging ]
     build:
-      context: /Users/xanderbilla/Desktop/examples-go/enternflix
+      context: ${UI_BUILD_CONTEXT:-./ui}
       dockerfile: Dockerfile
       args:
-        ENV_FILE: .env.local
+        ENV_FILE: ${UI_ENV_FILE:-.env.local}
     container_name: bi8s_ui_local
-    ports:
-      - "8443:8443"
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${UI_NODE_ENV:-development}
+    ports:
+      - "${UI_PORT:-8443}:8443"
     depends_on:
-      - api
-    restart: unless-stopped
+      api:
+        condition: service_started
+    networks:
+      - bi8s-net
+    profiles: [ "ui" ]
+
+  # ────────────────────────── Observability stack ─────────────────────────
+  otel-collector:
+    <<: [ *restart-policy, *default-logging ]
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    container_name: bi8s_otel_collector
+    command: [ "--config=/etc/otelcol/config.yaml" ]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "${OTEL_GRPC_PORT:-4317}:4317"
+      - "${OTEL_HTTP_PORT:-4318}:4318"
+      - "${OTEL_PROM_PORT:-8889}:8889"
+      - "13133:13133"
+    depends_on:
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
+    networks:
+      - bi8s-net
+
+  prometheus:
+    <<: [ *restart-policy, *default-logging ]
+    image: prom/prometheus:v2.55.1
+    container_name: bi8s_prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-72h}"
+      - "--web.enable-remote-write-receiver"
+      - "--enable-feature=exemplar-storage"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - bi8s-net
+
+  tempo:
+    <<: [ *restart-policy, *default-logging ]
+    image: grafana/tempo:2.6.1
+    container_name: bi8s_tempo
+    command: [ "-config.file=/etc/tempo/tempo.yaml" ]
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      TEMPO_BUCKET: ${TEMPO_BUCKET:-bi8s-tempo-traces-dev}
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "${TEMPO_HTTP_PORT:-3200}:3200"
+    networks:
+      - bi8s-net
+
+  loki:
+    <<: [ *restart-policy, *default-logging ]
+    image: grafana/loki:3.2.1
+    container_name: bi8s_loki
+    command: [ "-config.file=/etc/loki/loki-config.yaml" ]
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      LOKI_BUCKET: ${LOKI_BUCKET:-bi8s-loki-chunks-dev}
+    volumes:
+      - ./observability/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    networks:
+      - bi8s-net
+
+  promtail:
+    <<: [ *restart-policy, *default-logging ]
+    image: grafana/promtail:3.2.1
+    container_name: bi8s_promtail
+    command: [ "-config.file=/etc/promtail/config.yaml" ]
+    volumes:
+      - ./observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      loki:
+        condition: service_started
+    networks:
+      - bi8s-net
+
+  grafana:
+    <<: [ *restart-policy, *default-logging ]
+    image: grafana/grafana:11.3.0
+    container_name: bi8s_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor traceToMetrics"
+      # AWS credentials for the CloudWatch datasource. Falls through to instance/IRSA in cloud.
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-4000}:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
+    networks:
+      - bi8s-net
+
+  # ─────────────────────── Infrastructure exporters ───────────────────────
+  cadvisor:
+    <<: [ *restart-policy, *default-logging ]
+    image: gcr.io/cadvisor/cadvisor:v0.50.0
+    container_name: bi8s_cadvisor
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    command:
+      - --docker_only=true
+      - --store_container_labels=true
+    ports:
+      - "${CADVISOR_PORT:-8090}:8080"
+    networks:
+      - bi8s-net
+
+  node-exporter:
+    <<: [ *restart-policy, *default-logging ]
+    image: prom/node-exporter:v1.8.2
+    container_name: bi8s_node_exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)(\
+        $$|/)"
+    ports:
+      - "${NODE_EXPORTER_PORT:-9100}:9100"
+    networks:
+      - bi8s-net
+
+networks:
+  bi8s-net:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  tempo-data:
+  loki-data:
+  grafana-data:
