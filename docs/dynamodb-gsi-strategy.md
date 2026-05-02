@@ -1,5 +1,24 @@
 # DynamoDB Global Secondary Index (GSI) Strategy
 
+> **Status (2025 audit):**
+>
+> - ✅ **Implemented:** `contentId-index` on the encoder table is provisioned
+>   in `infra/tofu/envs/{dev,prod}/main.tf` and consumed by
+>   `EncoderRepository.GetByContentId` (paginated `Query`). The repo falls
+>   back to a paginated `Scan` only when the index name is empty
+>   (local-dev escape hatch).
+> - ⏳ **Not yet implemented:** the movie/person/attribute GSIs described
+>   below are aspirational. Several movie list operations
+>   (`GetMoviesByPersonId`, `GetContentByPersonId`,
+>   `GetMoviesByAttributeId`, `GetRecentContent`, `GetBanner`,
+>   `GetDiscoverContent`) filter on `contains(castIds, …)` /
+>   `contains(attributeIds, …)` over LIST attributes, which DynamoDB
+>   cannot index directly. Eliminating these scans requires inverted-
+>   index tables (`movies_by_person`, `movies_by_attribute`) populated
+>   via streams or dual-writes — tracked as deferred follow-up work.
+> - The `PersonRepository` does not currently expose `GetPersonsByRole`;
+>   the section below documents an idealized end-state.
+
 ## Overview
 
 This document defines the GSI strategy for production-grade DynamoDB performance. Without GSIs, the application uses expensive Scan operations that:
