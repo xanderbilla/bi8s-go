@@ -161,7 +161,8 @@ jobs:
           tofu plan -no-color -out=tfplan \
             -var="project_name=${{ env.PROJECT_NAME }}" \
             -var="ami_id=${{ env.EC2_AMI_ID }}" \
-            -var="key_name=${{ env.EC2_KEY_NAME }}"
+            -var="key_name=${{ env.EC2_KEY_NAME }}" \
+            -var="image_name=${{ secrets.DOCKER_IMAGE }}"
         continue-on-error: true
 
       - name: Upload Plan
@@ -321,7 +322,8 @@ jobs:
           tofu destroy -auto-approve \
             -var="project_name=${{ env.PROJECT_NAME }}" \
             -var="ami_id=${{ env.EC2_AMI_ID }}" \
-            -var="key_name=${{ env.EC2_KEY_NAME }}"
+            -var="key_name=${{ env.EC2_KEY_NAME }}" \
+            -var="image_name=${{ secrets.DOCKER_IMAGE }}"
 
           echo "### Infrastructure Destroyed 💥" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

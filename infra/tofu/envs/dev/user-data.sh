@@ -8,26 +8,34 @@ exec 2>&1
 echo "Starting EC2 User Data Script"
 echo ""
 
+export DEBIAN_FRONTEND=noninteractive
+
 # Update system
 echo "Updating system packages..."
-dnf update -y
+apt-get update -y
+apt-get upgrade -y
 
 # Install required packages
 echo "Installing required packages..."
-dnf install -y git wget tar curl unzip openssl jq
+apt-get install -y git wget tar curl unzip openssl jq ca-certificates gnupg lsb-release
 
-# Install Docker
-echo "Installing Docker..."
-dnf install -y docker
+# Install Docker CE (official Docker repo)
+echo "Installing Docker CE..."
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list
+apt-get update -y
+apt-get install -y docker-ce docker-ce-cli containerd.io
 
 # Start and enable Docker service
 echo "Starting Docker service..."
 systemctl start docker
 systemctl enable docker
 
-# Add ec2-user to docker group
-echo "Adding ec2-user to docker group..."
-usermod -aG docker ec2-user
+# Add ubuntu to docker group
+echo "Adding ubuntu to docker group..."
+usermod -aG docker ubuntu
 
 # Install Docker Compose
 echo "Installing Docker Compose..."
@@ -51,7 +59,7 @@ rm go$${GO_VERSION}.linux-amd64.tar.gz
 
 # Set up Go environment
 echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile.d/go.sh
-echo 'export GOPATH=/home/ec2-user/go' >> /etc/profile.d/go.sh
+echo 'export GOPATH=/home/ubuntu/go' >> /etc/profile.d/go.sh
 
 # Verify Go installation
 /usr/local/go/bin/go version
@@ -66,7 +74,7 @@ echo "Setting up Prometheus EBS volume..."
 PROM_DEVICE="${prometheus_device}"
 if [ -b "$PROM_DEVICE" ]; then
   # Format only if no filesystem exists on the device
-  if ! blkid "$PROM_DEVICE" > /dev/null 2>&1; then
+  if ! blkid "$PROM_DEVICE"; then
     echo "Formatting Prometheus EBS volume..."
     mkfs.ext4 -F "$PROM_DEVICE"
   fi
@@ -253,8 +261,8 @@ EOF
 
 # Set permissions (do not dereference symlinks; keep prometheus-data writable by root container).
 echo "Setting permissions..."
-chown -RH ec2-user:ec2-user /opt/${project_name}/compose /opt/${project_name}/scripts /opt/${project_name}/nginx
-chown -R ec2-user:ec2-user /opt/${project_name}/repo
+chown -RH ubuntu:ubuntu /opt/${project_name}/compose /opt/${project_name}/scripts /opt/${project_name}/nginx
+chown -R ubuntu:ubuntu /opt/${project_name}/repo
 chmod 600 /opt/${project_name}/compose/.env
 
 # Reload systemd
@@ -300,7 +308,7 @@ if [ "$NEW_IP" != "$OLD_IP" ]; then
       -newkey rsa:2048 \
       -keyout /opt/${project_name}/nginx/ssl/live/cert.key \
       -out /opt/${project_name}/nginx/ssl/live/cert.crt \
-      -subj "/C=US/ST=State/L=City/O=${project_name}/CN=$NEW_IP" 2>/dev/null
+      -subj "/C=US/ST=State/L=City/O=${project_name}/CN=$NEW_IP"
     
     chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
     chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
@@ -326,9 +334,9 @@ if [ -z "$DOMAIN" ]; then
 fi
 
 # Install certbot if not present
-if ! command -v certbot &> /dev/null; then
+if ! command -v certbot; then
     echo "Installing certbot..."
-    dnf install -y certbot
+    apt-get install -y certbot python3-certbot
 fi
 
 # Stop nginx container
