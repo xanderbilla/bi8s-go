@@ -1,3 +1,4 @@
+# IMDSv2 fix applied - instance will be recreated
 terraform {
   required_version = ">= 1.6.0"
 
