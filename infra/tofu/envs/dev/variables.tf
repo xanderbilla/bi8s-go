@@ -109,7 +109,19 @@ variable "repo_branch" {
 variable "image_name" {
   description = "Docker image (registry/repo:tag) the EC2 stack pulls for the API service"
   type        = string
-  default     = "xanderbilla/bi8s-go:latest"
+  default     = "xanderbilla/bi8s-api:latest"
+}
+
+variable "route53_zone_id" {
+  description = "Route53 hosted zone ID for auto-updating the DNS A record on deploy"
+  type        = string
+  default     = "Z001129137OC90Z9NK3SB"
+}
+
+variable "domain_name" {
+  description = "Domain name (A record) to point at the EC2 EIP"
+  type        = string
+  default     = "api.xanderbilla.com"
 }
 
 variable "grafana_admin_user" {
@@ -123,4 +135,22 @@ variable "grafana_admin_password" {
   type        = string
   sensitive   = true
   default     = "admin"
+}
+
+variable "grafana_domain_name" {
+  description = "Domain name for Grafana subdomain"
+  type        = string
+  default     = "grafana.xanderbilla.com"
+}
+
+variable "storage_domain_name" {
+  description = "Domain name for storage CDN"
+  type        = string
+  default     = "storage.xanderbilla.com"
+}
+
+variable "admin_email" {
+  description = "Admin email for Let's Encrypt certificate registration"
+  type        = string
+  default     = "admin@xanderbilla.com"
 }

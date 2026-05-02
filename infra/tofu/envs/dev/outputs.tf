@@ -60,3 +60,23 @@ output "prometheus_ebs_volume_id" {
   description = "EBS volume ID for Prometheus persistent data"
   value       = aws_ebs_volume.prometheus.id
 }
+
+output "api_domain" {
+  description = "Fully-qualified domain name managed by Route53"
+  value       = aws_route53_record.api.fqdn
+}
+
+output "api_url" {
+  description = "HTTPS URL for the API"
+  value       = "https://${aws_route53_record.api.fqdn}"
+}
+
+output "grafana_url" {
+  description = "HTTPS URL for Grafana"
+  value       = "https://${var.grafana_domain_name}"
+}
+
+output "storage_url" {
+  description = "CDN URL for storage"
+  value       = "https://${var.storage_domain_name}"
+}

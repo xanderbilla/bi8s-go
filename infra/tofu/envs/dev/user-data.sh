@@ -17,7 +17,7 @@ apt-get upgrade -y
 
 # Install required packages
 echo "Installing required packages..."
-apt-get install -y git wget tar curl unzip openssl jq ca-certificates gnupg lsb-release
+apt-get install -y git wget tar curl unzip openssl jq ca-certificates gnupg lsb-release certbot
 
 # Install Docker CE (official Docker repo)
 echo "Installing Docker CE..."
@@ -93,13 +93,14 @@ IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-
 PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
 echo "Public IP: $PUBLIC_IP"
 
-# Generate self-signed SSL certificate with IP
+# Generate self-signed SSL certificate with wildcard SAN
 echo "Generating self-signed SSL certificate..."
 openssl req -x509 -nodes -days 365 \
   -newkey rsa:2048 \
   -keyout /opt/${project_name}/nginx/ssl/live/cert.key \
   -out /opt/${project_name}/nginx/ssl/live/cert.crt \
-  -subj "/C=US/ST=State/L=City/O=${project_name}/CN=$PUBLIC_IP"
+  -subj "/C=US/ST=State/L=City/O=${project_name}/CN=*.xanderbilla.com" \
+  -addext "subjectAltName=DNS:${domain_name},DNS:${grafana_domain_name},IP:$PUBLIC_IP"
 
 # Set proper permissions for certificates
 chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
@@ -108,10 +109,43 @@ chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
 # Create certbot webroot
 mkdir -p /opt/${project_name}/nginx/certbot/www
 
+# Attempt to obtain Let's Encrypt certificate via standalone mode.
+# Port 80 is free here — Docker hasn't started yet.
+echo "Attempting Let's Encrypt certificate for ${domain_name} and ${grafana_domain_name}..."
+CERTBOT_SUCCESS=false
+for attempt in 1 2 3; do
+  if certbot certonly --standalone --non-interactive --agree-tos \
+      --email "${admin_email}" \
+      -d "${domain_name}" \
+      -d "${grafana_domain_name}" \
+      --preferred-challenges http 2>&1; then
+    CERTBOT_SUCCESS=true
+    echo "Let's Encrypt certificate obtained on attempt $attempt!"
+    break
+  fi
+  echo "Certbot attempt $attempt/3 failed, waiting 30s before retry..."
+  sleep 30
+done
+
+if [ "$CERTBOT_SUCCESS" = "true" ]; then
+  cp /etc/letsencrypt/live/${domain_name}/fullchain.pem /opt/${project_name}/nginx/ssl/live/cert.crt
+  cp /etc/letsencrypt/live/${domain_name}/privkey.pem /opt/${project_name}/nginx/ssl/live/cert.key
+  chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
+  chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
+  echo "Let's Encrypt certs installed."
+else
+  echo "WARNING: Let's Encrypt failed after 3 attempts. Self-signed cert will be used."
+  echo "Run /opt/${project_name}/scripts/renew-ssl.sh later to install a trusted cert."
+fi
+
 # Create nginx config
 cat > /opt/${project_name}/nginx/conf.d/api.conf <<'NGINXCONF'
 upstream api_backend {
     server api:8080;
+}
+
+upstream grafana_backend {
+    server grafana:3000;
 }
 
 # HTTP Server - Redirect to HTTPS
@@ -137,11 +171,42 @@ server {
     }
 }
 
-# HTTPS Server
+# HTTPS Server - Grafana subdomain
 server {
     listen 443 ssl;
     http2 on;
-    server_name _;
+    server_name ${grafana_domain_name};
+
+    ssl_certificate /etc/nginx/ssl/live/cert.crt;
+    ssl_certificate_key /etc/nginx/ssl/live/cert.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    location / {
+        proxy_pass http://grafana_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+
+# HTTPS Server - API (default / catch-all)
+server {
+    listen 443 ssl default_server;
+    http2 on;
+    server_name ${domain_name} _;
 
     # SSL Configuration
     ssl_certificate /etc/nginx/ssl/live/cert.crt;
@@ -198,7 +263,7 @@ export DYNAMODB_ENCODER_TABLE="${dynamodb_encoder_table}"
 export S3_BUCKET="${s3_bucket}"
 export LOKI_BUCKET="${loki_bucket}"
 export TEMPO_BUCKET="${tempo_bucket}"
-export CORS_ALLOWED_ORIGINS="https://api.xanderbilla.com,http://api.xanderbilla.com,http://$PUBLIC_IP"
+export CORS_ALLOWED_ORIGINS="https://api.xanderbilla.com,http://api.xanderbilla.com,https://grafana.xanderbilla.com,http://localhost:3000,http://localhost:8080,http://$PUBLIC_IP"
 export CORS_ALLOW_PRIVATE_NETWORK="true"
 export PUBLIC_IP="$PUBLIC_IP"
 EOF
@@ -222,7 +287,7 @@ CTX_DB_TIMEOUT_MS=30000
 S3_BUCKET=${s3_bucket}
 LOKI_BUCKET=${loki_bucket}
 TEMPO_BUCKET=${tempo_bucket}
-CORS_ALLOWED_ORIGINS=https://api.xanderbilla.com,http://api.xanderbilla.com,http://$${PUBLIC_IP}
+CORS_ALLOWED_ORIGINS=https://api.xanderbilla.com,http://api.xanderbilla.com,https://grafana.xanderbilla.com,http://localhost:3000,http://localhost:8080,http://$${PUBLIC_IP}
 CORS_ALLOW_PRIVATE_NETWORK=true
 TRUSTED_PROXIES=
 ENCODER_MAX_CONCURRENT=2
@@ -243,6 +308,9 @@ BUILD_VERSION=${environment}
 PROMETHEUS_RETENTION=168h
 GRAFANA_ADMIN_USER=${grafana_admin_user}
 GRAFANA_ADMIN_PASSWORD=${grafana_admin_password}
+GRAFANA_ROOT_URL=https://${grafana_domain_name}/
+GF_SERVER_SERVE_FROM_SUB_PATH=false
+STORAGE_BASE_URL=https://${storage_domain_name}
 EOF
 
 # Clone application repo (single source of truth for compose + observability configs).
@@ -286,8 +354,70 @@ chmod 600 /opt/${project_name}/compose/.env
 # Reload systemd
 systemctl daemon-reload
 
-# Enable service
+# Enable and start service (enable = survive reboots, start = run now)
 systemctl enable ${project_name}-docker.service
+systemctl start ${project_name}-docker.service
+
+# Set up certbot auto-renewal hooks and cron job
+mkdir -p /etc/letsencrypt/renewal-hooks/pre /etc/letsencrypt/renewal-hooks/post
+
+# Pre-hook: stop nginx so port 80 is free for standalone renewal
+cat > /etc/letsencrypt/renewal-hooks/pre/stop-nginx.sh <<'RENEW_PRE'
+#!/bin/bash
+cd /opt/${project_name}/compose
+docker-compose stop nginx
+RENEW_PRE
+chmod +x /etc/letsencrypt/renewal-hooks/pre/stop-nginx.sh
+
+# Post-hook: copy renewed certs and restart nginx
+cat > /etc/letsencrypt/renewal-hooks/post/start-nginx.sh <<'RENEW_POST'
+#!/bin/bash
+DOMAIN="${domain_name}"
+cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem /opt/${project_name}/nginx/ssl/live/cert.crt
+cp /etc/letsencrypt/live/$DOMAIN/privkey.pem /opt/${project_name}/nginx/ssl/live/cert.key
+chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
+chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
+cd /opt/${project_name}/compose
+docker-compose start nginx
+RENEW_POST
+chmod +x /etc/letsencrypt/renewal-hooks/post/start-nginx.sh
+
+# Cron: run certbot renew twice daily (Let's Encrypt recommendation)
+echo "0 0,12 * * * root certbot renew --quiet" > /etc/cron.d/certbot-renew
+
+# Create seed-on-boot script (runs seed.sh after Docker service is up)
+mkdir -p /opt/${project_name}/logs
+cat > /opt/${project_name}/scripts/seed-on-boot.sh <<'SEEDSCRIPT'
+#!/bin/bash
+set -euo pipefail
+
+LOG_FILE="/opt/${project_name}/logs/seed.log"
+REPO_DIR="/opt/${project_name}/repo"
+SEED_SCRIPT="$REPO_DIR/scripts/seed.sh"
+
+echo "[seed-on-boot] $(date) Starting..." >> "$LOG_FILE"
+
+# Wait for systemd service to be active
+for i in $(seq 1 30); do
+  if systemctl is-active --quiet ${project_name}-docker.service; then
+    echo "[seed-on-boot] $(date) Docker service active." >> "$LOG_FILE"
+    break
+  fi
+  echo "[seed-on-boot] $(date) Waiting for docker service ($i/30)..." >> "$LOG_FILE"
+  sleep 10
+done
+
+# Run seed script
+if [ -f "$SEED_SCRIPT" ]; then
+  bash "$SEED_SCRIPT" >> "$LOG_FILE" 2>&1
+  echo "[seed-on-boot] $(date) Seed finished (exit $?)." >> "$LOG_FILE"
+else
+  echo "[seed-on-boot] $(date) ERROR: seed.sh not found at $SEED_SCRIPT" >> "$LOG_FILE"
+fi
+SEEDSCRIPT
+
+chmod +x /opt/${project_name}/scripts/seed-on-boot.sh
+nohup /opt/${project_name}/scripts/seed-on-boot.sh > /opt/${project_name}/logs/seed.log 2>&1 &
 
 # Install AWS CLI v2
 echo "Installing AWS CLI v2..."
@@ -322,17 +452,22 @@ if [ "$NEW_IP" != "$OLD_IP" ]; then
     # Update environment profile
     sed -i "s/^export PUBLIC_IP=.*/export PUBLIC_IP=\"$NEW_IP\"/" /etc/profile.d/${project_name}.sh
     
-    # Regenerate self-signed certificate with new IP
-    openssl req -x509 -nodes -days 365 \
-      -newkey rsa:2048 \
-      -keyout /opt/${project_name}/nginx/ssl/live/cert.key \
-      -out /opt/${project_name}/nginx/ssl/live/cert.crt \
-      -subj "/C=US/ST=State/L=City/O=${project_name}/CN=$NEW_IP"
+    # Regenerate self-signed certificate ONLY if Let's Encrypt cert is not present
+    if [ ! -f /etc/letsencrypt/live/${domain_name}/fullchain.pem ]; then
+      openssl req -x509 -nodes -days 365 \
+        -newkey rsa:2048 \
+        -keyout /opt/${project_name}/nginx/ssl/live/cert.key \
+        -out /opt/${project_name}/nginx/ssl/live/cert.crt \
+        -subj "/C=US/ST=State/L=City/O=${project_name}/CN=*.xanderbilla.com" \
+        -addext "subjectAltName=DNS:${domain_name},DNS:${grafana_domain_name},IP:$NEW_IP"
+      chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
+      chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
+      echo "IP and self-signed certificate updated."
+    else
+      echo "Let's Encrypt cert present — skipping self-signed cert regen."
+    fi
     
-    chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
-    chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
-    
-    echo "IP and SSL certificate updated successfully!"
+    echo "IP updated successfully!"
 else
     echo "IP unchanged: $NEW_IP"
 fi

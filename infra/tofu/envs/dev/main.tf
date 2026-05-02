@@ -195,7 +195,10 @@ module "s3" {
         "http://127.0.0.1:3000",
         "http://127.0.0.1:8080",
         "http://127.0.0.1:8443",
-        "https://127.0.0.1:8443"
+        "https://127.0.0.1:8443",
+        "https://api.xanderbilla.com",
+        "https://grafana.xanderbilla.com",
+        "https://storage.xanderbilla.com"
       ]
       expose_headers  = ["ETag"]
       max_age_seconds = 3000
@@ -336,6 +339,10 @@ module "ec2" {
     image_name               = var.image_name
     grafana_admin_user       = var.grafana_admin_user
     grafana_admin_password   = var.grafana_admin_password
+    grafana_domain_name      = var.grafana_domain_name
+    storage_domain_name      = var.storage_domain_name
+    domain_name              = var.domain_name
+    admin_email              = var.admin_email
   }))
 
   tags = local.common_tags
@@ -362,4 +369,21 @@ resource "aws_volume_attachment" "prometheus" {
   device_name = "/dev/xvdb"
   volume_id   = aws_ebs_volume.prometheus.id
   instance_id = module.ec2.instance_id
+}
+
+# Route53 A record — auto-updated to the EC2 EIP on every deploy
+resource "aws_route53_record" "api" {
+  zone_id = var.route53_zone_id
+  name    = var.domain_name
+  type    = "A"
+  ttl     = 60
+  records = [module.ec2.instance_public_ip]
+}
+
+resource "aws_route53_record" "grafana" {
+  zone_id = var.route53_zone_id
+  name    = var.grafana_domain_name
+  type    = "A"
+  ttl     = 60
+  records = [module.ec2.instance_public_ip]
 }
