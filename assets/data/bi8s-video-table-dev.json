@@ -1,0 +1,921 @@
+{
+    "Items": [
+        {
+            "version": {
+                "N": "3"
+            },
+            "output": {
+                "M": {
+                    "preview": {
+                        "M": {
+                            "durationSec": {
+                                "N": "30"
+                            },
+                            "file": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/30sec.mp4"
+                            }
+                        }
+                    },
+                    "subtitles": {
+                        "M": {
+                            "dir": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/video/subtitle/"
+                            },
+                            "tracks": {
+                                "L": []
+                            }
+                        }
+                    },
+                    "masterPlaylists": {
+                        "M": {
+                            "recordMasterPlaylist": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/job_c8dc84ee-d03b-4e80-957d-9c0445404958_master.m3u8"
+                            },
+                            "currentMasterPlaylist": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/master.m3u8"
+                            }
+                        }
+                    },
+                    "baseOutputDir": {
+                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958"
+                    },
+                    "sprite": {
+                        "M": {
+                            "image": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/sprite.jpg"
+                            },
+                            "vtt": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/sprite.vtt"
+                            }
+                        }
+                    },
+                    "video": {
+                        "M": {
+                            "qualities": {
+                                "L": [
+                                    {
+                                        "M": {
+                                            "playlist": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/video/360/index.m3u8"
+                                            },
+                                            "resolution": {
+                                                "S": "640x360"
+                                            },
+                                            "quality": {
+                                                "S": "360p"
+                                            },
+                                            "chunksDir": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/video/360/"
+                                            },
+                                            "chunkCount": {
+                                                "N": "5"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "M": {
+                                            "playlist": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/video/480/index.m3u8"
+                                            },
+                                            "resolution": {
+                                                "S": "854x480"
+                                            },
+                                            "quality": {
+                                                "S": "480p"
+                                            },
+                                            "chunksDir": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/video/480/"
+                                            },
+                                            "chunkCount": {
+                                                "N": "5"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "M": {
+                                            "playlist": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/video/720/index.m3u8"
+                                            },
+                                            "resolution": {
+                                                "S": "1280x720"
+                                            },
+                                            "quality": {
+                                                "S": "720p"
+                                            },
+                                            "chunksDir": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/video/720/"
+                                            },
+                                            "chunkCount": {
+                                                "N": "5"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "audio": {
+                        "M": {
+                            "tracks": {
+                                "L": [
+                                    {
+                                        "M": {
+                                            "default": {
+                                                "BOOL": false
+                                            },
+                                            "playlist": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/audio/128k/index.m3u8"
+                                            },
+                                            "chunkCount": {
+                                                "N": "6"
+                                            },
+                                            "language": {
+                                                "S": "und"
+                                            },
+                                            "bitrate": {
+                                                "S": "128k"
+                                            },
+                                            "label": {
+                                                "S": "Default Audio"
+                                            },
+                                            "chunksDir": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/audio/128k/"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "M": {
+                                            "default": {
+                                                "BOOL": true
+                                            },
+                                            "playlist": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/audio/256k/index.m3u8"
+                                            },
+                                            "chunkCount": {
+                                                "N": "6"
+                                            },
+                                            "language": {
+                                                "S": "und"
+                                            },
+                                            "bitrate": {
+                                                "S": "256k"
+                                            },
+                                            "label": {
+                                                "S": "Default Audio"
+                                            },
+                                            "chunksDir": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_c8dc84ee-d03b-4e80-957d-9c0445404958/audio/256k/"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "thumbnails": {
+                        "M": {
+                            "dir": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/"
+                            },
+                            "count": {
+                                "N": "5"
+                            },
+                            "items": {
+                                "L": [
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_1.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_2.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_5.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_3.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_4.jpg"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            "contentId": {
+                "S": "2517125d-ec6f-4cdf-b2b9-ca9db5c79709"
+            },
+            "meta": {
+                "M": {
+                    "processingTimeSec": {
+                        "N": "26.045069417"
+                    },
+                    "createdAt": {
+                        "S": "2026-05-01T13:05:25.748114+05:30"
+                    },
+                    "startedAt": {
+                        "S": "2026-05-01T13:05:26.177983+05:30"
+                    },
+                    "failedAt": {
+                        "NULL": true
+                    },
+                    "completedAt": {
+                        "S": "2026-05-01T13:05:52.223295+05:30"
+                    }
+                }
+            },
+            "errors": {
+                "L": []
+            },
+            "status": {
+                "S": "COMPLETED"
+            },
+            "input": {
+                "M": {
+                    "generatedQualities": {
+                        "L": [
+                            {
+                                "M": {
+                                    "videoBitrate": {
+                                        "S": "800k"
+                                    },
+                                    "resolution": {
+                                        "S": "640x360"
+                                    },
+                                    "quality": {
+                                        "S": "360p"
+                                    }
+                                }
+                            },
+                            {
+                                "M": {
+                                    "videoBitrate": {
+                                        "S": "1200k"
+                                    },
+                                    "resolution": {
+                                        "S": "854x480"
+                                    },
+                                    "quality": {
+                                        "S": "480p"
+                                    }
+                                }
+                            },
+                            {
+                                "M": {
+                                    "videoBitrate": {
+                                        "S": "2500k"
+                                    },
+                                    "resolution": {
+                                        "S": "1280x720"
+                                    },
+                                    "quality": {
+                                        "S": "720p"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "fileName": {
+                        "S": "sample.mp4"
+                    },
+                    "hasEmbeddedAudio": {
+                        "BOOL": true
+                    },
+                    "hasExternalAudio": {
+                        "BOOL": false
+                    },
+                    "sourceExtension": {
+                        "S": "mp4"
+                    },
+                    "hasSubtitles": {
+                        "BOOL": false
+                    },
+                    "durationSec": {
+                        "N": "30.093061"
+                    },
+                    "audioCodec": {
+                        "S": "aac"
+                    },
+                    "resolution": {
+                        "S": "1280x720"
+                    },
+                    "sourcePath": {
+                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/input/job_c8dc84ee-d03b-4e80-957d-9c0445404958.mp4"
+                    },
+                    "videoCodec": {
+                        "S": "h264"
+                    }
+                }
+            },
+            "playback": {
+                "M": {
+                    "Streaming": {
+                        "M": {
+                            "MasterPlaylist": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/master.m3u8"
+                            },
+                            "Type": {
+                                "S": "HLS"
+                            }
+                        }
+                    },
+                    "Sprite": {
+                        "M": {
+                            "Image": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/sprite.jpg"
+                            },
+                            "VTT": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/sprite.vtt"
+                            }
+                        }
+                    },
+                    "Video": {
+                        "M": {
+                            "DefaultQuality": {
+                                "S": "auto"
+                            },
+                            "Qualities": {
+                                "L": [
+                                    {
+                                        "S": "360p"
+                                    },
+                                    {
+                                        "S": "480p"
+                                    },
+                                    {
+                                        "S": "720p"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "DurationSec": {
+                        "N": "30.093061"
+                    },
+                    "Subtitles": {
+                        "M": {
+                            "DefaultTrackID": {
+                                "NULL": true
+                            },
+                            "Tracks": {
+                                "L": []
+                            }
+                        }
+                    },
+                    "Preview": {
+                        "M": {
+                            "Video": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/30sec.mp4"
+                            }
+                        }
+                    },
+                    "Thumbnails": {
+                        "M": {
+                            "Poster": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_1.jpg"
+                            },
+                            "Items": {
+                                "L": [
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_1.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_2.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_5.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_3.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_4.jpg"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "Audio": {
+                        "M": {
+                            "DefaultTrackID": {
+                                "S": "audio_256k_und"
+                            },
+                            "Tracks": {
+                                "L": [
+                                    {
+                                        "M": {
+                                            "Label": {
+                                                "S": "Default Audio"
+                                            },
+                                            "ID": {
+                                                "S": "audio_128k_und"
+                                            },
+                                            "Language": {
+                                                "S": "und"
+                                            },
+                                            "Bitrate": {
+                                                "S": "128k"
+                                            },
+                                            "Default": {
+                                                "BOOL": false
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "M": {
+                                            "Label": {
+                                                "S": "Default Audio"
+                                            },
+                                            "ID": {
+                                                "S": "audio_256k_und"
+                                            },
+                                            "Language": {
+                                                "S": "und"
+                                            },
+                                            "Default": {
+                                                "BOOL": true
+                                            },
+                                            "Bitrate": {
+                                                "S": "256k"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            "warnings": {
+                "L": []
+            },
+            "id": {
+                "S": "job_c8dc84ee-d03b-4e80-957d-9c0445404958"
+            },
+            "contentType": {
+                "S": "MOVIE"
+            }
+        },
+        {
+            "version": {
+                "N": "3"
+            },
+            "output": {
+                "M": {
+                    "preview": {
+                        "M": {
+                            "durationSec": {
+                                "N": "30"
+                            },
+                            "file": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/30sec.mp4"
+                            }
+                        }
+                    },
+                    "subtitles": {
+                        "M": {
+                            "dir": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/video/subtitle/"
+                            },
+                            "tracks": {
+                                "L": []
+                            }
+                        }
+                    },
+                    "masterPlaylists": {
+                        "M": {
+                            "recordMasterPlaylist": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55_master.m3u8"
+                            },
+                            "currentMasterPlaylist": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/master.m3u8"
+                            }
+                        }
+                    },
+                    "baseOutputDir": {
+                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55"
+                    },
+                    "sprite": {
+                        "M": {
+                            "image": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/sprite.jpg"
+                            },
+                            "vtt": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/sprite.vtt"
+                            }
+                        }
+                    },
+                    "audio": {
+                        "M": {
+                            "tracks": {
+                                "L": [
+                                    {
+                                        "M": {
+                                            "default": {
+                                                "BOOL": false
+                                            },
+                                            "playlist": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/audio/128k/index.m3u8"
+                                            },
+                                            "chunkCount": {
+                                                "N": "6"
+                                            },
+                                            "bitrate": {
+                                                "S": "128k"
+                                            },
+                                            "language": {
+                                                "S": "und"
+                                            },
+                                            "label": {
+                                                "S": "Default Audio"
+                                            },
+                                            "chunksDir": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/audio/128k/"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "M": {
+                                            "default": {
+                                                "BOOL": true
+                                            },
+                                            "playlist": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/audio/256k/index.m3u8"
+                                            },
+                                            "chunkCount": {
+                                                "N": "6"
+                                            },
+                                            "bitrate": {
+                                                "S": "256k"
+                                            },
+                                            "language": {
+                                                "S": "und"
+                                            },
+                                            "label": {
+                                                "S": "Default Audio"
+                                            },
+                                            "chunksDir": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/audio/256k/"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "video": {
+                        "M": {
+                            "qualities": {
+                                "L": [
+                                    {
+                                        "M": {
+                                            "playlist": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/video/360/index.m3u8"
+                                            },
+                                            "resolution": {
+                                                "S": "640x360"
+                                            },
+                                            "chunkCount": {
+                                                "N": "5"
+                                            },
+                                            "quality": {
+                                                "S": "360p"
+                                            },
+                                            "chunksDir": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/video/360/"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "M": {
+                                            "playlist": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/video/720/index.m3u8"
+                                            },
+                                            "resolution": {
+                                                "S": "1280x720"
+                                            },
+                                            "chunkCount": {
+                                                "N": "5"
+                                            },
+                                            "quality": {
+                                                "S": "720p"
+                                            },
+                                            "chunksDir": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/video/720/"
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "M": {
+                                            "playlist": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/video/480/index.m3u8"
+                                            },
+                                            "resolution": {
+                                                "S": "854x480"
+                                            },
+                                            "chunksDir": {
+                                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55/video/480/"
+                                            },
+                                            "chunkCount": {
+                                                "N": "5"
+                                            },
+                                            "quality": {
+                                                "S": "480p"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "thumbnails": {
+                        "M": {
+                            "dir": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/"
+                            },
+                            "count": {
+                                "N": "5"
+                            },
+                            "items": {
+                                "L": [
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_1.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_2.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_3.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_5.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_4.jpg"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            "contentId": {
+                "S": "2517125d-ec6f-4cdf-b2b9-ca9db5c79709"
+            },
+            "meta": {
+                "M": {
+                    "processingTimeSec": {
+                        "N": "22.181315875"
+                    },
+                    "createdAt": {
+                        "S": "2026-05-01T14:17:37.880959+05:30"
+                    },
+                    "startedAt": {
+                        "S": "2026-05-01T14:17:38.243152+05:30"
+                    },
+                    "completedAt": {
+                        "S": "2026-05-01T14:18:00.424605+05:30"
+                    },
+                    "failedAt": {
+                        "NULL": true
+                    }
+                }
+            },
+            "errors": {
+                "L": []
+            },
+            "status": {
+                "S": "COMPLETED"
+            },
+            "input": {
+                "M": {
+                    "generatedQualities": {
+                        "L": [
+                            {
+                                "M": {
+                                    "videoBitrate": {
+                                        "S": "800k"
+                                    },
+                                    "resolution": {
+                                        "S": "640x360"
+                                    },
+                                    "quality": {
+                                        "S": "360p"
+                                    }
+                                }
+                            },
+                            {
+                                "M": {
+                                    "videoBitrate": {
+                                        "S": "1200k"
+                                    },
+                                    "resolution": {
+                                        "S": "854x480"
+                                    },
+                                    "quality": {
+                                        "S": "480p"
+                                    }
+                                }
+                            },
+                            {
+                                "M": {
+                                    "videoBitrate": {
+                                        "S": "2500k"
+                                    },
+                                    "resolution": {
+                                        "S": "1280x720"
+                                    },
+                                    "quality": {
+                                        "S": "720p"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "fileName": {
+                        "S": "sample.mp4"
+                    },
+                    "hasExternalAudio": {
+                        "BOOL": false
+                    },
+                    "hasEmbeddedAudio": {
+                        "BOOL": true
+                    },
+                    "sourceExtension": {
+                        "S": "mp4"
+                    },
+                    "audioCodec": {
+                        "S": "aac"
+                    },
+                    "hasSubtitles": {
+                        "BOOL": false
+                    },
+                    "durationSec": {
+                        "N": "30.093061"
+                    },
+                    "resolution": {
+                        "S": "1280x720"
+                    },
+                    "sourcePath": {
+                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/input/job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55.mp4"
+                    },
+                    "videoCodec": {
+                        "S": "h264"
+                    }
+                }
+            },
+            "playback": {
+                "M": {
+                    "Streaming": {
+                        "M": {
+                            "MasterPlaylist": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/output/master.m3u8"
+                            },
+                            "Type": {
+                                "S": "HLS"
+                            }
+                        }
+                    },
+                    "Sprite": {
+                        "M": {
+                            "Image": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/sprite.jpg"
+                            },
+                            "VTT": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/sprite.vtt"
+                            }
+                        }
+                    },
+                    "Video": {
+                        "M": {
+                            "DefaultQuality": {
+                                "S": "auto"
+                            },
+                            "Qualities": {
+                                "L": [
+                                    {
+                                        "S": "360p"
+                                    },
+                                    {
+                                        "S": "720p"
+                                    },
+                                    {
+                                        "S": "480p"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "Subtitles": {
+                        "M": {
+                            "DefaultTrackID": {
+                                "NULL": true
+                            },
+                            "Tracks": {
+                                "L": []
+                            }
+                        }
+                    },
+                    "DurationSec": {
+                        "N": "30.093061"
+                    },
+                    "Preview": {
+                        "M": {
+                            "Video": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/preview/30sec.mp4"
+                            }
+                        }
+                    },
+                    "Thumbnails": {
+                        "M": {
+                            "Poster": {
+                                "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_1.jpg"
+                            },
+                            "Items": {
+                                "L": [
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_1.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_2.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_3.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_5.jpg"
+                                    },
+                                    {
+                                        "S": "/movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/thumbnails/thumbnail_4.jpg"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "Audio": {
+                        "M": {
+                            "DefaultTrackID": {
+                                "S": "audio_256k_und"
+                            },
+                            "Tracks": {
+                                "L": [
+                                    {
+                                        "M": {
+                                            "Label": {
+                                                "S": "Default Audio"
+                                            },
+                                            "ID": {
+                                                "S": "audio_128k_und"
+                                            },
+                                            "Language": {
+                                                "S": "und"
+                                            },
+                                            "Bitrate": {
+                                                "S": "128k"
+                                            },
+                                            "Default": {
+                                                "BOOL": false
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "M": {
+                                            "Label": {
+                                                "S": "Default Audio"
+                                            },
+                                            "ID": {
+                                                "S": "audio_256k_und"
+                                            },
+                                            "Language": {
+                                                "S": "und"
+                                            },
+                                            "Bitrate": {
+                                                "S": "256k"
+                                            },
+                                            "Default": {
+                                                "BOOL": true
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            "warnings": {
+                "L": []
+            },
+            "id": {
+                "S": "job_86dd8c3c-0e1c-4af3-8f3f-71febff0fa55"
+            },
+            "contentType": {
+                "S": "MOVIE"
+            }
+        }
+    ],
+    "Count": 2,
+    "ScannedCount": 2,
+    "ConsumedCapacity": null
+}

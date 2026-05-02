@@ -1,0 +1,66 @@
+{
+  "dynamodb": [
+    {
+      "table_env": "DYNAMODB_MOVIE_TABLE",
+      "file": "assets/data/bi8s-content-table-dev.json"
+    },
+    {
+      "table_env": "DYNAMODB_PERSON_TABLE",
+      "file": "assets/data/bi8s-person-table-dev.json"
+    },
+    {
+      "table_env": "DYNAMODB_ATTRIBUTE_TABLE",
+      "file": "assets/data/bi8s-attributes-table-dev.json"
+    },
+    {
+      "table_env": "DYNAMODB_ENCODER_TABLE",
+      "file": "assets/data/bi8s-video-table-dev.json"
+    }
+  ],
+  "images": [
+    {
+      "local": "assets/images/movies/eternals-poster.jpg",
+      "s3_key": "movies/cb844b75-3547-4c88-a480-41a6912c34a8/poster-a8de96f4.png",
+      "content_type": "image/png"
+    },
+    {
+      "local": "assets/images/movies/eternals-backdrop.jpg",
+      "s3_key": "movies/cb844b75-3547-4c88-a480-41a6912c34a8/cover-955fb5a8.jpg",
+      "content_type": "image/jpeg"
+    },
+    {
+      "local": "assets/images/movies/ironman-poster.jpg",
+      "s3_key": "movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/poster-4f40846e.jpg",
+      "content_type": "image/jpeg"
+    },
+    {
+      "local": "assets/images/movies/ironman-backdrop.jpg",
+      "s3_key": "movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/cover-bcac97dc.jpg",
+      "content_type": "image/jpeg"
+    },
+    {
+      "local": "assets/images/persons/person-648032-profile.jpg",
+      "s3_key": "person/648032/profile-35f42c31.jpg",
+      "content_type": "image/jpeg"
+    },
+    {
+      "local": "assets/images/persons/person-648032-backdrop.jpg",
+      "s3_key": "person/648032/cover-897e590f.jpg",
+      "content_type": "image/jpeg"
+    },
+    {
+      "local": "assets/images/persons/person-542131-profile.jpg",
+      "s3_key": "person/542131/profile-06bddf17.jpg",
+      "content_type": "image/jpeg"
+    },
+    {
+      "local": "assets/images/persons/person-542131-backdrop.jpg",
+      "s3_key": "person/542131/cover-a998f129.jpg",
+      "content_type": "image/jpeg"
+    }
+  ],
+  "video": {
+    "local": "assets/videos/sample.mp4",
+    "content_id": "cb844b75-3547-4c88-a480-41a6912c34a8"
+  }
+}

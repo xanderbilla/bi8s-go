@@ -1,0 +1,380 @@
+{
+    "Items": [
+        {
+            "stats": {
+                "M": {
+                    "totalViews": {
+                        "N": "0"
+                    },
+                    "totalLikes": {
+                        "N": "0"
+                    },
+                    "averageRating": {
+                        "N": "0"
+                    }
+                }
+            },
+            "posterPath": {
+                "S": "movies/cb844b75-3547-4c88-a480-41a6912c34a8/poster-a8de96f4.png"
+            },
+            "castIds": {
+                "L": [
+                    {
+                        "S": "648032"
+                    },
+                    {
+                        "S": "542131"
+                    }
+                ]
+            },
+            "studios": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Vivid Entertainment"
+                            },
+                            "id": {
+                                "S": "331270"
+                            }
+                        }
+                    }
+                ]
+            },
+            "adult": {
+                "BOOL": true
+            },
+            "originalLanguage": {
+                "S": "en"
+            },
+            "runtime": {
+                "N": "156"
+            },
+            "casts": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Angelina Jolie"
+                            },
+                            "id": {
+                                "S": "648032"
+                            }
+                        }
+                    },
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Robert Downey Jr."
+                            },
+                            "id": {
+                                "S": "542131"
+                            }
+                        }
+                    }
+                ]
+            },
+            "overview": {
+                "S": "The Eternals, a race of immortal beings with superhuman powers who have secretly lived on Earth for thousands of years, reunite to battle the monstrous Deviants and uncover a startling secret about their own existence."
+            },
+            "status": {
+                "S": "RELEASED"
+            },
+            "visibility": {
+                "S": "PUBLIC"
+            },
+            "originCountry": {
+                "L": [
+                    {
+                        "S": "US"
+                    }
+                ]
+            },
+            "contentType": {
+                "S": "MOVIE"
+            },
+            "releaseDate": {
+                "S": "2021-11-05"
+            },
+            "tagline": {
+                "S": "In the beginning..."
+            },
+            "attributeIds": {
+                "L": [
+                    {
+                        "S": "126716"
+                    },
+                    {
+                        "S": "225828"
+                    },
+                    {
+                        "S": "225828"
+                    },
+                    {
+                        "S": "331270"
+                    }
+                ]
+            },
+            "audit": {
+                "M": {
+                    "createdAt": {
+                        "S": "2026-05-01T15:03:36.671322+05:30"
+                    },
+                    "version": {
+                        "N": "1"
+                    }
+                }
+            },
+            "moodTags": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Steamy"
+                            },
+                            "id": {
+                                "S": "225828"
+                            }
+                        }
+                    }
+                ]
+            },
+            "id": {
+                "S": "cb844b75-3547-4c88-a480-41a6912c34a8"
+            },
+            "genres": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Action"
+                            },
+                            "id": {
+                                "S": "126716"
+                            }
+                        }
+                    }
+                ]
+            },
+            "tags": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Steamy"
+                            },
+                            "id": {
+                                "S": "225828"
+                            }
+                        }
+                    }
+                ]
+            },
+            "title": {
+                "S": "Eternals"
+            },
+            "contentRating": {
+                "S": "18_PLUS"
+            },
+            "backdropPath": {
+                "S": "movies/cb844b75-3547-4c88-a480-41a6912c34a8/cover-955fb5a8.jpg"
+            }
+        },
+        {
+            "posterPath": {
+                "S": "movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/poster-4f40846e.jpg"
+            },
+            "stats": {
+                "M": {
+                    "totalViews": {
+                        "N": "0"
+                    },
+                    "totalLikes": {
+                        "N": "0"
+                    },
+                    "averageRating": {
+                        "N": "0"
+                    }
+                }
+            },
+            "castIds": {
+                "L": [
+                    {
+                        "S": "542131"
+                    },
+                    {
+                        "S": "648032"
+                    }
+                ]
+            },
+            "adult": {
+                "BOOL": false
+            },
+            "studios": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Vivid Entertainment"
+                            },
+                            "id": {
+                                "S": "331270"
+                            }
+                        }
+                    }
+                ]
+            },
+            "originalLanguage": {
+                "S": "ja"
+            },
+            "runtime": {
+                "N": "25"
+            },
+            "casts": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Robert Downey Jr."
+                            },
+                            "id": {
+                                "S": "542131"
+                            }
+                        }
+                    },
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Angelina Jolie"
+                            },
+                            "id": {
+                                "S": "648032"
+                            }
+                        }
+                    }
+                ]
+            },
+            "overview": {
+                "S": "Tony Stark travels to Japan to build a new arc reactor and unveil Iron Man Dio. When the villainous ZODIAC steals the suit, Tony dons the original armor to stop them in an epic clash across the neon-lit streets of Tokyo."
+            },
+            "status": {
+                "S": "ENDED"
+            },
+            "visibility": {
+                "S": "PUBLIC"
+            },
+            "originCountry": {
+                "L": [
+                    {
+                        "S": "US"
+                    }
+                ]
+            },
+            "contentType": {
+                "S": "MOVIE"
+            },
+            "releaseDate": {
+                "S": "2010-10-01"
+            },
+            "tagline": {
+                "S": "Forged in fire. Reborn in iron."
+            },
+            "attributeIds": {
+                "L": [
+                    {
+                        "S": "126716"
+                    },
+                    {
+                        "S": "176697"
+                    },
+                    {
+                        "S": "225828"
+                    },
+                    {
+                        "S": "225828"
+                    },
+                    {
+                        "S": "331270"
+                    }
+                ]
+            },
+            "audit": {
+                "M": {
+                    "version": {
+                        "N": "1"
+                    },
+                    "createdAt": {
+                        "S": "2026-05-01T13:05:03.118867+05:30"
+                    }
+                }
+            },
+            "moodTags": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Steamy"
+                            },
+                            "id": {
+                                "S": "225828"
+                            }
+                        }
+                    }
+                ]
+            },
+            "id": {
+                "S": "2517125d-ec6f-4cdf-b2b9-ca9db5c79709"
+            },
+            "genres": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Action"
+                            },
+                            "id": {
+                                "S": "126716"
+                            }
+                        }
+                    },
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Drama"
+                            },
+                            "id": {
+                                "S": "176697"
+                            }
+                        }
+                    }
+                ]
+            },
+            "tags": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Steamy"
+                            },
+                            "id": {
+                                "S": "225828"
+                            }
+                        }
+                    }
+                ]
+            },
+            "backdropPath": {
+                "S": "movies/2517125d-ec6f-4cdf-b2b9-ca9db5c79709/cover-bcac97dc.jpg"
+            },
+            "contentRating": {
+                "S": "18_PLUS"
+            },
+            "title": {
+                "S": "Marvel Anime: Iron Man"
+            }
+        }
+    ],
+    "Count": 2,
+    "ScannedCount": 2,
+    "ConsumedCapacity": null
+}

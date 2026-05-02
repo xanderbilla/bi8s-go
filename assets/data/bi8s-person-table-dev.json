@@ -1,0 +1,310 @@
+{
+    "Items": [
+        {
+            "nationality": {
+                "S": "American"
+            },
+            "stats": {
+                "M": {
+                    "totalViews": {
+                        "N": "0"
+                    },
+                    "totalProductions": {
+                        "N": "0"
+                    },
+                    "followersCount": {
+                        "N": "0"
+                    },
+                    "averageRating": {
+                        "N": "0"
+                    },
+                    "subscriberCount": {
+                        "N": "0"
+                    }
+                }
+            },
+            "birthDate": {
+                "S": "1975-06-04"
+            },
+            "bio": {
+                "S": "Angelina Jolie is an American actress, filmmaker, and humanitarian. Known for iconic roles in Lara Croft: Tomb Raider, Mr. & Mrs. Smith, Maleficent, and Eternals, she is one of the most celebrated and influential figures in Hollywood. She won an Academy Award for Best Supporting Actress for Girl, Interrupted."
+            },
+            "profilePath": {
+                "S": "person/648032/profile-35f42c31.jpg"
+            },
+            "stageName": {
+                "S": "AJ"
+            },
+            "contentType": {
+                "S": "PERSON"
+            },
+            "debutYear": {
+                "N": "1993"
+            },
+            "name": {
+                "S": "Angelina Jolie"
+            },
+            "verified": {
+                "BOOL": true
+            },
+            "gender": {
+                "S": "Female"
+            },
+            "careerStatus": {
+                "S": "Active"
+            },
+            "active": {
+                "BOOL": true
+            },
+            "measurements": {
+                "M": {
+                    "bodyType": {
+                        "S": "Slim"
+                    },
+                    "unit": {
+                        "S": "inches"
+                    },
+                    "hips": {
+                        "N": "36"
+                    },
+                    "eyeColor": {
+                        "S": "Green"
+                    },
+                    "bust": {
+                        "N": "36"
+                    },
+                    "waist": {
+                        "N": "27"
+                    },
+                    "hairColor": {
+                        "S": "Black"
+                    }
+                }
+            },
+            "roles": {
+                "L": [
+                    {
+                        "S": "PERFORMER"
+                    },
+                    {
+                        "S": "CONTENT_CREATOR"
+                    }
+                ]
+            },
+            "categories": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Fetish"
+                            },
+                            "id": {
+                                "S": "277219"
+                            }
+                        }
+                    }
+                ]
+            },
+            "height": {
+                "N": "173"
+            },
+            "birthPlace": {
+                "S": "Los Angeles, California"
+            },
+            "audit": {
+                "M": {
+                    "createdAt": {
+                        "S": "2026-05-01T13:04:16.032695+05:30"
+                    },
+                    "version": {
+                        "N": "1"
+                    }
+                }
+            },
+            "specialties": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Fetish"
+                            },
+                            "id": {
+                                "S": "277219"
+                            }
+                        }
+                    }
+                ]
+            },
+            "id": {
+                "S": "648032"
+            },
+            "tags": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Steamy"
+                            },
+                            "id": {
+                                "S": "225828"
+                            }
+                        }
+                    }
+                ]
+            },
+            "backdropPath": {
+                "S": "person/648032/cover-897e590f.jpg"
+            }
+        },
+        {
+            "nationality": {
+                "S": "American"
+            },
+            "stats": {
+                "M": {
+                    "totalViews": {
+                        "N": "0"
+                    },
+                    "followersCount": {
+                        "N": "0"
+                    },
+                    "totalProductions": {
+                        "N": "0"
+                    },
+                    "subscriberCount": {
+                        "N": "0"
+                    },
+                    "averageRating": {
+                        "N": "0"
+                    }
+                }
+            },
+            "birthDate": {
+                "S": "1965-04-04"
+            },
+            "bio": {
+                "S": "Robert John Downey Jr. is an American actor renowned for his portrayal of Tony Stark / Iron Man in the Marvel Cinematic Universe. With a career spanning over five decades, he is celebrated as one of the most talented and versatile actors of his generation, earning two Academy Award nominations and a BAFTA."
+            },
+            "profilePath": {
+                "S": "person/542131/profile-06bddf17.jpg"
+            },
+            "stageName": {
+                "S": "RDJ"
+            },
+            "contentType": {
+                "S": "PERSON"
+            },
+            "debutYear": {
+                "N": "1970"
+            },
+            "name": {
+                "S": "Robert Downey Jr."
+            },
+            "verified": {
+                "BOOL": false
+            },
+            "gender": {
+                "S": "Male"
+            },
+            "careerStatus": {
+                "S": "Active"
+            },
+            "active": {
+                "BOOL": true
+            },
+            "measurements": {
+                "M": {
+                    "bodyType": {
+                        "S": "Athletic"
+                    },
+                    "unit": {
+                        "S": "cm"
+                    },
+                    "hairColor": {
+                        "S": "Brown"
+                    },
+                    "eyeColor": {
+                        "S": "Brown"
+                    }
+                }
+            },
+            "roles": {
+                "L": [
+                    {
+                        "S": "PERFORMER"
+                    },
+                    {
+                        "S": "CONTENT_CREATOR"
+                    }
+                ]
+            },
+            "categories": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Fetish"
+                            },
+                            "id": {
+                                "S": "277219"
+                            }
+                        }
+                    }
+                ]
+            },
+            "height": {
+                "N": "174"
+            },
+            "birthPlace": {
+                "S": "Manhattan, New York City, NY"
+            },
+            "audit": {
+                "M": {
+                    "createdAt": {
+                        "S": "2026-05-01T13:04:05.308455+05:30"
+                    },
+                    "version": {
+                        "N": "1"
+                    }
+                }
+            },
+            "specialties": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Fetish"
+                            },
+                            "id": {
+                                "S": "277219"
+                            }
+                        }
+                    }
+                ]
+            },
+            "id": {
+                "S": "542131"
+            },
+            "tags": {
+                "L": [
+                    {
+                        "M": {
+                            "name": {
+                                "S": "Steamy"
+                            },
+                            "id": {
+                                "S": "225828"
+                            }
+                        }
+                    }
+                ]
+            },
+            "backdropPath": {
+                "S": "person/542131/cover-a998f129.jpg"
+            }
+        }
+    ],
+    "Count": 2,
+    "ScannedCount": 2,
+    "ConsumedCapacity": null
+}

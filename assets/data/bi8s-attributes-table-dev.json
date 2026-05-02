@@ -1,0 +1,168 @@
+{
+    "Items": [
+        {
+            "audit": {
+                "M": {
+                    "createdAt": {
+                        "S": "2026-05-01T13:03:23.810633+05:30"
+                    },
+                    "version": {
+                        "N": "1"
+                    }
+                }
+            },
+            "active": {
+                "BOOL": true
+            },
+            "attributeType": {
+                "L": [
+                    {
+                        "S": "GENRE"
+                    }
+                ]
+            },
+            "id": {
+                "S": "126716"
+            },
+            "name": {
+                "S": "Action"
+            },
+            "contentType": {
+                "S": "ATTRIBUTE"
+            }
+        },
+        {
+            "audit": {
+                "M": {
+                    "createdAt": {
+                        "S": "2026-05-01T13:03:39.111971+05:30"
+                    },
+                    "version": {
+                        "N": "1"
+                    }
+                }
+            },
+            "active": {
+                "BOOL": true
+            },
+            "attributeType": {
+                "L": [
+                    {
+                        "S": "CATEGORY"
+                    },
+                    {
+                        "S": "SPECIALITY"
+                    }
+                ]
+            },
+            "id": {
+                "S": "277219"
+            },
+            "name": {
+                "S": "Fetish"
+            },
+            "contentType": {
+                "S": "ATTRIBUTE"
+            }
+        },
+        {
+            "audit": {
+                "M": {
+                    "createdAt": {
+                        "S": "2026-05-01T13:03:33.562698+05:30"
+                    },
+                    "version": {
+                        "N": "1"
+                    }
+                }
+            },
+            "active": {
+                "BOOL": true
+            },
+            "attributeType": {
+                "L": [
+                    {
+                        "S": "MOOD"
+                    },
+                    {
+                        "S": "TAG"
+                    }
+                ]
+            },
+            "id": {
+                "S": "225828"
+            },
+            "name": {
+                "S": "Steamy"
+            },
+            "contentType": {
+                "S": "ATTRIBUTE"
+            }
+        },
+        {
+            "audit": {
+                "M": {
+                    "version": {
+                        "N": "1"
+                    },
+                    "createdAt": {
+                        "S": "2026-05-01T13:03:28.366389+05:30"
+                    }
+                }
+            },
+            "active": {
+                "BOOL": true
+            },
+            "attributeType": {
+                "L": [
+                    {
+                        "S": "GENRE"
+                    }
+                ]
+            },
+            "id": {
+                "S": "176697"
+            },
+            "name": {
+                "S": "Drama"
+            },
+            "contentType": {
+                "S": "ATTRIBUTE"
+            }
+        },
+        {
+            "audit": {
+                "M": {
+                    "createdAt": {
+                        "S": "2026-05-01T13:03:44.840421+05:30"
+                    },
+                    "version": {
+                        "N": "1"
+                    }
+                }
+            },
+            "active": {
+                "BOOL": true
+            },
+            "attributeType": {
+                "L": [
+                    {
+                        "S": "STUDIO"
+                    }
+                ]
+            },
+            "id": {
+                "S": "331270"
+            },
+            "name": {
+                "S": "Vivid Entertainment"
+            },
+            "contentType": {
+                "S": "ATTRIBUTE"
+            }
+        }
+    ],
+    "Count": 5,
+    "ScannedCount": 5,
+    "ConsumedCapacity": null
+}
