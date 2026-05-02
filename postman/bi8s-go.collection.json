@@ -2,12 +2,13 @@
   "info": {
     "_postman_id": "f4b0870c-a801-4b5b-a312-38a5d4af8d77",
     "name": "bi8s-go API",
-    "description": "Postman collection for bi8s-go API with public (/v1/c/*) and admin (/v1/a/*) endpoints.",
+    "description": "Postman collection for bi8s-go API — system, public (/v1/c/*), and admin (/v1/a/*) endpoints.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Health",
+      "name": "System",
+      "description": "Health, liveness, readiness, and documentation endpoints.",
       "item": [
         {
           "name": "GET /v1/health",
@@ -19,14 +20,79 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "health"]
             },
-            "description": "Checks if the API is running and returns environment version details."
+            "description": "Full health check. Runs concurrent DynamoDB, S3, ffmpeg, ffprobe checks (2s timeout). Returns 200 with checks map (up/down), or 503 if any dep is down."
+          }
+        },
+        {
+          "name": "GET /v1/livez",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/livez",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "livez"]
+            },
+            "description": "Liveness probe. Always returns 200 if the process is running."
+          }
+        },
+        {
+          "name": "GET /v1/readyz",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/readyz",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "readyz"]
+            },
+            "description": "Readiness probe. Returns 503 NOT_READY until bootstrap completes, then runs health checks."
+          }
+        },
+        {
+          "name": "GET /v1/openapi.yaml",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/openapi.yaml",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "openapi.yaml"]
+            },
+            "description": "Returns the raw OpenAPI 3.0 spec as YAML."
+          }
+        },
+        {
+          "name": "GET /v1/docs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/docs",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "docs"]
+            },
+            "description": "Serves the Swagger UI for the OpenAPI spec."
+          }
+        },
+        {
+          "name": "GET /v1/debug/vars",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/debug/vars",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "debug", "vars"]
+            },
+            "description": "Go expvar metrics endpoint. Only available in non-production environments."
           }
         }
       ]
     },
     {
-      "name": "Customer/Public Endpoints",
-      "description": "Public-facing endpoints under /v1/c/* that filter by visibility=PUBLIC and status=RELEASED or IN_PRODUCTION.",
+      "name": "Consumer / Public",
+      "description": "Public-facing endpoints under /v1/c/* that filter by visibility=PUBLIC.",
       "item": [
         {
           "name": "GET /v1/c/content",
@@ -41,11 +107,11 @@
                 {
                   "key": "type",
                   "value": "all",
-                  "description": "Content type filter: all (default), movie, or tv"
+                  "description": "Content type filter: all (default), movie, tv"
                 }
               ]
             },
-            "description": "Returns recent content sorted by creation date. Query params: type=all|movie|tv (default: all)"
+            "description": "Returns recent public content sorted by creation date. Query: type=all|movie|tv (default: all). Response: ContentPublicList[]"
           }
         },
         {
@@ -58,7 +124,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "c", "content", "{{movieId}}"]
             },
-            "description": "Returns a single content by ID. Excludes stats, audit, and visibility fields."
+            "description": "Returns public detail for a single content by UUID. Response: ContentPublicDetail (excludes stats, audit, visibility)."
           }
         },
         {
@@ -71,7 +137,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "c", "people", "{{personId}}"]
             },
-            "description": "Returns a single person by ID with public fields."
+            "description": "Returns public profile for a person by numeric ID. Response: PersonPublicDetail (excludes stats, audit)."
           }
         },
         {
@@ -87,11 +153,11 @@
                 {
                   "key": "type",
                   "value": "all",
-                  "description": "Content type filter: all (default), movie, or tv"
+                  "description": "Content type filter: all (default), movie, tv"
                 }
               ]
             },
-            "description": "Returns all content where the person is in the cast. Query params: type=all|movie|tv (default: all). Returns: id, title, backdropPath"
+            "description": "Returns public content where the person appears in the cast. Response: { id, title, backdropPath }[]"
           }
         },
         {
@@ -107,11 +173,11 @@
                 {
                   "key": "type",
                   "value": "all",
-                  "description": "Content type filter: all (default), movie, or tv"
+                  "description": "Content type filter: all (default), movie, tv"
                 }
               ]
             },
-            "description": "Returns random banner content. Query params: type=all|movie|tv (default: all). Response: id, backdropPath, title, overview, contentRating"
+            "description": "Returns random banner content. Response: BannerContent { id, backdropPath, title, overview, contentRating, assets }"
           }
         },
         {
@@ -127,16 +193,16 @@
                 {
                   "key": "type",
                   "value": "latest",
-                  "description": "Discovery type: latest (default), popular (TODO), trending (TODO)"
+                  "description": "Discovery type: latest (default)"
                 },
                 {
                   "key": "content",
                   "value": "all",
-                  "description": "Content type filter: all (default), movie, or tv"
+                  "description": "Content type filter: all (default), movie, tv"
                 }
               ]
             },
-            "description": "Discovers content. Query params: type=latest|popular|trending (default: latest), content=all|movie|tv (default: all)"
+            "description": "Discovery feed. Query: type=latest (default), content=all|movie|tv (default: all). Response: ContentPublicList[]"
           }
         },
         {
@@ -152,18 +218,31 @@
                 {
                   "key": "content",
                   "value": "all",
-                  "description": "Content type filter: all (default), movie, or tv"
+                  "description": "Content type filter: all (default), movie, tv"
                 }
               ]
             },
-            "description": "Returns content by attribute ID. Query params: content=all|movie|tv (default: all). Returns: id, title, backdropPath"
+            "description": "Returns content filtered by attribute ID (genre, mood, tag, etc.). Query: content=all|movie|tv. Response: { id, title, backdropPath }[]"
+          }
+        },
+        {
+          "name": "GET /v1/c/play/{contentType}/{contentId}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/c/play/{{contentType}}/{{movieId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "c", "play", "{{contentType}}", "{{movieId}}"]
+            },
+            "description": "Returns HLS playback info. Path params: contentType=MOVIE|TV (validated), contentId=UUID (validated). Response: PlaybackInfo { contentId, contentType, info { title, overview, casts }, playback { durationSec, streaming, video, audio, subtitles, preview, thumbnails, sprite } }"
           }
         }
       ]
     },
     {
       "name": "Admin - Movies",
-      "description": "Admin endpoints for movies under /v1/a/movies. Returns all fields without filtering.",
+      "description": "Admin CRUD for movies under /v1/a/movies. Returns all fields without filtering.",
       "item": [
         {
           "name": "GET /v1/a/movies",
@@ -175,7 +254,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "a", "movies"]
             },
-            "description": "Returns ALL movies without filtering. Includes stats, audit, visibility fields."
+            "description": "Returns ALL movies including stats, audit, and visibility fields."
           }
         },
         {
@@ -188,7 +267,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "a", "movies", "{{movieId}}"]
             },
-            "description": "Returns a single movie by ID with ALL fields. No filtering."
+            "description": "Returns a single movie by UUID with ALL fields."
           }
         },
         {
@@ -200,79 +279,124 @@
               "mode": "formdata",
               "formdata": [
                 {
-                  "key": "title",
-                  "value": "Iron Man",
-                  "type": "text"
-                },
-                {
                   "key": "overview",
-                  "value": "After being held captive in an Afghan cave, billionaire engineer Tony Stark creates a unique weaponized suit of armor to fight evil.",
-                  "type": "text"
-                },
-                {
-                  "key": "release_date",
-                  "value": "2008-05-02",
-                  "type": "text"
-                },
-                {
-                  "key": "adult",
-                  "value": "false",
-                  "type": "text"
-                },
-                {
-                  "key": "content_rating",
-                  "value": "18_PLUS",
-                  "type": "text"
+                  "value": "A gripping tale of mystery and suspense.",
+                  "type": "text",
+                  "description": "Required. min=1, max=1000"
                 },
                 {
                   "key": "original_language",
                   "value": "en",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Required. Enum: en, hi, ja, ko, fr, es"
                 },
                 {
-                  "key": "genres",
-                  "value": "Action,Adventure,Science Fiction",
-                  "type": "text"
+                  "key": "title",
+                  "value": "Shadow of the Night",
+                  "type": "text",
+                  "description": "Optional. min=1, max=128"
                 },
                 {
-                  "key": "casts",
-                  "value": "751679",
-                  "type": "text"
+                  "key": "release_date",
+                  "value": "2024-01-15",
+                  "type": "text",
+                  "description": "Optional. Format: YYYY-MM-DD"
                 },
                 {
-                  "key": "tags",
-                  "value": "Superhero,Marvel,MCU",
-                  "type": "text"
+                  "key": "first_air_date",
+                  "value": "",
+                  "type": "text",
+                  "description": "Optional. TV only. Format: YYYY-MM-DD"
+                },
+                {
+                  "key": "adult",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Optional. true or false"
+                },
+                {
+                  "key": "content_rating",
+                  "value": "18_PLUS",
+                  "type": "text",
+                  "description": "Optional. Enum: 18_PLUS, 21_PLUS"
                 },
                 {
                   "key": "content_type",
                   "value": "MOVIE",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Optional. Enum: MOVIE, TV"
                 },
                 {
                   "key": "runtime",
-                  "value": "126",
-                  "type": "text"
+                  "value": "120",
+                  "type": "text",
+                  "description": "Optional. Minutes (integer)"
                 },
                 {
                   "key": "status",
                   "value": "RELEASED",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Optional. Enum: RUMORED, PLANNED, IN_PRODUCTION, POST_PRODUCTION, RELEASED, ENDED, RETURNING_SERIES, CANCELED, PILOT"
+                },
+                {
+                  "key": "tagline",
+                  "value": "The night holds all secrets.",
+                  "type": "text",
+                  "description": "Optional. max=255"
                 },
                 {
                   "key": "visibility",
                   "value": "PUBLIC",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Optional. Enum: PUBLIC, PRIVATE"
+                },
+                {
+                  "key": "genres",
+                  "value": "126716,176697",
+                  "type": "text",
+                  "description": "Optional. Comma-separated attribute IDs"
+                },
+                {
+                  "key": "casts",
+                  "value": "542131,648032",
+                  "type": "text",
+                  "description": "Optional. Comma-separated person IDs"
+                },
+                {
+                  "key": "tags",
+                  "value": "225828",
+                  "type": "text",
+                  "description": "Optional. Comma-separated attribute IDs (TAG type)"
+                },
+                {
+                  "key": "mood_tags",
+                  "value": "225828",
+                  "type": "text",
+                  "description": "Optional. Comma-separated attribute IDs (MOOD type)"
+                },
+                {
+                  "key": "studios",
+                  "value": "331270",
+                  "type": "text",
+                  "description": "Optional. Comma-separated attribute IDs (STUDIO type)"
+                },
+                {
+                  "key": "origin_country",
+                  "value": "US",
+                  "type": "text",
+                  "description": "Optional. Comma-separated country codes, e.g. US,UK"
                 },
                 {
                   "key": "poster",
                   "type": "file",
-                  "src": ""
+                  "src": "",
+                  "description": "Optional. Image file — stored as posterPath"
                 },
                 {
                   "key": "cover",
                   "type": "file",
-                  "src": ""
+                  "src": "",
+                  "description": "Optional. Image file — stored as backdropPath"
                 }
               ]
             },
@@ -281,7 +405,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "a", "movies"]
             },
-            "description": "Creates a movie with poster and cover uploads."
+            "description": "Creates a movie. Rate-limited: 20 req/min, burst 20."
           }
         },
         {
@@ -294,14 +418,14 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "a", "movies", "{{movieId}}"]
             },
-            "description": "Deletes a movie by ID."
+            "description": "Deletes a movie by UUID."
           }
         }
       ]
     },
     {
       "name": "Admin - People",
-      "description": "Admin endpoints for people under /v1/a/people. Returns all fields without filtering.",
+      "description": "Admin CRUD for people under /v1/a/people. Returns all fields without filtering.",
       "item": [
         {
           "name": "GET /v1/a/people",
@@ -313,7 +437,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "a", "people"]
             },
-            "description": "Returns ALL people without filtering."
+            "description": "Returns ALL people including stats and audit fields."
           }
         },
         {
@@ -326,7 +450,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "a", "people", "{{personId}}"]
             },
-            "description": "Returns a single person by ID with ALL fields."
+            "description": "Returns a single person by numeric ID with ALL fields."
           }
         },
         {
@@ -342,11 +466,11 @@
                 {
                   "key": "type",
                   "value": "all",
-                  "description": "Content type filter: all (default), movie, or tv"
+                  "description": "Content type filter: all (default), movie, tv"
                 }
               ]
             },
-            "description": "Returns all content where the person is in the cast. Admin endpoint - no filtering by visibility or status. Query params: type=all|movie|tv (default: all). Returns: id, title, backdropPath"
+            "description": "Returns all content where the person appears in the cast. No visibility/status filtering. Response: { id, title, backdropPath }[]"
           }
         },
         {
@@ -359,43 +483,147 @@
               "formdata": [
                 {
                   "key": "name",
-                  "value": "Robert Downey Jr.",
-                  "type": "text"
+                  "value": "Jane Doe",
+                  "type": "text",
+                  "description": "Required. min=1, max=128"
                 },
                 {
                   "key": "roles",
                   "value": "PERFORMER",
-                  "type": "text"
-                },
-                {
-                  "key": "bio",
-                  "value": "Academy Award-nominated actor known for his role as Tony Stark/Iron Man.",
-                  "type": "text"
-                },
-                {
-                  "key": "birth_date",
-                  "value": "1965-04-04",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Required. Comma-separated: PERFORMER, CONTENT_CREATOR"
                 },
                 {
                   "key": "gender",
-                  "value": "Male",
-                  "type": "text"
+                  "value": "Female",
+                  "type": "text",
+                  "description": "Required. Enum: Male, Female, Trans"
                 },
                 {
                   "key": "career_status",
                   "value": "Active",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Required. Enum: Active, Retired, Hiatus"
+                },
+                {
+                  "key": "stage_name",
+                  "value": "",
+                  "type": "text",
+                  "description": "Optional. max=128"
+                },
+                {
+                  "key": "bio",
+                  "value": "",
+                  "type": "text",
+                  "description": "Optional. max=2000"
+                },
+                {
+                  "key": "birth_date",
+                  "value": "1995-03-22",
+                  "type": "text",
+                  "description": "Optional. Format: YYYY-MM-DD. Must be 18+ years ago."
+                },
+                {
+                  "key": "birth_place",
+                  "value": "",
+                  "type": "text",
+                  "description": "Optional. max=256"
+                },
+                {
+                  "key": "nationality",
+                  "value": "",
+                  "type": "text",
+                  "description": "Optional. max=64"
+                },
+                {
+                  "key": "height",
+                  "value": "165",
+                  "type": "text",
+                  "description": "Optional. Integer (cm or inches)"
+                },
+                {
+                  "key": "active",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Optional. true or false"
+                },
+                {
+                  "key": "debut_year",
+                  "value": "2018",
+                  "type": "text",
+                  "description": "Optional. Integer 1900–2100"
+                },
+                {
+                  "key": "measurements_bust",
+                  "value": "36",
+                  "type": "text",
+                  "description": "Optional. Integer"
+                },
+                {
+                  "key": "measurements_waist",
+                  "value": "24",
+                  "type": "text",
+                  "description": "Optional. Integer"
+                },
+                {
+                  "key": "measurements_hips",
+                  "value": "36",
+                  "type": "text",
+                  "description": "Optional. Integer"
+                },
+                {
+                  "key": "measurements_unit",
+                  "value": "inches",
+                  "type": "text",
+                  "description": "Optional. Enum: inches, cm"
+                },
+                {
+                  "key": "measurements_body_type",
+                  "value": "Hourglass",
+                  "type": "text",
+                  "description": "Optional. Free text"
+                },
+                {
+                  "key": "measurements_eye_color",
+                  "value": "Blue",
+                  "type": "text",
+                  "description": "Optional. Free text"
+                },
+                {
+                  "key": "measurements_hair_color",
+                  "value": "Blonde",
+                  "type": "text",
+                  "description": "Optional. Free text"
+                },
+                {
+                  "key": "tags",
+                  "value": "225828",
+                  "type": "text",
+                  "description": "Optional. Comma-separated attribute IDs (TAG type)"
+                },
+                {
+                  "key": "categories",
+                  "value": "277219",
+                  "type": "text",
+                  "description": "Optional. Comma-separated attribute IDs (CATEGORY type)"
+                },
+                {
+                  "key": "specialties",
+                  "value": "277219",
+                  "type": "text",
+                  "description": "Optional. Comma-separated attribute IDs (SPECIALITY type)"
                 },
                 {
                   "key": "profile",
                   "type": "file",
-                  "src": ""
+                  "src": "",
+                  "description": "Optional. Image file — stored as profilePath"
                 },
                 {
                   "key": "backdrop",
                   "type": "file",
-                  "src": ""
+                  "src": "",
+                  "description": "Optional. Image file — stored as backdropPath"
                 }
               ]
             },
@@ -404,7 +632,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "a", "people"]
             },
-            "description": "Creates a person with profile and backdrop uploads."
+            "description": "Creates a person with optional profile and backdrop image uploads. Rate-limited: 20 req/min, burst 20."
           }
         },
         {
@@ -417,14 +645,14 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "a", "people", "{{personId}}"]
             },
-            "description": "Deletes a person by ID."
+            "description": "Deletes a person by numeric ID."
           }
         }
       ]
     },
     {
       "name": "Admin - Attributes",
-      "description": "Admin endpoints for attributes under /v1/a/attributes.",
+      "description": "Admin CRUD for attributes under /v1/a/attributes. Attribute types: TAG, MOOD, GENRE, CATEGORY, SPECIALITY, STUDIO.",
       "item": [
         {
           "name": "GET /v1/a/attributes",
@@ -436,7 +664,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "a", "attributes"]
             },
-            "description": "Returns ALL attributes."
+            "description": "Returns ALL attributes including audit fields."
           }
         },
         {
@@ -449,7 +677,141 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "a", "attributes", "{{attributeId}}"]
             },
-            "description": "Returns a single attribute by ID."
+            "description": "Returns a single attribute by numeric ID."
+          }
+        },
+        {
+          "name": "POST /v1/a/attributes",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Action",
+                  "type": "text",
+                  "description": "Required. min=1, max=128"
+                },
+                {
+                  "key": "attribute_type",
+                  "value": "GENRE",
+                  "type": "text",
+                  "description": "Required. Comma-separated: TAG, MOOD, GENRE, CATEGORY, SPECIALITY, STUDIO"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/attributes",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "attributes"]
+            },
+            "description": "Creates a new attribute. attribute_type accepts multiple comma-separated values."
+          }
+        },
+        {
+          "name": "DELETE /v1/a/attributes/{attributeId}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/attributes/{{attributeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "attributes", "{{attributeId}}"]
+            },
+            "description": "Deletes an attribute by numeric ID."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Assets",
+      "description": "Upload supplemental video assets (trailers, teasers, clips, etc.) to existing content.",
+      "item": [
+        {
+          "name": "POST /v1/a/content/{contentId}",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "assetType",
+                  "value": "TRAILER",
+                  "type": "text",
+                  "description": "Required. Enum: TRAILER, TEASER, CLIP, PROMO, BTS"
+                },
+                {
+                  "key": "videos",
+                  "type": "file",
+                  "src": "",
+                  "description": "Required. One or more video files (multi-file field named 'videos')"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/content/{{movieId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "content", "{{movieId}}"]
+            },
+            "description": "Uploads one or more video assets to a content item. Returns { contentId, assetType, uploadedCount, paths[] }."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Encoder",
+      "description": "Submit and monitor HLS transcoding jobs. Rate-limited: 5 req/min, burst 5.",
+      "item": [
+        {
+          "name": "POST /v1/a/encoder",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "contentId",
+                  "value": "{{movieId}}",
+                  "type": "text",
+                  "description": "Required. UUID of the existing movie/TV content"
+                },
+                {
+                  "key": "contentType",
+                  "value": "MOVIE",
+                  "type": "text",
+                  "description": "Required. Enum: MOVIE, TV"
+                },
+                {
+                  "key": "video",
+                  "type": "file",
+                  "src": "",
+                  "description": "Required. MP4 video file. In curl use: -F 'video=@file.mp4;type=video/mp4'"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/encoder",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "encoder"]
+            },
+            "description": "Submits an HLS transcoding job. Generates 360p/480p/720p variants. Returns EncoderJob with status=QUEUED. Rate-limited: 5 req/min, burst 5.\n\nIMPORTANT: When using curl, specify the MIME type explicitly:\n  -F 'video=@/path/to/file.mp4;type=video/mp4'"
+          }
+        },
+        {
+          "name": "GET /v1/a/encoder/{jobId}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/a/encoder/{{jobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "a", "encoder", "{{jobId}}"]
+            },
+            "description": "Polls encoding job status by jobId (format: job_<uuid>). Status values: QUEUED → PROCESSING → COMPLETED / COMPLETED_WITH_WARNINGS / FAILED / CANCELLED.\n\nResponse includes input metadata (resolution, duration, codec), output paths (master.m3u8, quality playlists), and playback info once complete."
           }
         }
       ]
@@ -471,6 +833,14 @@
     {
       "key": "attributeId",
       "value": ""
+    },
+    {
+      "key": "jobId",
+      "value": ""
+    },
+    {
+      "key": "contentType",
+      "value": "MOVIE"
     }
   ]
 }
