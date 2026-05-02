@@ -87,7 +87,8 @@ jobs:
     name: Terraform Plan
     runs-on: ubuntu-latest
     needs: detect-environment
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.action != 'destroy'
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.action !=
+      'destroy'
     environment: ${{ needs.detect-environment.outputs.environment }}
     permissions:
       contents: read
@@ -204,7 +205,7 @@ jobs:
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    needs: [detect-environment, terraform-plan]
+    needs: [ detect-environment, terraform-plan ]
     if: |
       needs.detect-environment.outputs.should_deploy == 'true' &&
       (github.event_name == 'push' || 
@@ -252,6 +253,9 @@ jobs:
         run: |
           cd infra/tofu/envs/${{ needs.detect-environment.outputs.environment }}
           EC2_IP=$(tofu output -raw ec2_public_ip)
+          LOKI_BUCKET=$(tofu output -raw loki_bucket_name)
+          TEMPO_BUCKET=$(tofu output -raw tempo_bucket_name)
+          PROMETHEUS_EBS=$(tofu output -raw prometheus_ebs_volume_id)
           echo "ec2_ip=${EC2_IP}" >> $GITHUB_OUTPUT
           echo "ec2_url=http://${EC2_IP}:8080" >> $GITHUB_OUTPUT
 
@@ -261,6 +265,11 @@ jobs:
           echo "**EC2 Public IP:** ${EC2_IP}" >> $GITHUB_STEP_SUMMARY
           echo "**Application URL:** http://${EC2_IP}:8080" >> $GITHUB_STEP_SUMMARY
           echo "**Health Check:** http://${EC2_IP}:8080/v1/health" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Observability Resources" >> $GITHUB_STEP_SUMMARY
+          echo "**Loki S3 Bucket:** ${LOKI_BUCKET}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tempo S3 Bucket:** ${TEMPO_BUCKET}" >> $GITHUB_STEP_SUMMARY
+          echo "**Prometheus EBS Volume:** ${PROMETHEUS_EBS}" >> $GITHUB_STEP_SUMMARY
 
       - name: Save Infrastructure Outputs
         run: |
@@ -271,14 +280,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: infra-outputs-${{ needs.detect-environment.outputs.environment }}
-          path: infra/tofu/envs/${{ needs.detect-environment.outputs.environment }}/outputs.json
+          path: infra/tofu/envs/${{ needs.detect-environment.outputs.environment
+            }}/outputs.json
           retention-days: 30
 
   terraform-destroy:
     name: Terraform Destroy
     runs-on: ubuntu-latest
     needs: detect-environment
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action ==
+      'destroy'
     environment:
       name: ${{ needs.detect-environment.outputs.environment }}-destroy
     permissions:

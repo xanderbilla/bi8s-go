@@ -5,9 +5,11 @@ on:
     branches:
       - dev
     paths:
-      - app/cmd/**
-      - app/internal/**
-      - app/.air.toml
+      - appl/cmd/**
+      - appl/internal/**
+      - appl/Dockerfile
+      - appl/.air.toml
+      - appl/Makefile
   workflow_dispatch:
 
 permissions:
@@ -50,8 +52,8 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: ./app
-          file: ./app/Dockerfile
+          context: ./appl
+          file: ./appl/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
