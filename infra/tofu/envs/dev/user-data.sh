@@ -351,13 +351,6 @@ chown -RH ubuntu:ubuntu /opt/${project_name}/compose /opt/${project_name}/script
 chown -R ubuntu:ubuntu /opt/${project_name}/repo
 chmod 600 /opt/${project_name}/compose/.env
 
-# Reload systemd
-systemctl daemon-reload
-
-# Enable and start service (enable = survive reboots, start = run now)
-systemctl enable ${project_name}-docker.service
-systemctl start ${project_name}-docker.service
-
 # Set up certbot auto-renewal hooks and cron job
 mkdir -p /etc/letsencrypt/renewal-hooks/pre /etc/letsencrypt/renewal-hooks/post
 
@@ -474,6 +467,11 @@ fi
 SCRIPT
 
 chmod +x /opt/${project_name}/scripts/update-ip.sh
+
+# Reload systemd and start service (after all scripts are in place)
+systemctl daemon-reload
+systemctl enable ${project_name}-docker.service
+systemctl start ${project_name}-docker.service
 
 # Create helper script for SSL certificate renewal with Let's Encrypt
 cat > /opt/${project_name}/scripts/renew-ssl.sh <<'SCRIPT'
