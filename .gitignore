@@ -116,6 +116,10 @@ tmp/
 app/bin/
 app/tmp/
 app/build-errors.log
+appl/api
+appl/bin/
+appl/tmp/
+appl/build-errors.log
 .env
 .env.local
 *.log
