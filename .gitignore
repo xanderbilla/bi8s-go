@@ -93,11 +93,16 @@ app/bin/
 *.tfstate
 *.tfstate.*
 *.tfplan
+tfplan
 *.tfvars
 !*.tfvars.example
 crash.log
 crash.*.log
 override.tf
+
+# Assets - seed data only (no media)
+assets/images/
+assets/videos/
 override.tf.json
 *_override.tf
 *_override.tf.json
