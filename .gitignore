@@ -101,7 +101,6 @@ crash.*.log
 override.tf
 
 # Assets - seed data only (no media)
-assets/images/
 assets/videos/
 override.tf.json
 *_override.tf
