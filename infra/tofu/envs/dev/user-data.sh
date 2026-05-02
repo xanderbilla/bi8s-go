@@ -133,13 +133,14 @@ server {
 
     # Redirect to HTTPS
     location / {
-        return 301 https://\$host\$request_uri;
+        return 301 https://$host$request_uri;
     }
 }
 
 # HTTPS Server
 server {
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name _;
 
     # SSL Configuration
@@ -167,10 +168,10 @@ server {
         proxy_pass http://api_backend;
         proxy_http_version 1.1;
         
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
@@ -197,35 +198,51 @@ export DYNAMODB_ENCODER_TABLE="${dynamodb_encoder_table}"
 export S3_BUCKET="${s3_bucket}"
 export LOKI_BUCKET="${loki_bucket}"
 export TEMPO_BUCKET="${tempo_bucket}"
-export CORS_ALLOWED_ORIGINS="*"
+export CORS_ALLOWED_ORIGINS="https://api.xanderbilla.com,http://api.xanderbilla.com,http://$PUBLIC_IP"
 export CORS_ALLOW_PRIVATE_NETWORK="true"
 export PUBLIC_IP="$PUBLIC_IP"
 EOF
 
-# Create .env file for Docker Compose (no AWS access keys -- IAM instance profile is used).
+# Create .env file for Docker Compose (IAM instance profile provides AWS credentials via IMDS).
 cat > /opt/${project_name}/compose/.env <<EOF
 PROJECT_NAME=${project_name}
 IMAGE_NAME=${image_name}
 APP_ENV=${environment}
+PORT=:8080
+LOG_LEVEL=info
+LOG_ADD_SOURCE=false
 AWS_REGION=${aws_region}
 DYNAMODB_MOVIE_TABLE=${dynamodb_movie_table}
 DYNAMODB_PERSON_TABLE=${dynamodb_person_table}
 DYNAMODB_ATTRIBUTE_TABLE=${dynamodb_attribute_table}
 DYNAMODB_ENCODER_TABLE=${dynamodb_encoder_table}
 DYNAMODB_ENCODER_CONTENT_ID_INDEX=contentId-index
+DYNAMODB_MAX_SCAN_PAGES=1000
+CTX_DB_TIMEOUT_MS=30000
 S3_BUCKET=${s3_bucket}
 LOKI_BUCKET=${loki_bucket}
 TEMPO_BUCKET=${tempo_bucket}
-CORS_ALLOWED_ORIGINS=*
+CORS_ALLOWED_ORIGINS=https://api.xanderbilla.com,http://api.xanderbilla.com,http://$${PUBLIC_IP}
 CORS_ALLOW_PRIVATE_NETWORK=true
-PUBLIC_IP=$PUBLIC_IP
-LOG_LEVEL=info
+TRUSTED_PROXIES=
+ENCODER_MAX_CONCURRENT=2
+ENCODER_FFMPEG_PARALLELISM=0
+ENCODER_JOB_TIMEOUT_SECONDS=1800
+BI8S_TMP_DIR=/tmp
+PUBLIC_IP=$${PUBLIC_IP}
 OTEL_SERVICE_NAME=${project_name}-api
+OTEL_ENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+OTEL_EXPORTER_OTLP_INSECURE=true
+OTEL_TRACES_ENABLED=true
+OTEL_METRICS_ENABLED=true
 OTEL_TRACES_SAMPLER_ARG=1.0
+OTEL_METRIC_EXPORT_INTERVAL_SECONDS=15
+OTEL_SHUTDOWN_TIMEOUT_SECONDS=5
+BUILD_VERSION=${environment}
 PROMETHEUS_RETENTION=168h
 GRAFANA_ADMIN_USER=${grafana_admin_user}
 GRAFANA_ADMIN_PASSWORD=${grafana_admin_password}
-BUILD_VERSION=${environment}
 EOF
 
 # Clone application repo (single source of truth for compose + observability configs).

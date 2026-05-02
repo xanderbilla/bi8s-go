@@ -35,14 +35,23 @@ services:
       PORT: ":8080"
       LOG_LEVEL: ${LOG_LEVEL:-info}
       AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       DYNAMODB_MOVIE_TABLE: ${DYNAMODB_MOVIE_TABLE}
       DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE}
       DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE}
       DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE}
       DYNAMODB_ENCODER_CONTENT_ID_INDEX: ${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}
+      DYNAMODB_MAX_SCAN_PAGES: ${DYNAMODB_MAX_SCAN_PAGES:-1000}
+      CTX_DB_TIMEOUT_MS: ${CTX_DB_TIMEOUT_MS:-30000}
       S3_BUCKET: ${S3_BUCKET}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      ENCODER_MAX_CONCURRENT: ${ENCODER_MAX_CONCURRENT:-2}
+      ENCODER_FFMPEG_PARALLELISM: ${ENCODER_FFMPEG_PARALLELISM:-0}
+      ENCODER_JOB_TIMEOUT_SECONDS: ${ENCODER_JOB_TIMEOUT_SECONDS:-1800}
+      BI8S_TMP_DIR: ${BI8S_TMP_DIR:-/tmp}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api}
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
@@ -50,14 +59,15 @@ services:
       OTEL_TRACES_ENABLED: "true"
       OTEL_METRICS_ENABLED: "true"
       OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-1.0}
-      OTEL_METRIC_EXPORT_INTERVAL_SECONDS: "15"
-      BUILD_VERSION: ${BUILD_VERSION:-prod}
+      OTEL_METRIC_EXPORT_INTERVAL_SECONDS: ${OTEL_METRIC_EXPORT_INTERVAL_SECONDS:-15}
+      OTEL_SHUTDOWN_TIMEOUT_SECONDS: ${OTEL_SHUTDOWN_TIMEOUT_SECONDS:-5}
+      BUILD_VERSION: ${BUILD_VERSION:-dev}
     depends_on:
       otel-collector:
         condition: service_started
     networks: [app-network]
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/livez"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/v1/livez"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -79,7 +89,7 @@ services:
         condition: service_started
     networks: [app-network]
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 10s
       retries: 3

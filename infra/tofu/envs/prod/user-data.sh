@@ -106,13 +106,14 @@ server {
 
     # Redirect to HTTPS
     location / {
-        return 301 https://\$host\$request_uri;
+        return 301 https://$host$request_uri;
     }
 }
 
 # HTTPS Server
 server {
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name _;
 
     # SSL Configuration
@@ -140,10 +141,10 @@ server {
         proxy_pass http://api_backend;
         proxy_http_version 1.1;
         
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
@@ -285,7 +286,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
