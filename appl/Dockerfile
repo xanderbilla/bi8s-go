@@ -22,13 +22,23 @@ COPY internal ./internal
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 
-# Runtime stage: minimal, non-root image for security.
-FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+# Runtime stage: minimal Debian image with ffmpeg/ffprobe for encoder health checks.
+FROM debian:bookworm-slim AS runtime
+
+ARG APP_UID=10001
+ARG APP_GID=10001
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates ffmpeg wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid ${APP_GID} app \
+    && useradd  --system --uid ${APP_UID} --gid ${APP_GID} --no-create-home --shell /usr/sbin/nologin app
 
 WORKDIR /app
 
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /out/api /app/api
+
+USER app:app
 
 EXPOSE 8080
 
