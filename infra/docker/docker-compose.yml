@@ -194,8 +194,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor traceToMetrics"
-      GF_SERVER_ROOT_URL: "${GRAFANA_ROOT_URL:-https://grafana.xanderbilla.com/}"
-      GF_SERVER_SERVE_FROM_SUB_PATH: "${GF_SERVER_SERVE_FROM_SUB_PATH:-false}"
+      GF_SERVER_ROOT_URL: "${GRAFANA_ROOT_URL:-https://grafana.xanderbilla.com/bi8s}"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "${GF_SERVER_SERVE_FROM_SUB_PATH:-true}"
       AWS_REGION: ${AWS_REGION}
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro

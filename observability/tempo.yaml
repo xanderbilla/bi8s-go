@@ -37,8 +37,9 @@ storage:
     wal:
       path: /var/tempo/wal
     s3:
-      bucket: ${TEMPO_BUCKET}
+      bucket: ${S3_BUCKET}
       endpoint: s3.${AWS_REGION}.amazonaws.com
+      prefix: traces
       region: ${AWS_REGION}
       forcepathstyle: false
       # access_key / secret_key omitted -> uses AWS SDK default chain (instance profile / IRSA)

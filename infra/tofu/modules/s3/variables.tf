@@ -44,6 +44,12 @@ variable "lifecycle_rules" {
   type = list(object({
     id     = string
     status = string
+    filter = optional(object({
+      prefix = optional(string, "")
+    }))
+    expiration = optional(object({
+      days = number
+    }))
     noncurrent_version_transitions = optional(list(object({
       noncurrent_days = number
       storage_class   = string

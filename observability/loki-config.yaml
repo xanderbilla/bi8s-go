@@ -8,7 +8,7 @@ common:
   path_prefix: /loki
   storage:
     s3:
-      s3: s3://${AWS_REGION}/${LOKI_BUCKET}
+      s3: s3://${AWS_REGION}/${S3_BUCKET}/logs
       region: ${AWS_REGION}
   replication_factor: 1
   ring:
@@ -46,7 +46,7 @@ compactor:
 
 storage_config:
   aws:
-    s3: s3://${AWS_REGION}/${LOKI_BUCKET}
+    s3: s3://${AWS_REGION}/${S3_BUCKET}/logs
     region: ${AWS_REGION}
   tsdb_shipper:
     active_index_directory: /loki/tsdb-active

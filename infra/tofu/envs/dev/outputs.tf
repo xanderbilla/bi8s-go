@@ -46,16 +46,6 @@ output "environment_variables" {
   }
 }
 
-output "loki_bucket_name" {
-  description = "S3 bucket name for Loki log chunk storage"
-  value       = module.s3_loki.bucket_name
-}
-
-output "tempo_bucket_name" {
-  description = "S3 bucket name for Tempo distributed trace storage"
-  value       = module.s3_tempo.bucket_name
-}
-
 output "prometheus_ebs_volume_id" {
   description = "EBS volume ID for Prometheus persistent data"
   value       = aws_ebs_volume.prometheus.id

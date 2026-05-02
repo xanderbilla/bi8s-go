@@ -69,6 +69,20 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
       id     = rule.value.id
       status = rule.value.status
 
+      dynamic "filter" {
+        for_each = lookup(rule.value, "filter", null) != null ? [rule.value.filter] : []
+        content {
+          prefix = lookup(filter.value, "prefix", null)
+        }
+      }
+
+      dynamic "expiration" {
+        for_each = lookup(rule.value, "expiration", null) != null ? [rule.value.expiration] : []
+        content {
+          days = expiration.value.days
+        }
+      }
+
       dynamic "noncurrent_version_transition" {
         for_each = lookup(rule.value, "noncurrent_version_transitions", null) != null ? lookup(rule.value, "noncurrent_version_transitions", []) : []
         content {

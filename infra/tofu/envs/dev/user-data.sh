@@ -190,7 +190,7 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
 
-    location / {
+    location /${project_name} {
         proxy_pass http://grafana_backend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -261,8 +261,6 @@ export DYNAMODB_PERSON_TABLE="${dynamodb_person_table}"
 export DYNAMODB_ATTRIBUTE_TABLE="${dynamodb_attribute_table}"
 export DYNAMODB_ENCODER_TABLE="${dynamodb_encoder_table}"
 export S3_BUCKET="${s3_bucket}"
-export LOKI_BUCKET="${loki_bucket}"
-export TEMPO_BUCKET="${tempo_bucket}"
 export CORS_ALLOWED_ORIGINS="https://api.xanderbilla.com,http://api.xanderbilla.com,https://grafana.xanderbilla.com,http://localhost:3000,http://localhost:8080,http://$PUBLIC_IP"
 export CORS_ALLOW_PRIVATE_NETWORK="true"
 export PUBLIC_IP="$PUBLIC_IP"
@@ -285,8 +283,6 @@ DYNAMODB_ENCODER_CONTENT_ID_INDEX=contentId-index
 DYNAMODB_MAX_SCAN_PAGES=1000
 CTX_DB_TIMEOUT_MS=30000
 S3_BUCKET=${s3_bucket}
-LOKI_BUCKET=${loki_bucket}
-TEMPO_BUCKET=${tempo_bucket}
 CORS_ALLOWED_ORIGINS=https://api.xanderbilla.com,http://api.xanderbilla.com,https://grafana.xanderbilla.com,http://localhost:3000,http://localhost:8080,http://$${PUBLIC_IP}
 CORS_ALLOW_PRIVATE_NETWORK=true
 TRUSTED_PROXIES=
@@ -308,9 +304,9 @@ BUILD_VERSION=${environment}
 PROMETHEUS_RETENTION=168h
 GRAFANA_ADMIN_USER=${grafana_admin_user}
 GRAFANA_ADMIN_PASSWORD=${grafana_admin_password}
-GRAFANA_ROOT_URL=https://${grafana_domain_name}/
-GF_SERVER_SERVE_FROM_SUB_PATH=false
-STORAGE_BASE_URL=https://${storage_domain_name}
+GRAFANA_ROOT_URL=https://${grafana_domain_name}/${project_name}
+GF_SERVER_SERVE_FROM_SUB_PATH=true
+STORAGE_BASE_URL=https://${storage_domain_name}/${project_name}
 EOF
 
 # Clone application repo (single source of truth for compose + observability configs).

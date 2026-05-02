@@ -64,7 +64,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{container=\"bi8s_api_local\"} | json",
+          "expr": "{container=~\"bi8s[_-]api.*\"} | json",
           "queryType": "range",
           "refId": "A"
         }
@@ -161,7 +161,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(rate({container=\"bi8s_api_local\"} | json | level=\"ERROR\" [5m]))",
+          "expr": "sum(rate({container=~\"bi8s[_-]api.*\"} | json | level=\"ERROR\" [5m]))",
           "queryType": "range",
           "refId": "A"
         }
@@ -205,7 +205,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{container=\"bi8s_api_local\"} | json | level=\"ERROR\"",
+          "expr": "{container=~\"bi8s[_-]api.*\"} | json | level=\"ERROR\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -303,7 +303,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum(rate({container=\"bi8s_api_local\"} | json | level=\"WARN\" [5m]))",
+          "expr": "sum(rate({container=~\"bi8s[_-]api.*\"} | json | level=\"WARN\" [5m]))",
           "queryType": "range",
           "refId": "A"
         }
@@ -347,7 +347,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{container=\"bi8s_api_local\"} | json | level=\"WARN\"",
+          "expr": "{container=~\"bi8s[_-]api.*\"} | json | level=\"WARN\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -535,7 +535,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum by (level) (\n  rate({container=\"bi8s_api_local\"} | json [5m])\n)",
+          "expr": "sum by (level) (\n  rate({container=~\"bi8s[_-]api.*\"} | json [5m])\n)",
           "legendFormat": "{{level}}",
           "queryType": "range",
           "refId": "A"
@@ -580,7 +580,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{container=\"bi8s_api_local\"} | json | msg != \"http_request\"",
+          "expr": "{container=~\"bi8s[_-]api.*\"} | json | msg != \"http_request\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -624,7 +624,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{container=\"bi8s_api_local\"} | json | duration_ms > 500",
+          "expr": "{container=~\"bi8s[_-]api.*\"} | json | duration_ms > 500",
           "queryType": "range",
           "refId": "A"
         }
@@ -667,7 +667,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{container=\"bi8s_api_local\"} | json | status >= 400",
+          "expr": "{container=~\"bi8s[_-]api.*\"} | json | status >= 400",
           "queryType": "range",
           "refId": "A"
         }
@@ -710,7 +710,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{container=\"bi8s_api_local\"} | json | request_id=\"$request_id\"",
+          "expr": "{container=~\"bi8s[_-]api.*\"} | json | request_id=\"$request_id\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -753,7 +753,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{container=\"bi8s_api_local\"} | json | status >= 500",
+          "expr": "{container=~\"bi8s[_-]api.*\"} | json | status >= 500",
           "queryType": "range",
           "refId": "A"
         }
@@ -796,7 +796,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{container=\"bi8s_api_local\"} | json | level=\"ERROR\" | trace_id != \"\"",
+          "expr": "{container=~\"bi8s[_-]api.*\"} | json | level=\"ERROR\" | trace_id != \"\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -891,7 +891,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "sum by (path) (\n  rate({container=\"bi8s_api_local\"} | json | msg=\"http_request\" [5m])\n)",
+          "expr": "sum by (path) (\n  rate({container=~\"bi8s[_-]api.*\"} | json | msg=\"http_request\" [5m])\n)",
           "queryType": "range",
           "refId": "A"
         }
@@ -987,7 +987,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "quantile_over_time(0.95,\n  {container=\"bi8s_api_local\"}\n  | json\n  | msg=\"http_request\"\n  | unwrap duration_ms [5m]\n) by (path)",
+          "expr": "quantile_over_time(0.95,\n  {container=~\"bi8s[_-]api.*\"}\n  | json\n  | msg=\"http_request\"\n  | unwrap duration_ms [5m]\n) by (path)",
           "queryType": "range",
           "refId": "A"
         }
