@@ -330,6 +330,11 @@ module "ec2" {
     loki_bucket              = local.s3_loki_bucket
     tempo_bucket             = local.s3_tempo_bucket
     prometheus_device        = "/dev/xvdb"
+    repo_url                 = var.repo_url
+    repo_branch              = var.repo_branch
+    image_name               = var.image_name
+    grafana_admin_user       = var.grafana_admin_user
+    grafana_admin_password   = var.grafana_admin_password
   }))
 
   tags = local.common_tags

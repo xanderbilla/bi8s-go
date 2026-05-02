@@ -93,3 +93,34 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "repo_url" {
+  description = "Public Git repository URL cloned by EC2 user-data for compose + observability configs"
+  type        = string
+  default     = "https://github.com/xanderbilla/bi8s-go.git"
+}
+
+variable "repo_branch" {
+  description = "Git branch/tag to check out on the EC2 instance"
+  type        = string
+  default     = "dev"
+}
+
+variable "image_name" {
+  description = "Docker image (registry/repo:tag) the EC2 stack pulls for the API service"
+  type        = string
+  default     = "xanderbilla/bi8s-go:latest"
+}
+
+variable "grafana_admin_user" {
+  description = "Admin username for the Grafana UI on the EC2 instance"
+  type        = string
+  default     = "admin"
+}
+
+variable "grafana_admin_password" {
+  description = "Admin password for the Grafana UI on the EC2 instance"
+  type        = string
+  sensitive   = true
+  default     = "admin"
+}

@@ -193,129 +193,40 @@ export CORS_ALLOW_PRIVATE_NETWORK="true"
 export PUBLIC_IP="$PUBLIC_IP"
 EOF
 
-# Create .env file for Docker Compose
+# Create .env file for Docker Compose (no AWS access keys -- IAM instance profile is used).
 cat > /opt/${project_name}/compose/.env <<EOF
 PROJECT_NAME=${project_name}
-IMAGE_NAME=xanderbilla/my-project:latest
+IMAGE_NAME=${image_name}
 APP_ENV=${environment}
 AWS_REGION=${aws_region}
 DYNAMODB_MOVIE_TABLE=${dynamodb_movie_table}
 DYNAMODB_PERSON_TABLE=${dynamodb_person_table}
 DYNAMODB_ATTRIBUTE_TABLE=${dynamodb_attribute_table}
 DYNAMODB_ENCODER_TABLE=${dynamodb_encoder_table}
+DYNAMODB_ENCODER_CONTENT_ID_INDEX=contentId-index
 S3_BUCKET=${s3_bucket}
 LOKI_BUCKET=${loki_bucket}
 TEMPO_BUCKET=${tempo_bucket}
 CORS_ALLOWED_ORIGINS=*
 CORS_ALLOW_PRIVATE_NETWORK=true
 PUBLIC_IP=$PUBLIC_IP
+LOG_LEVEL=info
+OTEL_SERVICE_NAME=${project_name}-api
+OTEL_TRACES_SAMPLER_ARG=1.0
+PROMETHEUS_RETENTION=168h
+GRAFANA_ADMIN_USER=${grafana_admin_user}
+GRAFANA_ADMIN_PASSWORD=${grafana_admin_password}
+BUILD_VERSION=${environment}
 EOF
 
-# Create .env.example with all required variables
-cat > /opt/${project_name}/compose/.env.example <<'ENVEXAMPLE'
-# Project Configuration
-PROJECT_NAME=bi8s
-IMAGE_NAME=xanderbilla/my-project:latest
+# Clone application repo (single source of truth for compose + observability configs).
+echo "Cloning application repo (${repo_url}@${repo_branch})..."
+rm -rf /opt/${project_name}/repo
+git clone --depth 1 --branch "${repo_branch}" "${repo_url}" /opt/${project_name}/repo
 
-# Environment
-APP_ENV=dev
-
-# AWS Configuration
-AWS_REGION=us-east-1
-
-# DynamoDB Tables
-DYNAMODB_MOVIE_TABLE=bi8s-content-table-dev
-DYNAMODB_PERSON_TABLE=bi8s-person-table-dev
-DYNAMODB_ATTRIBUTE_TABLE=bi8s-attributes-table-dev
-DYNAMODB_ENCODER_TABLE=bi8s-video-table-dev
-
-# S3 Storage
-S3_BUCKET=bi8s-storage-dev
-
-# CORS Configuration
-CORS_ALLOWED_ORIGINS=*
-CORS_ALLOW_PRIVATE_NETWORK=true
-
-# Public IP (auto-detected, don't change)
-PUBLIC_IP=auto-detected
-
-# ============================================
-# ADD YOUR CUSTOM ENV VARIABLES BELOW
-# ============================================
-
-# Example: Database credentials (if needed)
-# DB_HOST=localhost
-# DB_PORT=5432
-# DB_USER=myuser
-# DB_PASSWORD=mypassword
-
-# Example: API Keys (if needed)
-# STRIPE_API_KEY=sk_test_xxxxx
-# SENDGRID_API_KEY=SG.xxxxx
-
-# Example: JWT Secret
-# JWT_SECRET=your-secret-key-here
-
-# Example: Other services
-# REDIS_URL=redis://localhost:6379
-# ELASTICSEARCH_URL=http://localhost:9200
-ENVEXAMPLE
-
-# Create docker-compose.yml
-cat > /opt/${project_name}/compose/docker-compose.yml <<'DOCKERCOMPOSE'
-version: '3.8'
-
-services:
-  api:
-    image: $${IMAGE_NAME:-xanderbilla/my-project:latest}
-    container_name: $${PROJECT_NAME:-bi8s}-api
-    restart: unless-stopped
-    expose:
-      - "8080"
-    environment:
-      - APP_ENV=$${APP_ENV}
-      - AWS_REGION=$${AWS_REGION}
-      - DYNAMODB_MOVIE_TABLE=$${DYNAMODB_MOVIE_TABLE}
-      - DYNAMODB_PERSON_TABLE=$${DYNAMODB_PERSON_TABLE}
-      - DYNAMODB_ATTRIBUTE_TABLE=$${DYNAMODB_ATTRIBUTE_TABLE}
-      - DYNAMODB_ENCODER_TABLE=$${DYNAMODB_ENCODER_TABLE}
-      - S3_BUCKET=$${S3_BUCKET}
-      - CORS_ALLOWED_ORIGINS=$${CORS_ALLOWED_ORIGINS}
-      - CORS_ALLOW_PRIVATE_NETWORK=$${CORS_ALLOW_PRIVATE_NETWORK}
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  nginx:
-    image: nginx:alpine
-    container_name: $${PROJECT_NAME:-bi8s}-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ../nginx/conf.d:/etc/nginx/conf.d:ro
-      - ../nginx/ssl:/etc/nginx/ssl:ro
-      - ../nginx/certbot/www:/var/www/certbot:ro
-    depends_on:
-      - api
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-networks:
-  app-network:
-    driver: bridge
-DOCKERCOMPOSE
+# Symlink the canonical compose + observability configs into /opt/${project_name}/compose/
+ln -sf /opt/${project_name}/repo/infra/docker/docker-compose.yml /opt/${project_name}/compose/docker-compose.yml
+ln -sfn /opt/${project_name}/repo/observability /opt/${project_name}/compose/observability
 
 # Create systemd service for Docker Compose
 cat > /etc/systemd/system/${project_name}-docker.service <<EOF
@@ -340,10 +251,11 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
 
-# Set permissions
+# Set permissions (do not dereference symlinks; keep prometheus-data writable by root container).
 echo "Setting permissions..."
-chown -R ec2-user:ec2-user /opt/${project_name}
-chmod 644 /opt/${project_name}/.env
+chown -RH ec2-user:ec2-user /opt/${project_name}/compose /opt/${project_name}/scripts /opt/${project_name}/nginx
+chown -R ec2-user:ec2-user /opt/${project_name}/repo
+chmod 600 /opt/${project_name}/compose/.env
 
 # Reload systemd
 systemctl daemon-reload
