@@ -1,0 +1,4 @@
+# Placeholder so the provisioner has a directory to scan. Drop dashboard JSON
+# files in this folder to have Grafana auto-load them under the "bi8s" folder.
+
+null

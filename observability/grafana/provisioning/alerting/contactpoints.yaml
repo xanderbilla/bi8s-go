@@ -1,0 +1,14 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: default-receiver
+    receivers:
+      - uid: default-receiver
+        type: webhook
+        settings:
+          # Override via env: GF_ALERTING_WEBHOOK_URL or edit per-env.
+          # In local dev this points to a no-op so Grafana startup doesn't fail.
+          url: http://localhost:65535/noop
+          httpMethod: POST
+        disableResolveMessage: false

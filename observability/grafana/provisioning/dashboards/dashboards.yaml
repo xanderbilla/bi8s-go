@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: bi8s-default
+    orgId: 1
+    folder: bi8s
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/files

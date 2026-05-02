@@ -1,0 +1,144 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: bi8s-api-slo
+    folder: bi8s
+    interval: 1m
+    rules:
+      - uid: bi8s-http-5xx-rate
+        title: High HTTP 5xx error rate
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: |
+                sum(rate(bi8s_http_server_requests_total{http_response_status_code=~"5.."}[5m]))
+                /
+                clamp_min(sum(rate(bi8s_http_server_requests_total[5m])), 1e-9)
+              instant: true
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [ 0.01 ]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "bi8s-api 5xx rate >1% over 5m"
+          description: "5xx ratio = {{ $values.A.Value }} (threshold 0.01)"
+        labels:
+          severity: critical
+          service: bi8s-api
+
+      - uid: bi8s-http-p99-latency
+        title: High HTTP p99 latency
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: |
+                histogram_quantile(0.99,
+                  sum by (le) (rate(bi8s_http_server_duration_milliseconds_bucket[5m]))
+                )
+              instant: true
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [ 500 ]
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: "bi8s-api p99 latency >500ms"
+          description: "p99 = {{ $values.A.Value }} ms (threshold 500ms)"
+        labels:
+          severity: warning
+          service: bi8s-api
+
+      - uid: bi8s-target-down
+        title: Prometheus target down
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: max by (job, instance) (up == 0)
+              instant: true
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [ 0 ]
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: "Target {{ $labels.job }} ({{ $labels.instance }}) is down"
+        labels:
+          severity: critical
+
+      - uid: bi8s-log-error-rate
+        title: Elevated ERROR log rate from api
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              expr: |
+                sum(rate({service_name="api"} |~ "(?i)\\\"level\\\":\\\"error\\\"|level=error"[5m]))
+              instant: true
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [ 1 ]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "bi8s-api ERROR log rate >1/s"
+          description: "Sustained error log rate from api service"
+        labels:
+          severity: warning
+          service: bi8s-api
