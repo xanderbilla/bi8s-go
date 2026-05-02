@@ -26,7 +26,7 @@ resource "aws_instance" "this" {
   iam_instance_profile        = var.iam_instance_profile
   key_name                    = var.key_name != "" ? var.key_name : null
   user_data                   = var.user_data
-  user_data_replace_on_change = false
+  user_data_replace_on_change = true
 
   root_block_device {
     volume_size           = var.root_volume_size
