@@ -36,12 +36,27 @@ output "dynamodb_tables" {
 output "environment_variables" {
   description = "Environment variables for application"
   value = {
-    APP_ENV                   = var.environment
-    AWS_REGION                = var.aws_region
-    DYNAMODB_MOVIE_TABLE      = module.dynamodb_movie.table_name
-    DYNAMODB_PERSON_TABLE     = module.dynamodb_person.table_name
-    DYNAMODB_ATTRIBUTE_TABLE  = module.dynamodb_attribute.table_name
-    DYNAMODB_ENCODER_TABLE    = module.dynamodb_encoder.table_name
-    S3_BUCKET                 = module.s3.bucket_name
+    APP_ENV                  = var.environment
+    AWS_REGION               = var.aws_region
+    DYNAMODB_MOVIE_TABLE     = module.dynamodb_movie.table_name
+    DYNAMODB_PERSON_TABLE    = module.dynamodb_person.table_name
+    DYNAMODB_ATTRIBUTE_TABLE = module.dynamodb_attribute.table_name
+    DYNAMODB_ENCODER_TABLE   = module.dynamodb_encoder.table_name
+    S3_BUCKET                = module.s3.bucket_name
   }
+}
+
+output "loki_bucket_name" {
+  description = "S3 bucket name for Loki log chunk storage"
+  value       = module.s3_loki.bucket_name
+}
+
+output "tempo_bucket_name" {
+  description = "S3 bucket name for Tempo distributed trace storage"
+  value       = module.s3_tempo.bucket_name
+}
+
+output "prometheus_ebs_volume_id" {
+  description = "EBS volume ID for Prometheus persistent data"
+  value       = aws_ebs_volume.prometheus.id
 }

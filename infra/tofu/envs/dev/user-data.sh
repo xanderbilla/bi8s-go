@@ -58,8 +58,26 @@ echo 'export GOPATH=/home/ec2-user/go' >> /etc/profile.d/go.sh
 
 # Create proper directory structure
 echo "Creating application directory structure..."
-mkdir -p /opt/${project_name}/{compose,nginx/{conf.d,ssl/{live,archive,renewal},certbot/www},scripts}
+mkdir -p /opt/${project_name}/{compose,nginx/{conf.d,ssl/{live,archive,renewal},certbot/www},scripts,prometheus-data}
 cd /opt/${project_name}
+
+# Mount Prometheus EBS volume
+echo "Setting up Prometheus EBS volume..."
+PROM_DEVICE="${prometheus_device}"
+if [ -b "$PROM_DEVICE" ]; then
+  # Format only if no filesystem exists on the device
+  if ! blkid "$PROM_DEVICE" > /dev/null 2>&1; then
+    echo "Formatting Prometheus EBS volume..."
+    mkfs.ext4 -F "$PROM_DEVICE"
+  fi
+  mount "$PROM_DEVICE" /opt/${project_name}/prometheus-data
+  # Persist across reboots
+  PROM_UUID=$(blkid -s UUID -o value "$PROM_DEVICE")
+  echo "UUID=$PROM_UUID /opt/${project_name}/prometheus-data ext4 defaults,nofail 0 2" >> /etc/fstab
+  echo "Prometheus volume mounted at /opt/${project_name}/prometheus-data"
+else
+  echo "WARNING: Prometheus device $PROM_DEVICE not found, skipping mount."
+fi
 
 # Get current public IP
 echo "Fetching EC2 public IP..."
@@ -168,6 +186,8 @@ export DYNAMODB_PERSON_TABLE="${dynamodb_person_table}"
 export DYNAMODB_ATTRIBUTE_TABLE="${dynamodb_attribute_table}"
 export DYNAMODB_ENCODER_TABLE="${dynamodb_encoder_table}"
 export S3_BUCKET="${s3_bucket}"
+export LOKI_BUCKET="${loki_bucket}"
+export TEMPO_BUCKET="${tempo_bucket}"
 export CORS_ALLOWED_ORIGINS="*"
 export CORS_ALLOW_PRIVATE_NETWORK="true"
 export PUBLIC_IP="$PUBLIC_IP"
@@ -184,6 +204,8 @@ DYNAMODB_PERSON_TABLE=${dynamodb_person_table}
 DYNAMODB_ATTRIBUTE_TABLE=${dynamodb_attribute_table}
 DYNAMODB_ENCODER_TABLE=${dynamodb_encoder_table}
 S3_BUCKET=${s3_bucket}
+LOKI_BUCKET=${loki_bucket}
+TEMPO_BUCKET=${tempo_bucket}
 CORS_ALLOWED_ORIGINS=*
 CORS_ALLOW_PRIVATE_NETWORK=true
 PUBLIC_IP=$PUBLIC_IP

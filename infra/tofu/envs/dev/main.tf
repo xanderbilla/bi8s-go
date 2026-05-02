@@ -30,6 +30,8 @@ locals {
   dynamodb_attribute_table = "${var.project_name}-attributes-table-${var.environment}"
   dynamodb_encoder_table   = "${var.project_name}-video-table-${var.environment}"
   s3_bucket                = "${var.project_name}-storage-${var.environment}"
+  s3_loki_bucket           = "${var.project_name}-loki-chunks-${var.environment}"
+  s3_tempo_bucket          = "${var.project_name}-tempo-traces-${var.environment}"
 
   common_tags = merge(
     var.tags,
@@ -229,6 +231,56 @@ module "s3" {
   tags = local.common_tags
 }
 
+# S3 Bucket for Loki (log chunk storage)
+module "s3_loki" {
+  source = "../../modules/s3"
+
+  bucket_name         = local.s3_loki_bucket
+  enable_versioning   = false
+  enable_encryption   = true
+  block_public_access = true
+
+  lifecycle_rules = [
+    {
+      id     = "expire-old-log-chunks"
+      status = "Enabled"
+      expiration = {
+        days = 30
+      }
+      abort_incomplete_multipart_upload = {
+        days_after_initiation = 1
+      }
+    }
+  ]
+
+  tags = local.common_tags
+}
+
+# S3 Bucket for Tempo (distributed trace storage)
+module "s3_tempo" {
+  source = "../../modules/s3"
+
+  bucket_name         = local.s3_tempo_bucket
+  enable_versioning   = false
+  enable_encryption   = true
+  block_public_access = true
+
+  lifecycle_rules = [
+    {
+      id     = "expire-old-traces"
+      status = "Enabled"
+      expiration = {
+        days = 14
+      }
+      abort_incomplete_multipart_upload = {
+        days_after_initiation = 1
+      }
+    }
+  ]
+
+  tags = local.common_tags
+}
+
 # IAM Role
 module "iam" {
   source = "../../modules/iam"
@@ -244,7 +296,11 @@ module "iam" {
     module.dynamodb_encoder.table_arn
   ]
 
-  s3_bucket_arns = [module.s3.bucket_arn]
+  s3_bucket_arns = [
+    module.s3.bucket_arn,
+    module.s3_loki.bucket_arn,
+    module.s3_tempo.bucket_arn,
+  ]
 
   tags = local.common_tags
 }
@@ -271,7 +327,33 @@ module "ec2" {
     dynamodb_attribute_table = local.dynamodb_attribute_table
     dynamodb_encoder_table   = local.dynamodb_encoder_table
     s3_bucket                = local.s3_bucket
+    loki_bucket              = local.s3_loki_bucket
+    tempo_bucket             = local.s3_tempo_bucket
+    prometheus_device        = "/dev/xvdb"
   }))
 
   tags = local.common_tags
+}
+
+# Resolve the AZ of the primary public subnet so the EBS volume is co-located
+data "aws_subnet" "primary" {
+  id = module.vpc.public_subnet_ids[0]
+}
+
+# EBS Volume for Prometheus persistent data storage
+resource "aws_ebs_volume" "prometheus" {
+  availability_zone = data.aws_subnet.primary.availability_zone
+  size              = 20
+  type              = "gp3"
+  encrypted         = true
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-prometheus-data"
+  })
+}
+
+resource "aws_volume_attachment" "prometheus" {
+  device_name = "/dev/xvdb"
+  volume_id   = aws_ebs_volume.prometheus.id
+  instance_id = module.ec2.instance_id
 }
