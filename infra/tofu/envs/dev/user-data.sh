@@ -87,9 +87,10 @@ else
   echo "WARNING: Prometheus device $PROM_DEVICE not found, skipping mount."
 fi
 
-# Get current public IP
+# Get current public IP (IMDSv2)
 echo "Fetching EC2 public IP..."
-PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
 echo "Public IP: $PUBLIC_IP"
 
 # Generate self-signed SSL certificate with IP
@@ -291,7 +292,8 @@ cat > /opt/${project_name}/scripts/update-ip.sh <<'SCRIPT'
 set -e
 
 echo "Updating public IP..."
-NEW_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+NEW_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
 OLD_IP=$(grep "^PUBLIC_IP=" /opt/${project_name}/compose/.env | cut -d'=' -f2)
 
 if [ "$NEW_IP" != "$OLD_IP" ]; then
@@ -456,8 +458,9 @@ echo ""
 echo "Recent logs:"
 docker-compose logs --tail=30
 
-# Get public IP
-PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+# Get public IP (IMDSv2)
+IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
 
 echo ""
 echo "Deployment Complete!"
