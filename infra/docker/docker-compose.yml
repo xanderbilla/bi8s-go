@@ -25,7 +25,7 @@ x-logging: &default-logging
 services:
   api:
     <<: [ *restart-policy, *default-logging ]
-    image: ${IMAGE_NAME:-xanderbilla/bi8s-api:latest}
+    image: ${IMAGE_NAME:-docker.io/xanderbilla/bi8s-dev:latest}
     container_name: ${PROJECT_NAME:-bi8s}-api
     pull_policy: always
     expose:

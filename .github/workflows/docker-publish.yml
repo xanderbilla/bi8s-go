@@ -123,7 +123,7 @@ jobs:
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids $INSTANCE_IDS \
             --document-name "AWS-RunShellScript" \
-            --parameters "{\"commands\":[\"cd /opt/${{ env.PROJECT_NAME }}/compose && docker-compose pull && systemctl restart ${{ env.PROJECT_NAME }}-docker.service\"]}" \
+            --parameters "{\"commands\":[\"cd /opt/${{ env.PROJECT_NAME }}/compose && docker-compose pull && docker-compose up -d --force-recreate --remove-orphans\"]}" \
             --timeout-seconds 300 \
             --comment "Redeploy ${{ env.PROJECT_NAME }}-$ENVIRONMENT triggered by ${{ github.sha }}" \
             --query 'Command.CommandId' \

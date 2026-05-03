@@ -109,33 +109,60 @@ chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
 # Create certbot webroot
 mkdir -p /opt/${project_name}/nginx/certbot/www
 
+CERT_DIR="/opt/${project_name}/nginx/ssl/live"
+S3_CERT_PREFIX="s3://${s3_bucket}/ssl/certs"
+CERTBOT_SUCCESS=false
+
+# Restore a previously obtained Let's Encrypt cert from S3.
+# This prevents hitting LE rate limits (5 certs/7 days) on repeated destroy/recreate cycles.
+echo "Checking S3 for cached Let's Encrypt certificate..."
+if aws s3 cp "$S3_CERT_PREFIX/cert.crt" "$CERT_DIR/cert.crt" 2>/dev/null && \
+   aws s3 cp "$S3_CERT_PREFIX/cert.key" "$CERT_DIR/cert.key" 2>/dev/null; then
+  chmod 644 "$CERT_DIR/cert.crt"
+  chmod 600 "$CERT_DIR/cert.key"
+  # Only reuse if cert won't expire within 7 days
+  if openssl x509 -checkend 604800 -noout -in "$CERT_DIR/cert.crt" 2>/dev/null; then
+    echo "Valid Let's Encrypt cert restored from S3 — skipping certbot."
+    CERTBOT_SUCCESS=true
+  else
+    echo "Cached cert is expired or expires within 7 days — will request a fresh cert."
+  fi
+else
+  echo "No cached cert found in S3."
+fi
+
 # Attempt to obtain Let's Encrypt certificate via standalone mode.
 # Port 80 is free here — Docker hasn't started yet.
-echo "Attempting Let's Encrypt certificate for ${domain_name} and ${grafana_domain_name}..."
-CERTBOT_SUCCESS=false
-for attempt in 1 2 3; do
-  if certbot certonly --standalone --non-interactive --agree-tos \
-      --email "${admin_email}" \
-      -d "${domain_name}" \
-      -d "${grafana_domain_name}" \
-      --preferred-challenges http 2>&1; then
-    CERTBOT_SUCCESS=true
-    echo "Let's Encrypt certificate obtained on attempt $attempt!"
-    break
-  fi
-  echo "Certbot attempt $attempt/3 failed, waiting 30s before retry..."
-  sleep 30
-done
+if [ "$CERTBOT_SUCCESS" = "false" ]; then
+  echo "Attempting Let's Encrypt certificate for ${domain_name} and ${grafana_domain_name}..."
+  for attempt in 1 2 3; do
+    if certbot certonly --standalone --non-interactive --agree-tos \
+        --email "${admin_email}" \
+        -d "${domain_name}" \
+        -d "${grafana_domain_name}" \
+        --preferred-challenges http 2>&1; then
+      CERTBOT_SUCCESS=true
+      echo "Let's Encrypt certificate obtained on attempt $attempt!"
+      break
+    fi
+    echo "Certbot attempt $attempt/3 failed, waiting 30s before retry..."
+    sleep 30
+  done
 
-if [ "$CERTBOT_SUCCESS" = "true" ]; then
-  cp /etc/letsencrypt/live/${domain_name}/fullchain.pem /opt/${project_name}/nginx/ssl/live/cert.crt
-  cp /etc/letsencrypt/live/${domain_name}/privkey.pem /opt/${project_name}/nginx/ssl/live/cert.key
-  chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
-  chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
-  echo "Let's Encrypt certs installed."
-else
-  echo "WARNING: Let's Encrypt failed after 3 attempts. Self-signed cert will be used."
-  echo "Run /opt/${project_name}/scripts/renew-ssl.sh later to install a trusted cert."
+  if [ "$CERTBOT_SUCCESS" = "true" ]; then
+    cp /etc/letsencrypt/live/${domain_name}/fullchain.pem "$CERT_DIR/cert.crt"
+    cp /etc/letsencrypt/live/${domain_name}/privkey.pem "$CERT_DIR/cert.key"
+    chmod 644 "$CERT_DIR/cert.crt"
+    chmod 600 "$CERT_DIR/cert.key"
+    echo "Let's Encrypt certs installed."
+    # Cache to S3 so future instances skip the certbot request
+    aws s3 cp "$CERT_DIR/cert.crt" "$S3_CERT_PREFIX/cert.crt" && \
+      aws s3 cp "$CERT_DIR/cert.key" "$S3_CERT_PREFIX/cert.key" && \
+      echo "Cert cached to S3." || echo "WARNING: Failed to cache cert to S3."
+  else
+    echo "WARNING: Let's Encrypt failed after 3 attempts. Self-signed cert will be used."
+    echo "Run /opt/${project_name}/scripts/renew-ssl.sh later to install a trusted cert."
+  fi
 fi
 
 # Create nginx config
@@ -358,14 +385,18 @@ docker-compose stop nginx
 RENEW_PRE
 chmod +x /etc/letsencrypt/renewal-hooks/pre/stop-nginx.sh
 
-# Post-hook: copy renewed certs and restart nginx
+# Post-hook: copy renewed certs, cache to S3, and restart nginx
 cat > /etc/letsencrypt/renewal-hooks/post/start-nginx.sh <<'RENEW_POST'
 #!/bin/bash
 DOMAIN="${domain_name}"
-cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem /opt/${project_name}/nginx/ssl/live/cert.crt
-cp /etc/letsencrypt/live/$DOMAIN/privkey.pem /opt/${project_name}/nginx/ssl/live/cert.key
-chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
-chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
+CERT_DIR="/opt/${project_name}/nginx/ssl/live"
+cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem $CERT_DIR/cert.crt
+cp /etc/letsencrypt/live/$DOMAIN/privkey.pem $CERT_DIR/cert.key
+chmod 644 $CERT_DIR/cert.crt
+chmod 600 $CERT_DIR/cert.key
+# Cache renewed cert to S3 for future deploys
+aws s3 cp $CERT_DIR/cert.crt s3://${s3_bucket}/ssl/certs/cert.crt || true
+aws s3 cp $CERT_DIR/cert.key s3://${s3_bucket}/ssl/certs/cert.key || true
 cd /opt/${project_name}/compose
 docker-compose start nginx
 RENEW_POST
