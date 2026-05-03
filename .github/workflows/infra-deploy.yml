@@ -3,19 +3,15 @@ name: Infrastructure Deployment
 on:
   push:
     branches:
-      - main
-      - master
       - dev
-      - develop
+      - prod
     paths:
       - "infra/**"
       - ".github/workflows/infra-deploy.yml"
   pull_request:
     branches:
-      - main
-      - master
       - dev
-      - develop
+      - prod
     paths:
       - "infra/**"
   workflow_dispatch:
@@ -42,6 +38,8 @@ env:
   PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
   EC2_KEY_NAME: ${{ secrets.EC2_KEY_NAME }}
   EC2_AMI_ID: ${{ secrets.EC2_AMI_ID }}
+  DOCKER_REGISTRY: "docker.io"
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
@@ -59,24 +57,23 @@ jobs:
             # Manual trigger - use selected environment
             echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
             echo "should_deploy=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-            # Push to main/master - deploy to prod
+          elif [[ "${{ github.ref }}" == "refs/heads/prod" ]]; then
+            # Push to prod branch - deploy to prod
             echo "environment=prod" >> $GITHUB_OUTPUT
             echo "should_deploy=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]] || [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
-            # Push to dev/develop branch - deploy to dev
+          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            # Push to dev branch - deploy to dev
             echo "environment=dev" >> $GITHUB_OUTPUT
             echo "should_deploy=true" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # Pull request - determine target environment but don't deploy
-            if [[ "${{ github.base_ref }}" == "main" ]] || [[ "${{ github.base_ref }}" == "master" ]]; then
+            if [[ "${{ github.base_ref }}" == "prod" ]]; then
               echo "environment=prod" >> $GITHUB_OUTPUT
             else
               echo "environment=dev" >> $GITHUB_OUTPUT
             fi
             echo "should_deploy=false" >> $GITHUB_OUTPUT
           else
-            # Other branches - plan for dev but don't deploy
             echo "environment=dev" >> $GITHUB_OUTPUT
             echo "should_deploy=false" >> $GITHUB_OUTPUT
           fi
@@ -163,8 +160,8 @@ jobs:
             -var="project_name=${{ env.PROJECT_NAME }}" \
             -var="ami_id=${{ env.EC2_AMI_ID }}" \
             -var="key_name=${{ env.EC2_KEY_NAME }}" \
-            -var="image_name=${{ secrets.DOCKER_IMAGE }}"
-        continue-on-error: true
+            -var="image_name=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/${{ env.PROJECT_NAME }}-${{ needs.detect-environment.outputs.environment }}:latest"
+        continue-on-error: false
 
       - name: Upload Plan
         uses: actions/upload-artifact@v4
@@ -320,7 +317,7 @@ jobs:
             -var="project_name=${{ env.PROJECT_NAME }}" \
             -var="ami_id=${{ env.EC2_AMI_ID }}" \
             -var="key_name=${{ env.EC2_KEY_NAME }}" \
-            -var="image_name=${{ secrets.DOCKER_IMAGE }}"
+            -var="image_name=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/${{ env.PROJECT_NAME }}-${{ needs.detect-environment.outputs.environment }}:latest"
 
           echo "### Infrastructure Destroyed 💥" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

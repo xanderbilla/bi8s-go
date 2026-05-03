@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - prod
     paths:
       - appl/cmd/**
       - appl/internal/**
@@ -20,18 +21,32 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DOCKER_IMAGE: ${{ secrets.DOCKER_IMAGE }}
+  DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   docker:
     name: Build and Push Multi-Platform Image
     runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.detect-env.outputs.environment }}
 
     steps:
       # Pull repository code at the commit that triggered this workflow.
       - name: Checkout source
         uses: actions/checkout@v4
+
+      # Derive environment and Docker image name from the branch.
+      - name: Detect environment
+        id: detect-env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/prod" ]]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          fi
 
       # Enable emulation so we can build for multiple CPU architectures.
       - name: Set up QEMU
@@ -58,7 +73,92 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ env.DOCKER_IMAGE }}:latest
-            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/${{ env.PROJECT_NAME }}-${{ steps.detect-env.outputs.environment }}:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/${{ env.PROJECT_NAME }}-${{ steps.detect-env.outputs.environment }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    name: Redeploy on ${{ needs.docker.outputs.environment }}
+    runs-on: ubuntu-latest
+    needs: docker
+
+    steps:
+      # Authenticate to AWS to query EC2 and run SSM commands.
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Find any running EC2 instances tagged for this project/environment.
+      - name: Check for running EC2 instances
+        id: check-infra
+        run: |
+          INSTANCE_IDS=$(aws ec2 describe-instances \
+            --filters \
+              "Name=tag:Project,Values=${{ env.PROJECT_NAME }}" \
+              "Name=tag:Environment,Values=${{ needs.docker.outputs.environment }}" \
+              "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].InstanceId' \
+            --output text)
+
+          if [ -z "$INSTANCE_IDS" ]; then
+            echo "No running instances found for ${{ needs.docker.outputs.environment }} — skipping deploy."
+            echo "found=false" >> $GITHUB_OUTPUT
+          else
+            echo "Found instances: $INSTANCE_IDS"
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo "instance_ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
+          fi
+
+      # Pull the latest image and restart the compose service on each instance via SSM.
+      - name: Redeploy containers via SSM
+        if: steps.check-infra.outputs.found == 'true'
+        env:
+          INSTANCE_IDS: ${{ steps.check-infra.outputs.instance_ids }}
+          ENVIRONMENT: ${{ needs.docker.outputs.environment }}
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids $INSTANCE_IDS \
+            --document-name "AWS-RunShellScript" \
+            --parameters "{\"commands\":[\"cd /opt/${{ env.PROJECT_NAME }}/compose && docker-compose pull && systemctl restart ${{ env.PROJECT_NAME }}-docker.service\"]}" \
+            --timeout-seconds 300 \
+            --comment "Redeploy ${{ env.PROJECT_NAME }}-$ENVIRONMENT triggered by ${{ github.sha }}" \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          for INSTANCE_ID in $INSTANCE_IDS; do
+            echo "Waiting for command on $INSTANCE_ID..."
+            aws ssm wait command-executed \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID"
+
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query 'Status' --output text)
+
+            echo "$INSTANCE_ID → $STATUS"
+
+            if [ "$STATUS" != "Success" ]; then
+              echo "--- stdout ---"
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+                --query 'StandardOutputContent' --output text
+              echo "--- stderr ---"
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+                --query 'StandardErrorContent' --output text
+              exit 1
+            fi
+          done
+
+          echo "### Containers Redeployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** $ENVIRONMENT" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ env.PROJECT_NAME }}-$ENVIRONMENT:latest" >> $GITHUB_STEP_SUMMARY
+          echo "**Instances:** $INSTANCE_IDS" >> $GITHUB_STEP_SUMMARY
