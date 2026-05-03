@@ -146,7 +146,7 @@ services:
     command: [ "-config.file=/etc/tempo/tempo.yaml", "-config.expand-env=true" ]
     environment:
       AWS_REGION: ${AWS_REGION}
-      TEMPO_BUCKET: ${TEMPO_BUCKET}
+      S3_BUCKET: ${S3_BUCKET}
     volumes:
       - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - tempo-data:/var/tempo
@@ -163,7 +163,7 @@ services:
     command: [ "-config.file=/etc/loki/loki-config.yaml", "-config.expand-env=true" ]
     environment:
       AWS_REGION: ${AWS_REGION}
-      LOKI_BUCKET: ${LOKI_BUCKET}
+      S3_BUCKET: ${S3_BUCKET}
     volumes:
       - ./observability/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki-data:/loki
