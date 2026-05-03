@@ -84,6 +84,15 @@ resource "aws_nat_gateway" "main" {
   )
 
   depends_on = [aws_internet_gateway.main]
+
+  # NAT GW deletion is async and can take up to 15 minutes. Without an explicit
+  # timeout the provider's default (5 min in some versions) may expire before AWS
+  # finishes, leaving an orphaned gateway that continues to hold the EIP and
+  # prevents VPC teardown on the next destroy run.
+  timeouts {
+    create = "10m"
+    delete = "30m"
+  }
 }
 
 # Public Route Table

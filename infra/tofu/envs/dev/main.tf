@@ -365,6 +365,12 @@ resource "aws_volume_attachment" "prometheus" {
   device_name = "/dev/xvdb"
   volume_id   = aws_ebs_volume.prometheus.id
   instance_id = module.ec2.instance_id
+
+  # Stop the instance cleanly before detaching. Without this, AWS can return
+  # "VolumeInUse" if the detach API races with the EC2 termination that Tofu
+  # issues in parallel, causing the attachment resource to fail and leaving an
+  # orphaned EBS volume on subsequent destroy attempts.
+  stop_instance_before_detaching = true
 }
 
 # Route53 A record — auto-updated to the EC2 EIP on every deploy

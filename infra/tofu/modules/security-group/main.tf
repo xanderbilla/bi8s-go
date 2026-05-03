@@ -4,6 +4,11 @@ resource "aws_security_group" "this" {
   description = var.description
   vpc_id      = var.vpc_id
 
+  # Revoke all rules before deleting the SG. Without this, destroy can fail
+  # with "DependencyViolation" when another resource still references this SG
+  # (e.g. an ENI from a recently-terminated EC2 not yet fully released by AWS).
+  revoke_rules_on_delete = true
+
   tags = merge(
     var.tags,
     {

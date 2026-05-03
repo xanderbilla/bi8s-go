@@ -3,9 +3,11 @@ resource "aws_acm_certificate" "storage" {
   domain_name       = var.storage_domain_name
   validation_method = "DNS"
 
-  lifecycle {
-    create_before_destroy = true
-  }
+  # NOTE: create_before_destroy removed intentionally.
+  # With it enabled, replacing the cert creates a NEW cert first. But the
+  # existing CloudFront distribution still holds the old cert, causing the
+  # old cert delete to fail with "certificate is in use". Removing this flag
+  # forces the correct destroy-then-create order during replacement.
 
   tags = local.common_tags
 }
@@ -84,6 +86,11 @@ resource "aws_cloudfront_distribution" "storage" {
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }
+
+  # NOTE: aws_cloudfront_distribution does not support a timeouts block in the
+  # current AWS provider version. The provider's built-in delete timeout is
+  # 90 minutes (disable+deploy cycle + deletion). Ensure your shell / CI runner
+  # does not impose a shorter timeout when running `tofu destroy`.
 
   tags = local.common_tags
 }
