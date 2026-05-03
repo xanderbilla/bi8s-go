@@ -25,6 +25,7 @@ func ParsePersonFromForm(formValues url.Values) (model.Person, error) {
 	height, _ := strconv.Atoi(strings.TrimSpace(formValues.Get("height")))
 	debutYear, _ := strconv.Atoi(strings.TrimSpace(formValues.Get("debut_year")))
 	active, _ := strconv.ParseBool(strings.TrimSpace(formValues.Get("active")))
+	verified, _ := strconv.ParseBool(strings.TrimSpace(formValues.Get("verified")))
 
 	roles := parseRoles(formValues, "roles")
 
@@ -44,6 +45,7 @@ func ParsePersonFromForm(formValues url.Values) (model.Person, error) {
 		Nationality:  strings.TrimSpace(formValues.Get("nationality")),
 		Gender:       model.Gender(strings.TrimSpace(formValues.Get("gender"))),
 		Height:       height,
+		Verified:     verified,
 		Active:       active,
 		DebutYear:    debutYear,
 		CareerStatus: model.CareerStatus(strings.TrimSpace(formValues.Get("career_status"))),

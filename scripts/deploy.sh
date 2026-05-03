@@ -84,6 +84,13 @@ case $ACTION in
         else
             ${TF_CMD} apply -auto-approve
         fi
+        # Remove any stale /etc/hosts overrides for project domains so DNS resolves correctly
+        if grep -q "xanderbilla" /etc/hosts 2>/dev/null; then
+            echo ""
+            echo "Removing stale /etc/hosts entries for xanderbilla.com domains..."
+            sudo sed -i '' '/xanderbilla/d' /etc/hosts
+            echo "Done."
+        fi
         ;;
     destroy)
         echo "WARNING: This will destroy all resources in ${ENVIRONMENT} environment!"
