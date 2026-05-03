@@ -1,4 +1,4 @@
-.PHONY: help init-backend create-infra update-infra destroy-infra build-image push-image deploy-app clean test lint format build run
+.PHONY: help init-backend create-infra update-infra destroy-infra build-image push-image deploy-app clean test lint format build run runbuild
 
 # Variables
 PROJECT_NAME ?= $(shell echo $$PROJECT_NAME)
@@ -57,34 +57,24 @@ help:
 	@printf "   $(CYAN)export$(RESET) PROJECT_NAME=bi8s\n"
 	@printf "   $(CYAN)export$(RESET) AWS_REGION=us-east-1\n"
 	@printf "   $(CYAN)export$(RESET) DOCKER_IMAGE=docker.io/username/image\n\n"
+	@printf "$(BOLD)$(YELLOW)NOTE:$(RESET) Available environments: $(CYAN)dev$(RESET) and $(CYAN)prod$(RESET)\n\n"
 	@printf "$(BOLD)$(BLUE)Backend Management:$(RESET)\n"
-	@printf "   $(GREEN)make init-backend ENV=dev$(RESET)           Initialize Terraform backend\n"
-	@printf "   $(GREEN)make init-backend ENV=prod$(RESET)\n\n"
+	@printf "   $(GREEN)make init-backend ENV=dev$(RESET)           Initialize Terraform backend\n\n"
 	@printf "$(BOLD)$(BLUE)Infrastructure Management:$(RESET)\n"
 	@printf "   $(GREEN)make create-infra ENV=dev$(RESET)           Create infrastructure (plan + apply)\n"
-	@printf "   $(GREEN)make create-infra ENV=prod$(RESET)\n"
 	@printf "   $(GREEN)make update-infra ENV=dev$(RESET)           Update infrastructure (plan + apply)\n"
-	@printf "   $(GREEN)make update-infra ENV=prod$(RESET)\n"
-	@printf "   $(GREEN)make destroy-infra ENV=dev$(RESET)          Destroy infrastructure\n"
-	@printf "   $(GREEN)make destroy-infra ENV=prod$(RESET)\n\n"
+	@printf "   $(GREEN)make destroy-infra ENV=dev$(RESET)          Destroy infrastructure\n\n"
 	@printf "$(BOLD)$(BLUE)Docker Operations:$(RESET)\n"
 	@printf "   $(GREEN)make build-image$(RESET)                    Build Docker image\n"
 	@printf "   $(GREEN)make push-image$(RESET)                     Build and push Docker image\n\n"
-	@printf "$(BOLD)$(BLUE)Application Deployment:$(RESET)\n"
-	@printf "   $(GREEN)make deploy-app ENV=dev EC2_IP=x$(RESET)    Deploy application to EC2\n"
-	@printf "   $(GREEN)make deploy-app ENV=prod EC2_IP=x$(RESET)\n\n"
 	@printf "$(BOLD)$(BLUE)Development:$(RESET)\n"
 	@printf "   $(GREEN)make test$(RESET)                           Run tests\n"
 	@printf "   $(GREEN)make lint$(RESET)                           Run linter\n"
 	@printf "   $(GREEN)make format$(RESET)                         Format code\n"
-	@printf "   $(GREEN)make build$(RESET)                          Build application\n"
+	@printf "   $(GREEN)make build$(RESET)                          clean → format → lint → test → build\n"
+	@printf "   $(GREEN)make runbuild$(RESET)                       clean → format → lint → test → build → air\n"
 	@printf "   $(GREEN)make run$(RESET)                            Run application\n"
 	@printf "   $(GREEN)make clean$(RESET)                          Clean build artifacts\n\n"
-	@printf "$(BOLD)$(MAGENTA)Examples:$(RESET)\n"
-	@printf "   $(CYAN)make init-backend ENV=dev$(RESET)\n"
-	@printf "   $(CYAN)make create-infra ENV=dev$(RESET)\n"
-	@printf "   $(CYAN)make push-image$(RESET)\n"
-	@printf "   $(CYAN)make deploy-app ENV=dev EC2_IP=54.123.45.67$(RESET)\n\n"
 
 # Backend Initialization
 init-backend: check-env validate-env
@@ -137,29 +127,28 @@ deploy-app: validate-env check-ec2-ip
 
 # Development
 test:
-	@printf "\n$(BOLD)$(BLUE)Running tests...$(RESET)\n\n"
 	@cd appl && go test -v ./...
-	@printf "\n$(BOLD)$(GREEN)Tests complete$(RESET)\n\n"
+	@printf "$(GREEN)✓ tests$(RESET)\n"
 
 lint:
-	@printf "\n$(BOLD)$(BLUE)Running linter...$(RESET)\n\n"
 	@if command -v golangci-lint > /dev/null; then \
 		cd appl && golangci-lint run; \
-		printf "\n$(BOLD)$(GREEN)Linting complete$(RESET)\n\n"; \
+		printf "$(GREEN)✓ lint$(RESET)\n"; \
 	else \
-		printf "$(YELLOW)golangci-lint not installed$(RESET)\n\n"; \
+		printf "$(YELLOW)⚠ golangci-lint not installed$(RESET)\n"; \
 	fi
 
 format:
-	@printf "\n$(BOLD)$(BLUE)Formatting code...$(RESET)\n\n"
 	@cd appl && go fmt ./...
 	@cd appl && gofmt -s -w .
-	@printf "$(BOLD)$(GREEN)Code formatted$(RESET)\n\n"
+	@printf "$(GREEN)✓ format$(RESET)\n"
 
-build:
-	@printf "\n$(BOLD)$(BLUE)Building application...$(RESET)\n\n"
+build: clean format lint test
 	@cd appl && go build -o bin/api ./cmd/api
-	@printf "$(BOLD)$(GREEN)Build complete:$(RESET) $(CYAN)appl/bin/api$(RESET)\n\n"
+	@printf "$(GREEN)✓ build$(RESET) $(CYAN)appl/bin/api$(RESET)\n"
+
+runbuild: build
+	@cd appl && air
 
 run:
 	@printf "\n$(BOLD)$(BLUE)Running application...$(RESET)\n\n"
@@ -167,9 +156,8 @@ run:
 
 # Utilities
 clean:
-	@printf "\n$(BOLD)$(BLUE)Cleaning build artifacts...$(RESET)\n\n"
 	@rm -f appl/bin/api appl/bin/api-linux appl/bin/main
 	@rm -f coverage.out coverage.html
 	@rm -f *.tar.gz
 	@find . -name "*.tfplan" -delete
-	@printf "$(BOLD)$(GREEN)Clean complete$(RESET)\n\n"
+	@printf "$(GREEN)✓ clean$(RESET)\n"
