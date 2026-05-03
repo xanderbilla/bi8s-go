@@ -86,6 +86,7 @@ _wipe_dynamo_table() {
 
 if [ "$SKIP_WIPE" = "0" ]; then
   log "Phase 1: wipe"
+  _wipe_dynamo_table "${DYNAMODB_ATTRIBUTE_TABLE:-${_project}-attributes-table-${_env}}"
   _wipe_dynamo_table "${DYNAMODB_MOVIE_TABLE:-${_project}-content-table-${_env}}"
   _wipe_dynamo_table "${DYNAMODB_PERSON_TABLE:-${_project}-person-table-${_env}}"
   aws s3 rm "s3://$S3_BUCKET/movies/"  --recursive --region "$AWS_REGION" 2>&1 | grep -v "^$" || true
@@ -157,8 +158,8 @@ if [ "$SKIP_SEED" = "0" ]; then
     -F "tags=${_attr_id[epic]}:Epic" \
     -F "categories=${_attr_id[superhero]}:Superhero" \
     -F "specialties=${_attr_id[superhero]}:Superhero" \
-    -F "profile=@${IMG_DIR}/persons/person-648032-profile.jpg;type=image/jpeg" \
-    -F "backdrop=@${IMG_DIR}/persons/person-648032-backdrop.jpg;type=image/jpeg") || {
+    -F "profile=@${IMG_DIR}/persons/person-542131-profile.jpg;type=image/jpeg" \
+    -F "backdrop=@${IMG_DIR}/persons/person-542131-backdrop.jpg;type=image/jpeg") || {
     err "failed: Angelina Jolie"; exit 1; }
   log "$_resp"
   _person_id["648032"]=$(echo "$_resp" | jq -r '.data.id')
@@ -185,8 +186,8 @@ if [ "$SKIP_SEED" = "0" ]; then
     -F "tags=${_attr_id[epic]}:Epic" \
     -F "categories=${_attr_id[superhero]}:Superhero" \
     -F "specialties=${_attr_id[superhero]}:Superhero" \
-    -F "profile=@${IMG_DIR}/persons/person-542131-profile.jpg;type=image/jpeg" \
-    -F "backdrop=@${IMG_DIR}/persons/person-542131-backdrop.jpg;type=image/jpeg") || {
+    -F "profile=@${IMG_DIR}/persons/person-648032-profile.jpg;type=image/jpeg" \
+    -F "backdrop=@${IMG_DIR}/persons/person-648032-backdrop.jpg;type=image/jpeg") || {
     err "failed: Robert Downey Jr."; exit 1; }
   log "$_resp"
   _person_id["542131"]=$(echo "$_resp" | jq -r '.data.id')
@@ -211,8 +212,8 @@ if [ "$SKIP_SEED" = "0" ]; then
     -F "tags=${_attr_id[epic]}:Epic" \
     -F "mood_tags=${_attr_id[epic]}:Epic" \
     -F "studios=${_attr_id[marvel-studios]}:Marvel Studios" \
-    -F "poster=@${IMG_DIR}/movies/eternals-poster.jpg;type=image/jpeg" \
-    -F "cover=@${IMG_DIR}/movies/eternals-backdrop.jpg;type=image/jpeg") || {
+    -F "poster=@${IMG_DIR}/movies/ironman-poster.jpg;type=image/jpeg" \
+    -F "cover=@${IMG_DIR}/movies/ironman-backdrop.jpg;type=image/jpeg") || {
     err "failed: Eternals"; exit 1; }
   log "$_resp"
   _eternals_id=$(echo "$_resp" | jq -r '.data.id')
@@ -235,8 +236,8 @@ if [ "$SKIP_SEED" = "0" ]; then
     -F "tags=${_attr_id[epic]}:Epic" \
     -F "mood_tags=${_attr_id[epic]}:Epic" \
     -F "studios=${_attr_id[marvel-studios]}:Marvel Studios" \
-    -F "poster=@${IMG_DIR}/movies/ironman-poster.jpg;type=image/jpeg" \
-    -F "cover=@${IMG_DIR}/movies/ironman-backdrop.jpg;type=image/jpeg") || {
+    -F "poster=@${IMG_DIR}/movies/eternals-poster.jpg;type=image/jpeg" \
+    -F "cover=@${IMG_DIR}/movies/eternals-backdrop.jpg;type=image/jpeg") || {
     err "failed: Marvel Anime: Iron Man"; exit 1; }
   log "$_resp"
   log "movie: Marvel Anime: Iron Man → $(echo "$_resp" | jq -r '.data.id')"
