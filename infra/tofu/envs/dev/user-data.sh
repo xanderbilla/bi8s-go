@@ -498,6 +498,12 @@ chmod +x /opt/${project_name}/scripts/update-ip.sh
 # Reload systemd and start service (after all scripts are in place)
 systemctl daemon-reload
 systemctl enable ${project_name}-docker.service
+
+# Log in to ECR so Docker can pull the private image
+echo "Logging in to Amazon ECR..."
+aws ecr get-login-password --region ${aws_region} | \
+  docker login --username AWS --password-stdin ${ecr_registry}
+
 systemctl start ${project_name}-docker.service
 
 # Create helper script for SSL certificate renewal with Let's Encrypt

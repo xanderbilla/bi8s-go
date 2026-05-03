@@ -22,8 +22,11 @@ provider "aws" {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
-  name_prefix = "${var.project_name}-${var.environment}"
+  name_prefix  = "${var.project_name}-${var.environment}"
+  ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 
   # Resource names
   dynamodb_movie_table     = "${var.project_name}-content-table-${var.environment}"
@@ -251,6 +254,36 @@ module "s3" {
   tags = local.common_tags
 }
 
+# ECR Repository
+resource "aws_ecr_repository" "this" {
+  name                 = local.name_prefix
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_ecr_lifecycle_policy" "this" {
+  repository = aws_ecr_repository.this.name
+
+  policy = jsonencode({
+    rules = [{
+      rulePriority = 1
+      description  = "Keep last 10 images"
+      selection = {
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = 10
+      }
+      action = { type = "expire" }
+    }]
+  })
+}
+
 # IAM Role
 module "iam" {
   source = "../../modules/iam"
@@ -298,7 +331,8 @@ module "ec2" {
     prometheus_device        = "/dev/xvdb"
     repo_url                 = var.repo_url
     repo_branch              = var.repo_branch
-    image_name               = var.image_name
+    image_name               = "${local.ecr_registry}/${local.name_prefix}:latest"
+    ecr_registry             = local.ecr_registry
     grafana_admin_user       = var.grafana_admin_user
     grafana_admin_password   = var.grafana_admin_password
     grafana_domain_name      = var.grafana_domain_name

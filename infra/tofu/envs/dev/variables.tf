@@ -106,12 +106,6 @@ variable "repo_branch" {
   default     = "dev"
 }
 
-variable "image_name" {
-  description = "Docker image (registry/repo:tag) the EC2 stack pulls for the API service"
-  type        = string
-  default     = "xanderbilla/bi8s-api:latest"
-}
-
 variable "route53_zone_id" {
   description = "Route53 hosted zone ID for auto-updating the DNS A record on deploy"
   type        = string

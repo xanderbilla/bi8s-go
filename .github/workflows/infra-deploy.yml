@@ -38,8 +38,6 @@ env:
   PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
   EC2_KEY_NAME: ${{ secrets.EC2_KEY_NAME }}
   EC2_AMI_ID: ${{ secrets.EC2_AMI_ID }}
-  DOCKER_REGISTRY: "docker.io"
-  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
@@ -159,8 +157,7 @@ jobs:
           tofu plan -no-color -out=tfplan \
             -var="project_name=${{ env.PROJECT_NAME }}" \
             -var="ami_id=${{ env.EC2_AMI_ID }}" \
-            -var="key_name=${{ env.EC2_KEY_NAME }}" \
-            -var="image_name=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/${{ env.PROJECT_NAME }}-${{ needs.detect-environment.outputs.environment }}:latest"
+            -var="key_name=${{ env.EC2_KEY_NAME }}"
         continue-on-error: false
 
       - name: Upload Plan
@@ -316,8 +313,7 @@ jobs:
           tofu destroy -auto-approve \
             -var="project_name=${{ env.PROJECT_NAME }}" \
             -var="ami_id=${{ env.EC2_AMI_ID }}" \
-            -var="key_name=${{ env.EC2_KEY_NAME }}" \
-            -var="image_name=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/${{ env.PROJECT_NAME }}-${{ needs.detect-environment.outputs.environment }}:latest"
+            -var="key_name=${{ env.EC2_KEY_NAME }}"
 
           echo "### Infrastructure Destroyed 💥" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
