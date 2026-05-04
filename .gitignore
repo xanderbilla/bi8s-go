@@ -107,23 +107,22 @@ override.tf.json
 *_override.tf.json
 .terraformrc
 terraform.rc
-.terraform.lock.hcl
+# NOTE: .terraform.lock.hcl MUST be committed for reproducible provider versions across operators / CI.
 
 # Terraform backend config (contains sensitive data)
 backend-*.hcl
 !backend-*.hcl.example
 
 
-#Other folders
-tmp/
 ### bi8s-go project specific ###
+tmp/
 app/bin/
 app/tmp/
 app/build-errors.log
-appl/api
-appl/bin/
-appl/tmp/
-appl/build-errors.log
+app/api
+coverage.out
+coverage.html
+*.cov
 .env
 .env.local
 *.log
