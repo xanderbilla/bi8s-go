@@ -1,356 +1,130 @@
-# Configuration Guide
+# Configuration
+
+`bi8s-go` reads its configuration exclusively from environment variables.
+Defaults live in [`app/internal/app/config.go`](../app/internal/app/config.go);
+validation lives in `Config.Validate()` and runs at startup — the binary
+will refuse to start with an invalid config.
+
+`.env.example` (in the repo root) is the canonical, copy-pasteable template.
+Copy it to `.env` and fill in real values. **Never commit `.env`.**
+
+## Required vs optional
+
+A variable is **required** if `Config.Validate()` rejects an empty value.
+Everything else is optional with the default shown.
+
+### Application
+
+| Variable         | Required | Default | Notes                                                                 |
+| ---------------- | -------- | ------- | --------------------------------------------------------------------- |
+| `APP_ENV`        | yes      | —       | `dev`, `staging`, or `prod`. Controls log format and CORS strictness. |
+| `PORT`           | yes      | —       | Listen address (e.g. `:8080`).                                        |
+| `LOG_LEVEL`      | no       | `info`  | `debug`, `info`, `warn`, `error`.                                     |
+| `LOG_ADD_SOURCE` | no       | `false` | Add `source={file:line}` to log lines.                                |
+| `BUILD_VERSION`  | no       | `dev`   | Surfaced in `/v1/health` and OTel resource attributes.                |
+
+### HTTP / CORS
+
+| Variable                     | Required | Default                  | Notes                                                                                                              |
+| ---------------------------- | -------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `CORS_ALLOWED_ORIGINS`       | no       | see `DefaultCORSOrigins` | Comma-separated. **Cannot contain `*`** when credentials are enabled. In `prod`, every origin must use `https://`. |
+| `CORS_ALLOW_PRIVATE_NETWORK` | no       | `false`                  | Enable [Private Network Access](https://wicg.github.io/private-network-access/) preflight.                         |
+| `HTTP_MAX_JSON_BYTES`        | no       | `1048576`                | Per-request body cap (bytes).                                                                                      |
+| `ROUTER_TIMEOUT_SECONDS`     | no       | `60`                     | Per-request deadline.                                                                                              |
+| `TRUSTED_PROXIES`            | no       | (empty)                  | Comma-separated CIDRs. Required when behind NGINX so `X-Forwarded-For` is honoured.                                |
+
+### AWS
+
+| Variable                | Required | Default | Notes                                                                      |
+| ----------------------- | -------- | ------- | -------------------------------------------------------------------------- |
+| `AWS_REGION`            | yes      | —       | All AWS clients use this region.                                           |
+| `AWS_ACCESS_KEY_ID`     | no¹      | —       | Falls back to the default credentials chain (instance profile, SSO, etc.). |
+| `AWS_SECRET_ACCESS_KEY` | no¹      | —       | See above.                                                                 |
+
+¹ Required only when not running under an EC2 instance profile / IRSA / SSO.
+
+### DynamoDB
+
+| Variable                            | Required | Default      | Notes                                        |
+| ----------------------------------- | -------- | ------------ | -------------------------------------------- |
+| `DYNAMODB_MOVIE_TABLE`              | yes      | —            | Movie / content table name.                  |
+| `DYNAMODB_PERSON_TABLE`             | yes      | —            | Person table name.                           |
+| `DYNAMODB_ATTRIBUTE_TABLE`          | yes      | —            | Attribute table name.                        |
+| `DYNAMODB_ENCODER_TABLE`            | yes      | —            | Encoder job table name.                      |
+| `DYNAMODB_ATTRIBUTE_NAME_INDEX`     | no       | `name-index` | GSI used for attribute lookups by name.      |
+| `DYNAMODB_ENCODER_CONTENT_ID_INDEX` | yes      | —            | GSI used to find encoder jobs by content id. |
+| `DYNAMODB_MAX_SCAN_PAGES`           | no       | `1000`       | Hard cap on paginated scans.                 |
+| `CTX_DB_TIMEOUT_MS`                 | no       | `30000`      | Per-DynamoDB-call deadline.                  |
+
+### S3
+
+| Variable           | Required | Default | Notes                                                         |
+| ------------------ | -------- | ------- | ------------------------------------------------------------- |
+| `S3_BUCKET`        | yes      | —       | Single bucket used for uploads, HLS, and Loki/Tempo backends. |
+| `STORAGE_BASE_URL` | no       | (empty) | Public base URL prefix when generating links.                 |
+
+### Encoder
+
+| Variable                      | Required | Default | Notes                                   |
+| ----------------------------- | -------- | ------- | --------------------------------------- |
+| `ENCODER_MAX_CONCURRENT`      | no       | `2`     | Max parallel ffmpeg jobs.               |
+| `ENCODER_FFMPEG_PARALLELISM`  | no       | `0`     | ffmpeg `-threads` (`0` = auto).         |
+| `ENCODER_JOB_TIMEOUT_SECONDS` | no       | `1800`  | Hard timeout per encoding job.          |
+| `BI8S_TMP_DIR`                | no       | `/tmp`  | Scratch directory used during encoding. |
+
+### Rate limiting
+
+| Variable                                     | Required    | Default     | Notes                                                                               |
+| -------------------------------------------- | ----------- | ----------- | ----------------------------------------------------------------------------------- |
+| `RATE_LIMIT_BACKEND`                         | no          | `memory`    | `memory` (per-instance) or `redis` (multi-replica safe).                            |
+| `REDIS_URL`                                  | conditional | —           | Required when `RATE_LIMIT_BACKEND=redis`. Format: `redis://[:pass@]host:port[/db]`. |
+| `RATE_LIMIT_REDIS_FAIL_MODE`                 | no          | `fail-open` | `fail-open` allows traffic on Redis outages; `fail-closed` rejects.                 |
+| `RATE_LIMIT_REDIS_TIMEOUT_MS`                | no          | `50`        | Per-call deadline against Redis.                                                    |
+| `RATELIMIT_GLOBAL_BURST`                     | no          | `100`       | Global token bucket burst.                                                          |
+| `RATELIMIT_GLOBAL_PER_MIN`                   | no          | `100`       | Global refill rate (per minute).                                                    |
+| `RATELIMIT_ENCODER_WRITE_BURST` / `_PER_MIN` | no          | `5` / `5`   | Burst / RPM for `POST /v1/a/encoder`.                                               |
+| `RATELIMIT_MOVIE_WRITE_BURST` / `_PER_MIN`   | no          | `20` / `20` | Burst / RPM for movie write routes.                                                 |
+| `RATELIMIT_PERSON_WRITE_BURST` / `_PER_MIN`  | no          | `20` / `20` | Burst / RPM for person write routes.                                                |
+
+### OpenTelemetry
+
+| Variable                              | Required | Default               | Notes                                        |
+| ------------------------------------- | -------- | --------------------- | -------------------------------------------- |
+| `OTEL_ENABLED`                        | no       | `true`                | Master switch.                               |
+| `OTEL_SERVICE_NAME`                   | no       | `bi8s-api`            | Resource attribute.                          |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`         | no       | `otel-collector:4317` | gRPC endpoint of the collector.              |
+| `OTEL_EXPORTER_OTLP_INSECURE`         | no       | `true`                | Set `false` when the collector requires TLS. |
+| `OTEL_TRACES_ENABLED`                 | no       | `true`                | Disable trace export only.                   |
+| `OTEL_METRICS_ENABLED`                | no       | `true`                | Disable metric export only.                  |
+| `OTEL_TRACES_SAMPLER_ARG`             | no       | `1.0`                 | Head-based sampler ratio (0–1).              |
+| `OTEL_METRIC_EXPORT_INTERVAL_SECONDS` | no       | `15`                  | Periodic exporter interval.                  |
+| `OTEL_SHUTDOWN_TIMEOUT_SECONDS`       | no       | `5`                   | Max time to flush on shutdown.               |
 
-This document explains how to configure the project for your deployment.
+### Local-stack-only (compose)
 
-## Project Name Configuration
+These are read by `docker-compose.local.yml`, not by the binary.
 
-The project name is the most important configuration as it's used to name all AWS resources.
+| Variable                                                       | Default            | Purpose                                              |
+| -------------------------------------------------------------- | ------------------ | ---------------------------------------------------- |
+| `API_PORT` / `UI_PORT` / `REDIS_PORT` / `OTEL_GRPC_PORT` / ... | see `.env.example` | Host port mappings.                                  |
+| `PROMETHEUS_RETENTION`                                         | `72h`              | Prometheus TSDB retention.                           |
+| `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`                | `admin` / `admin`  | Grafana login (change in any non-local environment). |
 
-### Where to Configure
+## Validation rules (enforced at startup)
 
-#### 1. GitHub Actions Workflow (Required)
+`Config.Validate()` will fail fast on:
 
-File: `.github/workflows/infra-deploy.yml`
+- Unknown `APP_ENV` (must be `dev`, `staging`, or `prod`).
+- Empty `PORT`, `S3_BUCKET`, `AWS_REGION`, any `DYNAMODB_*_TABLE`, or
+  `DYNAMODB_ENCODER_CONTENT_ID_INDEX`.
+- `RATE_LIMIT_BACKEND=redis` with empty `REDIS_URL`.
+- `CORS_ALLOWED_ORIGINS=*` (must enumerate explicit origins).
+- Any non-`https://` origin when `APP_ENV=prod`.
 
-```yaml
-env:
-  TF_VERSION: "1.6.0"
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  PROJECT_NAME: "bi8s" # Change this to your project name
-```
+## Tips
 
-Change `"bi8s"` to your project name (lowercase, alphanumeric, hyphens allowed).
-
-#### 2. Terraform Variables (Optional - has default)
-
-File: `infra/tofu/envs/dev/variables.tf` and `infra/tofu/envs/prod/variables.tf`
-
-```hcl
-variable "project_name" {
-  description = "Project name"
-  type        = string
-  default     = "bi8s"  # Change this to match GitHub workflow
-}
-```
-
-**Note:** If you don't change this, the GitHub workflow value will override it anyway.
-
-### Resource Naming Convention
-
-The project name is used to create resource names following this pattern:
-
-```
-{project-name}-{resource}-{environment}
-```
-
-Examples with project name "myapp":
-
-**DynamoDB Tables:**
-
-- `myapp-content-table-dev`
-- `myapp-person-table-dev`
-- `myapp-attributes-table-dev`
-- `myapp-video-table-dev`
-
-**S3 Bucket:**
-
-- `myapp-storage-dev`
-
-**EC2 Instance:**
-
-- `myapp-dev-instance`
-
-**Security Group:**
-
-- `myapp-dev-sg`
-
-**VPC:**
-
-- `myapp-dev-vpc`
-
-**IAM Role:**
-
-- `myapp-dev-ec2-role`
-
-**Terraform State (S3):**
-
-- `myapp-terraform-state-dev`
-
-**Terraform Locks (DynamoDB):**
-
-- `myapp-terraform-locks-dev`
-
-### Rules for Project Name
-
-- Use lowercase letters only
-- Use alphanumeric characters and hyphens
-- Start with a letter
-- Keep it short (3-20 characters recommended)
-- Avoid special characters except hyphens
-- Must be unique in your AWS account
-
-**Good examples:**
-
-- `myapp`
-- `my-project`
-- `acme-api`
-- `content-platform`
-
-**Bad examples:**
-
-- `MyApp` (uppercase)
-- `my_app` (underscore)
-- `my.app` (dot)
-- `123app` (starts with number)
-
-## Environment Configuration
-
-Environments are automatically detected from the git branch:
-
-- `dev` branch → dev environment
-- `main` branch → prod environment
-
-### Environment-Specific Variables
-
-Each environment has its own variables file:
-
-- `infra/tofu/envs/dev/variables.tf`
-- `infra/tofu/envs/prod/variables.tf`
-
-You can customize per environment:
-
-```hcl
-# Dev environment - smaller/cheaper resources
-variable "instance_type" {
-  default = "t3.micro"
-}
-
-variable "dynamodb_billing_mode" {
-  default = "PAY_PER_REQUEST"
-}
-```
-
-```hcl
-# Prod environment - larger/production resources
-variable "instance_type" {
-  default = "t3.small"
-}
-
-variable "dynamodb_billing_mode" {
-  default = "PROVISIONED"
-}
-```
-
-## AWS Configuration
-
-### Required Secrets
-
-Configure these in GitHub repository settings (Settings → Secrets and variables → Actions):
-
-```
-AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-AWS_REGION=us-east-1
-```
-
-### IAM Permissions Required
-
-The AWS credentials need these permissions:
-
-- EC2: Full access (create instances, security groups, VPC)
-- DynamoDB: Full access (create tables)
-- S3: Full access (create buckets)
-- IAM: Create roles and policies
-- CloudWatch: Create log groups
-
-Recommended: Use a dedicated IAM user for CI/CD with these permissions.
-
-### SSH Key Configuration
-
-For EC2 access, configure SSH key name in Terraform variables:
-
-```hcl
-variable "key_name" {
-  description = "SSH key name"
-  type        = string
-  default     = "my-ec2-key"  # Your EC2 key pair name
-}
-```
-
-The key pair must exist in AWS before deployment.
-
-## Docker Configuration
-
-### Docker Hub Credentials
-
-Configure these in GitHub repository settings:
-
-```
-DOCKER_REGISTRY=docker.io
-DOCKER_USERNAME=your-dockerhub-username
-DOCKER_PASSWORD=your-dockerhub-token
-```
-
-**Note:** Use a Docker Hub access token, not your password.
-
-### Docker Image Name
-
-Update in `.github/workflows/docker-publish.yml`:
-
-```yaml
-env:
-  IMAGE_NAME: docker.io/your-username/your-project
-```
-
-Also update in `infra/tofu/envs/dev/user-data.sh`:
-
-```bash
-IMAGE_NAME=your-username/your-project:latest
-```
-
-## Application Configuration
-
-### Environment Variables on EC2
-
-After EC2 is created, configure application secrets in `/opt/bi8s/compose/.env`:
-
-```bash
-# Auto-configured by Terraform (don't change)
-PROJECT_NAME=myapp
-IMAGE_NAME=username/myapp:latest
-APP_ENV=dev
-AWS_REGION=us-east-1
-DYNAMODB_MOVIE_TABLE=myapp-content-table-dev
-DYNAMODB_PERSON_TABLE=myapp-person-table-dev
-DYNAMODB_ATTRIBUTE_TABLE=myapp-attributes-table-dev
-DYNAMODB_ENCODER_TABLE=myapp-video-table-dev
-S3_BUCKET=myapp-storage-dev
-CORS_ALLOWED_ORIGINS=*
-CORS_ALLOW_PRIVATE_NETWORK=true
-PUBLIC_IP=auto-detected
-
-# Add your custom secrets below
-JWT_SECRET=your-jwt-secret-key
-API_KEY=your-api-key
-# Add more as needed
-```
-
-## CORS Configuration
-
-Configure allowed origins in Terraform variables:
-
-```hcl
-# Allow all origins (development)
-CORS_ALLOWED_ORIGINS=*
-
-# Allow specific origins (production)
-CORS_ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
-```
-
-## SSL Configuration
-
-### Self-Signed Certificate (Default)
-
-Automatically generated on EC2 boot. No configuration needed.
-
-### Let's Encrypt (Production)
-
-Requires a domain name. Configure after deployment:
-
-1. Point domain to EC2 IP
-2. Run: `./infra/scripts/setup-ssl-letsencrypt.sh <EC2_IP> api.yourdomain.com`
-
-## Resource Sizing
-
-### Development Environment
-
-```hcl
-# infra/tofu/envs/dev/variables.tf
-variable "instance_type" {
-  default = "t3.micro"  # 1 vCPU, 1 GB RAM
-}
-
-variable "dynamodb_billing_mode" {
-  default = "PAY_PER_REQUEST"  # Pay only for what you use
-}
-```
-
-### Production Environment
-
-```hcl
-# infra/tofu/envs/prod/variables.tf
-variable "instance_type" {
-  default = "t3.small"  # 2 vCPU, 2 GB RAM
-}
-
-variable "dynamodb_billing_mode" {
-  default = "PROVISIONED"  # Predictable costs
-}
-
-variable "dynamodb_read_capacity" {
-  default = 10
-}
-
-variable "dynamodb_write_capacity" {
-  default = 10
-}
-```
-
-## Configuration Checklist
-
-Before first deployment:
-
-- [ ] Change PROJECT_NAME in `.github/workflows/infra-deploy.yml`
-- [ ] Configure AWS secrets in GitHub
-- [ ] Configure Docker Hub secrets in GitHub
-- [ ] Update Docker image name in workflows
-- [ ] Create EC2 key pair in AWS
-- [ ] Update key_name in Terraform variables
-- [ ] Review instance types for each environment
-- [ ] Configure CORS allowed origins
-- [ ] Plan your domain name (if using Let's Encrypt)
-
-After first deployment:
-
-- [ ] SSH into EC2 and create .env file
-- [ ] Add application secrets to .env
-- [ ] Setup SSL certificate (if using domain)
-- [ ] Test application endpoints
-- [ ] Configure monitoring/alerts
-
-## Troubleshooting Configuration
-
-### Project name conflicts
-
-Error: S3 bucket already exists
-
-Solution: Change PROJECT_NAME to something unique
-
-### AWS credentials invalid
-
-Error: Unable to locate credentials
-
-Solution: Verify AWS secrets in GitHub settings
-
-### Docker image not found
-
-Error: Failed to pull image
-
-Solution: Verify Docker Hub credentials and image name
-
-### SSH key not found
-
-Error: Key pair 'xxx' does not exist
-
-Solution: Create key pair in AWS EC2 console first
-
-## Best Practices
-
-1. Use different project names for dev and prod (e.g., `myapp-dev`, `myapp-prod`)
-2. Use separate AWS accounts for dev and prod
-3. Rotate AWS credentials regularly
-4. Use Docker Hub access tokens, not passwords
-5. Keep .env file secure, never commit to git
-6. Document custom configuration changes
-7. Test configuration changes in dev first
-8. Use infrastructure as code for all changes
+- Use [`direnv`](https://direnv.net/) with `.envrc` to auto-load `.env`.
+- Two profiles ship out of the box: `.env.example` (full reference) and
+  `.envrc.example` (minimal direnv setup).
+- The Compose file uses `env_file: .env` with `required: false`, so missing
+  files won't break local-stack-only flows that don't need the API.
