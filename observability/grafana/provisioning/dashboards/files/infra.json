@@ -15,9 +15,7 @@
       "icon": "external link",
       "includeVars": false,
       "keepTime": true,
-      "tags": [
-        "bi8s"
-      ],
+      "tags": ["bi8s"],
       "targetBlank": false,
       "title": "bi8s Dashboards",
       "tooltip": "",
@@ -69,10 +67,7 @@
           "id": 1,
           "options": {
             "legend": {
-              "calcs": [
-                "lastNotNull",
-                "max"
-              ],
+              "calcs": ["lastNotNull", "max"],
               "displayMode": "table",
               "placement": "bottom"
             },
@@ -125,10 +120,7 @@
           "id": 2,
           "options": {
             "legend": {
-              "calcs": [
-                "lastNotNull",
-                "max"
-              ],
+              "calcs": ["lastNotNull", "max"],
               "displayMode": "table",
               "placement": "bottom"
             },
@@ -181,10 +173,7 @@
           "id": 3,
           "options": {
             "legend": {
-              "calcs": [
-                "lastNotNull",
-                "max"
-              ],
+              "calcs": ["lastNotNull", "max"],
               "displayMode": "table",
               "placement": "bottom"
             },
@@ -246,10 +235,7 @@
           "id": 4,
           "options": {
             "legend": {
-              "calcs": [
-                "lastNotNull",
-                "max"
-              ],
+              "calcs": ["lastNotNull", "max"],
               "displayMode": "table",
               "placement": "bottom"
             },
@@ -329,9 +315,7 @@
       "id": 20,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -397,9 +381,7 @@
       "id": 21,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -455,9 +437,7 @@
       "id": 30,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -523,9 +503,7 @@
       "id": 31,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -582,9 +560,7 @@
       "id": 32,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -599,7 +575,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs\"})",
+          "expr": "sum(node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"})",
           "legendFormat": "Total Disk",
           "refId": "A",
           "instant": true
@@ -650,9 +626,7 @@
       "id": 33,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -667,7 +641,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 * sum(node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs\"} - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs\"}) / sum(node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs\"})",
+          "expr": "100 * sum(node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} - node_filesystem_avail_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"}) / sum(node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"})",
           "legendFormat": "Disk Used %",
           "refId": "A",
           "instant": true
@@ -816,10 +790,7 @@
       "id": 5,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ],
+          "calcs": ["lastNotNull", "max"],
           "displayMode": "table",
           "placement": "bottom"
         },
@@ -893,9 +864,7 @@
       "id": 6,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -958,10 +927,7 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [
-                    10,
-                    10
-                  ],
+                  "dash": [10, 10],
                   "fill": "dash"
                 }
               }
@@ -1023,10 +989,7 @@
       "id": 22,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ],
+          "calcs": ["lastNotNull", "max"],
           "displayMode": "table",
           "placement": "bottom"
         },
@@ -1106,10 +1069,7 @@
       "id": 8,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ],
+          "calcs": ["lastNotNull", "max"],
           "displayMode": "table",
           "placement": "bottom"
         },
@@ -1124,8 +1084,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(node_network_receive_bytes_total{device!~\"lo|docker.*|veth.*\"}[5m])",
-          "legendFormat": "Receive ({{device}})",
+          "expr": "rate(node_network_receive_bytes_total{device!~\"lo|docker.*|veth.*|br.*|gre.*|gretap.*|erspan.*|ip.*|sit.*|tunl.*|bond.*|dummy.*\"}[5m]) and on(device) ((rate(node_network_receive_bytes_total{device!~\"lo|docker.*|veth.*|br.*|gre.*|gretap.*|erspan.*|ip.*|sit.*|tunl.*|bond.*|dummy.*\"}[5m]) + rate(node_network_transmit_bytes_total{device!~\"lo|docker.*|veth.*|br.*|gre.*|gretap.*|erspan.*|ip.*|sit.*|tunl.*|bond.*|dummy.*\"}[5m])) > 0)",
+          "legendFormat": "Download ({{device}})",
           "refId": "A"
         },
         {
@@ -1133,12 +1093,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(node_network_transmit_bytes_total{device!~\"lo|docker.*|veth.*\"}[5m])",
-          "legendFormat": "Transmit ({{device}})",
+          "expr": "rate(node_network_transmit_bytes_total{device!~\"lo|docker.*|veth.*|br.*|gre.*|gretap.*|erspan.*|ip.*|sit.*|tunl.*|bond.*|dummy.*\"}[5m]) and on(device) ((rate(node_network_receive_bytes_total{device!~\"lo|docker.*|veth.*|br.*|gre.*|gretap.*|erspan.*|ip.*|sit.*|tunl.*|bond.*|dummy.*\"}[5m]) + rate(node_network_transmit_bytes_total{device!~\"lo|docker.*|veth.*|br.*|gre.*|gretap.*|erspan.*|ip.*|sit.*|tunl.*|bond.*|dummy.*\"}[5m])) > 0)",
+          "legendFormat": "Upload ({{device}})",
           "refId": "B"
         }
       ],
-      "title": "Host Network I/O",
+      "title": "Host Network (Active Interfaces)",
       "type": "timeseries"
     },
     {
@@ -1217,9 +1177,7 @@
       "id": 7,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "displayMode": "list",
           "placement": "bottom"
         },
@@ -1300,9 +1258,7 @@
       "id": 34,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1317,7 +1273,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs\"} - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs\"})",
+          "expr": "sum(node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} - node_filesystem_avail_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"})",
           "legendFormat": "Used Disk Space",
           "refId": "A",
           "instant": true
@@ -1358,9 +1314,7 @@
       "id": 35,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1375,7 +1329,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs\"})",
+          "expr": "sum(node_filesystem_avail_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"})",
           "legendFormat": "Free Disk Space",
           "refId": "A",
           "instant": true
@@ -1427,9 +1381,7 @@
       "id": 9,
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1443,7 +1395,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs\"} - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs\"}) / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs\"} * 100",
+          "expr": "(node_filesystem_size_bytes{mountpoint=~\"/var/lib|/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} - node_filesystem_avail_bytes{mountpoint=~\"/var/lib|/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"}) / node_filesystem_size_bytes{mountpoint=~\"/var/lib|/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} * 100",
           "legendFormat": "{{mountpoint}}",
           "refId": "A",
           "instant": true
