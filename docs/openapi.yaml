@@ -218,15 +218,15 @@ paths:
         "200": { $ref: "#/components/responses/OK" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /a/movies:
+  /a/content:
     get:
       tags: [ Admin ]
-      summary: List all movies (admin view)
+      summary: List all content (admin view)
       responses:
         "200": { $ref: "#/components/responses/OK" }
     post:
       tags: [ Admin ]
-      summary: Create a movie
+      summary: Create content
       requestBody:
         required: true
         content:
@@ -239,13 +239,13 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
-  /a/movies/{movieId}:
+  /a/content/{contentId}:
     get:
       tags: [ Admin ]
-      summary: Get a movie (admin view)
+      summary: Get content (admin view)
       parameters:
         - in: path
-          name: movieId
+          name: contentId
           required: true
           schema: { type: string, maxLength: 100 }
       responses:
@@ -253,10 +253,10 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [ Admin ]
-      summary: Delete a movie
+      summary: Delete content
       parameters:
         - in: path
-          name: movieId
+          name: contentId
           required: true
           schema: { type: string }
       responses:

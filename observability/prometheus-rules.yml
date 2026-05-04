@@ -1,0 +1,241 @@
+# Native Prometheus alerting + recording rules for bi8s-api.
+#
+# These run inside the Prometheus instance itself (independent of Grafana
+# alerting) so the same rules are portable to AWS Managed Prometheus, a
+# self-managed Alertmanager, or any other PromQL-compatible target.
+#
+# Metric naming notes:
+#   - The API emits OTel metrics; the otel-collector exports them with the
+#     `bi8s_` namespace prefix, so HTTP counters become
+#     `bi8s_http_server_requests_total` and the duration histogram becomes
+#     `bi8s_http_server_duration_milliseconds_*`.
+#   - Prometheus scrapes the otel-collector job, so the API identity is
+#     surfaced as `exported_job="bi8s-api"`.
+#   - cAdvisor and node-exporter contribute container/host metrics.
+
+groups:
+  # ────────────────────────────────────────────────────────────────────────
+  # Recording rules — pre-compute SLI values once per evaluation_interval to
+  # keep dashboard / alert evaluation cheap.
+  # ────────────────────────────────────────────────────────────────────────
+  - name: bi8s-api.recording
+    interval: 30s
+    rules:
+      - record: bi8s:http_requests:rate5m
+        expr: sum by (http_route, http_request_method) (
+          rate(bi8s_http_server_requests_total[5m]) )
+
+      - record: bi8s:http_5xx_ratio:rate5m
+        expr: |
+          sum(rate(bi8s_http_server_requests_total{http_response_status_code=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(bi8s_http_server_requests_total[5m])), 1e-9)
+
+      - record: bi8s:http_4xx_ratio:rate5m
+        expr: |
+          sum(rate(bi8s_http_server_requests_total{http_response_status_code=~"4.."}[5m]))
+          /
+          clamp_min(sum(rate(bi8s_http_server_requests_total[5m])), 1e-9)
+
+      - record: bi8s:http_p95_latency_ms:rate5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(bi8s_http_server_duration_milliseconds_bucket[5m]))
+          )
+
+      - record: bi8s:http_p99_latency_ms:rate5m
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le) (rate(bi8s_http_server_duration_milliseconds_bucket[5m]))
+          )
+
+  # ────────────────────────────────────────────────────────────────────────
+  # API SLO + availability alerts.
+  # ────────────────────────────────────────────────────────────────────────
+  - name: bi8s-api.slo
+    interval: 30s
+    rules:
+      - alert: Bi8sApiHigh5xxRate
+        expr: bi8s:http_5xx_ratio:rate5m > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: bi8s-api
+        annotations:
+          summary: "bi8s-api 5xx ratio above 1% (current: {{ $value | humanizePercentage
+            }})"
+          description: |
+            The 5xx error ratio over the last 5m is {{ $value | humanizePercentage }},
+            which is above the 1% SLO budget. Investigate recent deploys, upstream
+            dependency health (DynamoDB, Redis), and the application error logs.
+
+      - alert: Bi8sApiHighP95Latency
+        expr: bi8s:http_p95_latency_ms:rate5m > 500
+        for: 5m
+        labels:
+          severity: warning
+          service: bi8s-api
+        annotations:
+          summary: "bi8s-api p95 latency above 500ms (current: {{ $value }}ms)"
+          description: |
+            p95 request latency is {{ $value }}ms over the last 5m. Check DynamoDB
+            latency, encoder backpressure, and CPU saturation on the API replicas.
+
+      - alert: Bi8sApiHighP99Latency
+        expr: bi8s:http_p99_latency_ms:rate5m > 1500
+        for: 10m
+        labels:
+          severity: warning
+          service: bi8s-api
+        annotations:
+          summary: "bi8s-api p99 latency above 1500ms (current: {{ $value }}ms)"
+          description: |
+            p99 latency is {{ $value }}ms. Sustained tail latency suggests
+            saturated dependencies or GC/connection-pool exhaustion.
+
+      - alert: Bi8sApiNoTraffic
+        expr: sum(rate(bi8s_http_server_requests_total[5m])) == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: bi8s-api
+        annotations:
+          summary: "bi8s-api received zero requests for 10m"
+          description: |
+            No HTTP requests have been observed for 10 minutes. Either traffic
+            is genuinely absent (off-hours / maintenance) or the metrics
+            pipeline is broken — check the otel-collector and the API readiness
+            probe (LBs may have de-registered the targets).
+
+  # ────────────────────────────────────────────────────────────────────────
+  # Dependency health: Redis (rate-limit backend), DynamoDB throttles, etc.
+  # ────────────────────────────────────────────────────────────────────────
+  - name: bi8s-api.dependencies
+    interval: 30s
+    rules:
+      - alert: Bi8sRateLimitBackendErrors
+        # Surfaces a sustained spike in rate-limit backend errors. The
+        # backend is fail-open so user impact is bounded, but a sustained
+        # error rate means the protection mechanism is silently degraded.
+        expr: |
+          sum(rate(bi8s_ratelimit_backend_errors_total[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: bi8s-api
+        annotations:
+          summary: "Rate-limit backend errors >1/s sustained for 10m"
+          description: |
+            The rate-limit backend (likely Redis) is returning errors. Protection
+            is fail-open so requests still flow, but the limiter is effectively
+            disabled. Check Redis connectivity, AUTH, and CPU.
+
+      - alert: Bi8sDynamoDbThrottles
+        # otelaws emits throttle counters when DDB returns ProvisionedThroughputExceeded
+        # or RequestLimitExceeded. Even on PAY_PER_REQUEST tables, sustained
+        # throttles mean adaptive capacity isn't keeping up with the access pattern.
+        expr: |
+          sum(rate(bi8s_aws_dynamodb_request_throttle_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: bi8s-api
+        annotations:
+          summary: "DynamoDB throttling detected"
+          description: |
+            DynamoDB is throttling requests. On PAY_PER_REQUEST tables this
+            usually means adaptive capacity is still scaling — verify hot
+            partitions and confirm GSI projections aren't amplifying writes.
+
+      - alert: Bi8sEncoderJobFailures
+        # Encoder jobs run async. A sustained failure rate means uploaded
+        # videos aren't reaching the public manifest, which is silent to the
+        # API caller (job is created successfully but never completes).
+        expr: |
+          sum(rate(bi8s_encoder_jobs_failed_total[10m])) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+          service: bi8s-api
+        annotations:
+          summary: "Encoder failure rate elevated"
+          description: |
+            Encoder jobs are failing at >0.05/s sustained. Check ffmpeg
+            availability, S3 upload errors, and disk-space on the encoder
+            host.
+
+  # ────────────────────────────────────────────────────────────────────────
+  # Infrastructure: container / host saturation, target up/down.
+  # ────────────────────────────────────────────────────────────────────────
+  - name: bi8s-infra
+    interval: 30s
+    rules:
+      - alert: Bi8sTargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} ({{ $labels.instance }}) is down"
+          description: |
+            Prometheus has been unable to scrape {{ $labels.instance }} for the
+            {{ $labels.job }} job for 2 minutes. If this is the API job, the
+            service may be crash-looping or its readiness probe is failing.
+
+      - alert: Bi8sContainerHighCpu
+        # cAdvisor exposes per-container CPU as container_cpu_usage_seconds_total.
+        # >80% of one core sustained for 10m signals saturation that warrants
+        # either horizontal scale-out or profiling.
+        expr: |
+          sum by (name) (
+            rate(container_cpu_usage_seconds_total{name=~"bi8s.*"}[5m])
+          ) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} CPU >80% for 10m"
+          description: |
+            Container {{ $labels.name }} sustained CPU usage above 80% of one
+            vCPU for 10 minutes. Consider scaling out or profiling for hot paths.
+
+      - alert: Bi8sContainerHighMemory
+        # Trigger when container RSS approaches its memory limit. Without an
+        # explicit limit cAdvisor reports limit=node memory, so this still
+        # catches runaway growth on the host.
+        expr: |
+          (
+            container_memory_working_set_bytes{name=~"bi8s.*"}
+            /
+            clamp_min(container_spec_memory_limit_bytes{name=~"bi8s.*"}, 1)
+          ) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} memory >85% of limit"
+          description: |
+            Container {{ $labels.name }} is using more than 85% of its memory
+            limit for 10m. OOM kill is imminent if growth continues.
+
+      - alert: Bi8sNodeDiskFillingUp
+        # node-exporter root filesystem usage. 85% sustained is the canonical
+        # "act now" threshold before logs / Prometheus TSDB run out of space.
+        expr: |
+          (
+            1 - (
+              node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+              /
+              node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}
+            )
+          ) > 0.85
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }} >85%
+            full"
+          description: |
+            Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }} has
+            been over 85% full for 15 minutes. Free space or rotate logs
+            before Prometheus / Loki ingestion stalls.
