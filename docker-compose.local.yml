@@ -21,11 +21,22 @@ x-logging: &default-logging
       max-file: "3"
 
 services:
+  quality:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+      target: quality
+    container_name: bi8s_quality_local
+    command: [ "/bin/sh", "-c", "echo quality checks passed" ]
+    profiles: [ "quality" ]
+    networks:
+      - bi8s-net
+
   # ────────────────────────────── Application ─────────────────────────────
   api:
     <<: [ *restart-policy, *default-logging ]
     build:
-      context: ./appl
+      context: ./app
       dockerfile: Dockerfile
       target: runtime
     container_name: bi8s_api_local
@@ -39,6 +50,7 @@ services:
       DYNAMODB_MOVIE_TABLE: ${DYNAMODB_MOVIE_TABLE:-bi8s-content-table-dev}
       DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE:-bi8s-person-table-dev}
       DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE:-bi8s-attributes-table-dev}
+      DYNAMODB_ATTRIBUTE_NAME_INDEX: ${DYNAMODB_ATTRIBUTE_NAME_INDEX:-name-index}
       DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE:-bi8s-video-table-dev}
       DYNAMODB_ENCODER_CONTENT_ID_INDEX: ${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}
       AWS_REGION: ${AWS_REGION:-us-east-1}
@@ -57,11 +69,17 @@ services:
       OTEL_METRIC_EXPORT_INTERVAL_SECONDS: ${OTEL_METRIC_EXPORT_INTERVAL_SECONDS:-15}
       OTEL_SHUTDOWN_TIMEOUT_SECONDS: ${OTEL_SHUTDOWN_TIMEOUT_SECONDS:-5}
       BUILD_VERSION: ${BUILD_VERSION:-dev}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-memory}
+      RATE_LIMIT_REDIS_FAIL_MODE: ${RATE_LIMIT_REDIS_FAIL_MODE:-fail-open}
+      RATE_LIMIT_REDIS_TIMEOUT_MS: ${RATE_LIMIT_REDIS_TIMEOUT_MS:-50}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:
       otel-collector:
         condition: service_started
+      redis:
+        condition: service_healthy
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:8080/v1/livez" ]
       interval: 30s
@@ -89,6 +107,35 @@ services:
     networks:
       - bi8s-net
     profiles: [ "ui" ]
+
+  # ────────────────────────────── Redis ───────────────────────────────────
+  # Shared rate-limit backend. Single replica for local; in prod use a
+  # managed Redis (ElastiCache / Upstash) and set REDIS_URL accordingly.
+  redis:
+    <<: [ *restart-policy, *default-logging ]
+    image: redis:7-alpine
+    container_name: bi8s_redis_local
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "128mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - bi8s-net
 
   # ────────────────────────── Observability stack ─────────────────────────
   otel-collector:
@@ -123,6 +170,7 @@ services:
       - "--enable-feature=exemplar-storage"
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus-rules.yml:/etc/prometheus/rules/prometheus-rules.yml:ro
       - prometheus-data:/prometheus
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
@@ -138,7 +186,7 @@ services:
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      TEMPO_BUCKET: ${TEMPO_BUCKET:-bi8s-tempo-traces-dev}
+      S3_BUCKET: ${S3_BUCKET:-bi8s-storage-dev}
     volumes:
       - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - tempo-data:/var/tempo
@@ -156,7 +204,7 @@ services:
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      LOKI_BUCKET: ${LOKI_BUCKET:-bi8s-loki-chunks-dev}
+      S3_BUCKET: ${S3_BUCKET:-bi8s-storage-dev}
     volumes:
       - ./observability/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki-data:/loki

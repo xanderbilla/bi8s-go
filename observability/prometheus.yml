@@ -5,6 +5,12 @@ global:
     cluster: bi8s-local
     replica: 0
 
+# Native Prometheus alerting + recording rules. Loaded from a separate file
+# so the same rules can be reused by AWS Managed Prometheus or any other
+# PromQL-compatible target without copy/paste.
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
 scrape_configs:
   - job_name: otel-collector
     static_configs:
