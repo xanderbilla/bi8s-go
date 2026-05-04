@@ -93,14 +93,14 @@ IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-
 PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
 echo "Public IP: $PUBLIC_IP"
 
-# Generate self-signed SSL certificate with wildcard SAN
+# Generate self-signed SSL certificate (always created as a fallback)
 echo "Generating self-signed SSL certificate..."
 openssl req -x509 -nodes -days 365 \
   -newkey rsa:2048 \
   -keyout /opt/${project_name}/nginx/ssl/live/cert.key \
   -out /opt/${project_name}/nginx/ssl/live/cert.crt \
-  -subj "/C=US/ST=State/L=City/O=${project_name}/CN=*.xanderbilla.com" \
-  -addext "subjectAltName=DNS:${domain_name},DNS:${grafana_domain_name},IP:$PUBLIC_IP"
+  -subj "/C=US/ST=State/L=City/O=${project_name}/CN=${project_name}-${environment}" \
+  -addext "subjectAltName=%{ if domain_name != "" }DNS:${domain_name},%{ endif }%{ if grafana_domain_name != "" }DNS:${grafana_domain_name},%{ endif }IP:$PUBLIC_IP"
 
 # Set proper permissions for certificates
 chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
@@ -113,6 +113,7 @@ CERT_DIR="/opt/${project_name}/nginx/ssl/live"
 S3_CERT_PREFIX="s3://${s3_bucket}/ssl/certs"
 CERTBOT_SUCCESS=false
 
+%{ if enable_public_dns }
 # Restore a previously obtained Let's Encrypt cert from S3.
 # This prevents hitting LE rate limits (5 certs/7 days) on repeated destroy/recreate cycles.
 echo "Checking S3 for cached Let's Encrypt certificate..."
@@ -164,6 +165,9 @@ if [ "$CERTBOT_SUCCESS" = "false" ]; then
     echo "Run /opt/${project_name}/scripts/renew-ssl.sh later to install a trusted cert."
   fi
 fi
+%{ else }
+echo "Public DNS disabled (enable_public_dns=false) — skipping Let's Encrypt; using self-signed cert."
+%{ endif }
 
 # Create nginx config
 cat > /opt/${project_name}/nginx/conf.d/api.conf <<'NGINXCONF'
@@ -198,6 +202,7 @@ server {
     }
 }
 
+%{ if grafana_domain_name != "" }
 # HTTPS Server - Grafana subdomain
 server {
     listen 443 ssl;
@@ -228,12 +233,13 @@ server {
         proxy_set_header Connection "upgrade";
     }
 }
+%{ endif }
 
 # HTTPS Server - API (default / catch-all)
 server {
     listen 443 ssl default_server;
     http2 on;
-    server_name ${domain_name} _;
+    server_name %{ if domain_name != "" }${domain_name}%{ endif } _;
 
     # SSL Configuration
     ssl_certificate /etc/nginx/ssl/live/cert.crt;
@@ -286,9 +292,10 @@ export AWS_REGION="${aws_region}"
 export DYNAMODB_MOVIE_TABLE="${dynamodb_movie_table}"
 export DYNAMODB_PERSON_TABLE="${dynamodb_person_table}"
 export DYNAMODB_ATTRIBUTE_TABLE="${dynamodb_attribute_table}"
+export DYNAMODB_ATTRIBUTE_NAME_INDEX="${dynamodb_attribute_name_index}"
 export DYNAMODB_ENCODER_TABLE="${dynamodb_encoder_table}"
 export S3_BUCKET="${s3_bucket}"
-export CORS_ALLOWED_ORIGINS="https://api.xanderbilla.com,http://api.xanderbilla.com,https://grafana.xanderbilla.com,http://localhost:3000,http://localhost:8080,http://$PUBLIC_IP"
+export CORS_ALLOWED_ORIGINS="%{ if domain_name != "" }https://${domain_name},http://${domain_name},%{ endif }%{ if grafana_domain_name != "" }https://${grafana_domain_name},%{ endif }http://localhost:3000,http://localhost:8080,http://$PUBLIC_IP"
 export CORS_ALLOW_PRIVATE_NETWORK="true"
 export PUBLIC_IP="$PUBLIC_IP"
 EOF
@@ -305,12 +312,13 @@ AWS_REGION=${aws_region}
 DYNAMODB_MOVIE_TABLE=${dynamodb_movie_table}
 DYNAMODB_PERSON_TABLE=${dynamodb_person_table}
 DYNAMODB_ATTRIBUTE_TABLE=${dynamodb_attribute_table}
+DYNAMODB_ATTRIBUTE_NAME_INDEX=${dynamodb_attribute_name_index}
 DYNAMODB_ENCODER_TABLE=${dynamodb_encoder_table}
 DYNAMODB_ENCODER_CONTENT_ID_INDEX=contentId-index
 DYNAMODB_MAX_SCAN_PAGES=1000
 CTX_DB_TIMEOUT_MS=30000
 S3_BUCKET=${s3_bucket}
-CORS_ALLOWED_ORIGINS=https://api.xanderbilla.com,http://api.xanderbilla.com,https://grafana.xanderbilla.com,http://localhost:3000,http://localhost:8080,http://$${PUBLIC_IP}
+CORS_ALLOWED_ORIGINS=%{ if domain_name != "" }https://${domain_name},http://${domain_name},%{ endif }%{ if grafana_domain_name != "" }https://${grafana_domain_name},%{ endif }http://localhost:3000,http://localhost:8080,http://$${PUBLIC_IP}
 CORS_ALLOW_PRIVATE_NETWORK=true
 TRUSTED_PROXIES=
 ENCODER_MAX_CONCURRENT=2
@@ -331,9 +339,9 @@ BUILD_VERSION=${environment}
 PROMETHEUS_RETENTION=168h
 GRAFANA_ADMIN_USER=${grafana_admin_user}
 GRAFANA_ADMIN_PASSWORD=${grafana_admin_password}
-GRAFANA_ROOT_URL=https://${grafana_domain_name}/${project_name}
+GRAFANA_ROOT_URL=%{ if grafana_domain_name != "" }https://${grafana_domain_name}/${project_name}%{ else }http://$${PUBLIC_IP}/${project_name}%{ endif }
 GF_SERVER_SERVE_FROM_SUB_PATH=true
-STORAGE_BASE_URL=https://${storage_domain_name}/${project_name}
+STORAGE_BASE_URL=%{ if storage_domain_name != "" }https://${storage_domain_name}/${project_name}%{ else }http://$${PUBLIC_IP}/${project_name}%{ endif }
 EOF
 
 # Clone application repo (single source of truth for compose + observability configs).
@@ -374,6 +382,7 @@ chown -RH ubuntu:ubuntu /opt/${project_name}/compose /opt/${project_name}/script
 chown -R ubuntu:ubuntu /opt/${project_name}/repo
 chmod 600 /opt/${project_name}/compose/.env
 
+%{ if enable_public_dns }
 # Set up certbot auto-renewal hooks and cron job
 mkdir -p /etc/letsencrypt/renewal-hooks/pre /etc/letsencrypt/renewal-hooks/post
 
@@ -404,6 +413,7 @@ chmod +x /etc/letsencrypt/renewal-hooks/post/start-nginx.sh
 
 # Cron: run certbot renew twice daily (Let's Encrypt recommendation)
 echo "0 0,12 * * * root certbot renew --quiet" > /etc/cron.d/certbot-renew
+%{ endif }
 
 # Create seed-on-boot script (runs seed.sh after Docker service is up)
 mkdir -p /opt/${project_name}/logs
@@ -473,13 +483,14 @@ if [ "$NEW_IP" != "$OLD_IP" ]; then
     sed -i "s/^export PUBLIC_IP=.*/export PUBLIC_IP=\"$NEW_IP\"/" /etc/profile.d/${project_name}.sh
     
     # Regenerate self-signed certificate ONLY if Let's Encrypt cert is not present
-    if [ ! -f /etc/letsencrypt/live/${domain_name}/fullchain.pem ]; then
+    LE_CERT="%{ if domain_name != "" }/etc/letsencrypt/live/${domain_name}/fullchain.pem%{ else }/dev/null%{ endif }"
+    if [ ! -f "$LE_CERT" ]; then
       openssl req -x509 -nodes -days 365 \
         -newkey rsa:2048 \
         -keyout /opt/${project_name}/nginx/ssl/live/cert.key \
         -out /opt/${project_name}/nginx/ssl/live/cert.crt \
-        -subj "/C=US/ST=State/L=City/O=${project_name}/CN=*.xanderbilla.com" \
-        -addext "subjectAltName=DNS:${domain_name},DNS:${grafana_domain_name},IP:$NEW_IP"
+        -subj "/C=US/ST=State/L=City/O=${project_name}/CN=${project_name}-${environment}" \
+        -addext "subjectAltName=%{ if domain_name != "" }DNS:${domain_name},%{ endif }%{ if grafana_domain_name != "" }DNS:${grafana_domain_name},%{ endif }IP:$NEW_IP"
       chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
       chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
       echo "IP and self-signed certificate updated."

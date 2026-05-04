@@ -31,6 +31,8 @@ locals {
   dynamodb_encoder_table   = "${var.project_name}-video-table-${var.environment}"
   s3_bucket                = "${var.project_name}-storage-${var.environment}"
 
+  ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+
   common_tags = merge(
     var.tags,
     {
@@ -40,6 +42,8 @@ locals {
     }
   )
 }
+
+data "aws_caller_identity" "current" {}
 
 # VPC Module
 module "vpc" {
@@ -61,32 +65,23 @@ module "security_group" {
   description = "Security group for ${var.project_name} application"
   vpc_id      = module.vpc.vpc_id
 
+  # NOTE: SSH (22) is intentionally NOT exposed. Use AWS SSM Session Manager:
+  #   aws ssm start-session --target <instance-id>
+  # The EC2 IAM role already has AmazonSSMManagedInstanceCore attached.
+  # The application port (8080) is NOT exposed publicly: nginx terminates TLS
+  # and proxies to the api container over the internal docker network.
   ingress_rules = [
     {
-      description = "HTTP"
+      description = "HTTP (redirected to HTTPS by nginx)"
       from_port   = 80
       to_port     = 80
       protocol    = "tcp"
       cidr_ipv4   = "0.0.0.0/0"
     },
     {
-      description = "HTTPS"
+      description = "HTTPS (nginx)"
       from_port   = 443
       to_port     = 443
-      protocol    = "tcp"
-      cidr_ipv4   = "0.0.0.0/0"
-    },
-    {
-      description = "Application Port"
-      from_port   = 8080
-      to_port     = 8080
-      protocol    = "tcp"
-      cidr_ipv4   = "0.0.0.0/0"
-    },
-    {
-      description = "SSH"
-      from_port   = 22
-      to_port     = 22
       protocol    = "tcp"
       cidr_ipv4   = "0.0.0.0/0"
     }
@@ -135,10 +130,20 @@ module "dynamodb_person" {
 module "dynamodb_attribute" {
   source = "../../modules/dynamodb"
 
-  table_name                    = local.dynamodb_attribute_table
-  billing_mode                  = var.dynamodb_billing_mode
-  hash_key                      = "id"
-  attributes                    = [{ name = "id", type = "S" }]
+  table_name   = local.dynamodb_attribute_table
+  billing_mode = var.dynamodb_billing_mode
+  hash_key     = "id"
+  attributes = [
+    { name = "id", type = "S" },
+    { name = "name", type = "S" },
+  ]
+  global_secondary_indexes = [
+    {
+      name            = "name-index"
+      hash_key        = "name"
+      projection_type = "ALL"
+    },
+  ]
   read_capacity                 = var.dynamodb_read_capacity
   write_capacity                = var.dynamodb_write_capacity
   enable_point_in_time_recovery = true
@@ -262,16 +267,112 @@ module "ec2" {
   key_name             = var.key_name
   create_eip           = true
 
-  user_data = base64gzip(templatefile("${path.module}/user-data.sh", {
-    project_name             = var.project_name
-    environment              = var.environment
-    aws_region               = var.aws_region
-    dynamodb_movie_table     = local.dynamodb_movie_table
-    dynamodb_person_table    = local.dynamodb_person_table
-    dynamodb_attribute_table = local.dynamodb_attribute_table
-    dynamodb_encoder_table   = local.dynamodb_encoder_table
-    s3_bucket                = local.s3_bucket
+  user_data = base64gzip(templatefile("${path.module}/../_shared/user-data.sh.tpl", {
+    project_name                  = var.project_name
+    environment                   = var.environment
+    aws_region                    = var.aws_region
+    dynamodb_movie_table          = local.dynamodb_movie_table
+    dynamodb_person_table         = local.dynamodb_person_table
+    dynamodb_attribute_table      = local.dynamodb_attribute_table
+    dynamodb_attribute_name_index = "name-index"
+    dynamodb_encoder_table        = local.dynamodb_encoder_table
+    s3_bucket                     = local.s3_bucket
+    prometheus_device             = "/dev/xvdb"
+    repo_url                      = var.repo_url
+    repo_branch                   = var.repo_branch
+    image_name                    = "${local.ecr_registry}/${local.name_prefix}:latest"
+    ecr_registry                  = local.ecr_registry
+    grafana_admin_user            = var.grafana_admin_user
+    grafana_admin_password        = var.grafana_admin_password
+    grafana_domain_name           = var.grafana_domain_name
+    storage_domain_name           = var.storage_domain_name
+    domain_name                   = var.domain_name
+    admin_email                   = var.admin_email
+    enable_public_dns             = var.enable_public_dns
   }))
 
   tags = local.common_tags
+}
+
+# ---------------------------------------------------------------------------
+# ECR repository for application image (parity with dev)
+# ---------------------------------------------------------------------------
+resource "aws_ecr_repository" "this" {
+  name                 = local.name_prefix
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_ecr_lifecycle_policy" "this" {
+  repository = aws_ecr_repository.this.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep only the last 10 images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 10
+        }
+        action = { type = "expire" }
+      }
+    ]
+  })
+}
+
+# ---------------------------------------------------------------------------
+# Persistent EBS volume for Prometheus data
+# ---------------------------------------------------------------------------
+data "aws_subnet" "primary" {
+  id = module.vpc.public_subnet_ids[0]
+}
+
+resource "aws_ebs_volume" "prometheus" {
+  availability_zone = data.aws_subnet.primary.availability_zone
+  size              = 20
+  type              = "gp3"
+  encrypted         = true
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-prometheus-data"
+  })
+}
+
+resource "aws_volume_attachment" "prometheus" {
+  device_name                    = "/dev/xvdb"
+  volume_id                      = aws_ebs_volume.prometheus.id
+  instance_id                    = module.ec2.instance_id
+  stop_instance_before_detaching = true
+}
+
+# ---------------------------------------------------------------------------
+# Optional public DNS (set var.enable_public_dns = true to activate)
+# ---------------------------------------------------------------------------
+resource "aws_route53_record" "api" {
+  count   = var.enable_public_dns ? 1 : 0
+  zone_id = var.route53_zone_id
+  name    = var.domain_name
+  type    = "A"
+  ttl     = 60
+  records = [module.ec2.instance_public_ip]
+}
+
+resource "aws_route53_record" "grafana" {
+  count   = var.enable_public_dns && var.grafana_domain_name != "" ? 1 : 0
+  zone_id = var.route53_zone_id
+  name    = var.grafana_domain_name
+  type    = "A"
+  ttl     = 60
+  records = [module.ec2.instance_public_ip]
 }

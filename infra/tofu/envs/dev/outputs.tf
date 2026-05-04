@@ -36,13 +36,15 @@ output "dynamodb_tables" {
 output "environment_variables" {
   description = "Environment variables for application"
   value = {
-    APP_ENV                  = var.environment
-    AWS_REGION               = var.aws_region
-    DYNAMODB_MOVIE_TABLE     = module.dynamodb_movie.table_name
-    DYNAMODB_PERSON_TABLE    = module.dynamodb_person.table_name
-    DYNAMODB_ATTRIBUTE_TABLE = module.dynamodb_attribute.table_name
-    DYNAMODB_ENCODER_TABLE   = module.dynamodb_encoder.table_name
-    S3_BUCKET                = module.s3.bucket_name
+    APP_ENV                           = var.environment
+    AWS_REGION                        = var.aws_region
+    DYNAMODB_MOVIE_TABLE              = module.dynamodb_movie.table_name
+    DYNAMODB_PERSON_TABLE             = module.dynamodb_person.table_name
+    DYNAMODB_ATTRIBUTE_TABLE          = module.dynamodb_attribute.table_name
+    DYNAMODB_ATTRIBUTE_NAME_INDEX     = "name-index"
+    DYNAMODB_ENCODER_TABLE            = module.dynamodb_encoder.table_name
+    DYNAMODB_ENCODER_CONTENT_ID_INDEX = "contentId-index"
+    S3_BUCKET                         = module.s3.bucket_name
   }
 }
 
@@ -52,23 +54,23 @@ output "prometheus_ebs_volume_id" {
 }
 
 output "api_domain" {
-  description = "Fully-qualified domain name managed by Route53"
-  value       = aws_route53_record.api.fqdn
+  description = "Fully-qualified domain name managed by Route53 (empty when public DNS disabled)"
+  value       = var.enable_public_dns ? aws_route53_record.api[0].fqdn : ""
 }
 
 output "api_url" {
   description = "HTTPS URL for the API"
-  value       = "https://${aws_route53_record.api.fqdn}"
+  value       = var.enable_public_dns ? "https://${aws_route53_record.api[0].fqdn}" : "http://${module.ec2.instance_public_ip}"
 }
 
 output "grafana_url" {
   description = "HTTPS URL for Grafana"
-  value       = "https://${var.grafana_domain_name}"
+  value       = var.grafana_domain_name != "" ? "https://${var.grafana_domain_name}" : ""
 }
 
 output "storage_url" {
   description = "CDN URL for storage"
-  value       = "https://${var.storage_domain_name}"
+  value       = var.storage_domain_name != "" ? "https://${var.storage_domain_name}" : ""
 }
 
 output "ecr_repository_url" {

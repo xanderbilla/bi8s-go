@@ -125,10 +125,9 @@ variable "grafana_admin_user" {
 }
 
 variable "grafana_admin_password" {
-  description = "Admin password for the Grafana UI on the EC2 instance"
+  description = "Admin password for the Grafana UI on the EC2 instance. Must be supplied via TF_VAR_grafana_admin_password or a *.tfvars file; no insecure default is provided."
   type        = string
   sensitive   = true
-  default     = "admin"
 }
 
 variable "grafana_domain_name" {
@@ -147,4 +146,10 @@ variable "admin_email" {
   description = "Admin email for Let's Encrypt certificate registration"
   type        = string
   default     = "admin@xanderbilla.com"
+}
+
+variable "enable_public_dns" {
+  description = "When true, request Let's Encrypt certs and create Route53 records for the configured domains. Set false for ephemeral / no-DNS environments."
+  type        = bool
+  default     = true
 }
