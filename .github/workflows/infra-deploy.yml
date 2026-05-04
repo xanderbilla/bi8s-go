@@ -32,6 +32,12 @@ on:
           - apply
           - destroy
 
+# OIDC requires id-token: write. contents: read for actions/checkout.
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
 env:
   TF_VERSION: "1.6.0"
   AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -46,38 +52,44 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       environment: ${{ steps.set-env.outputs.environment }}
-      should_deploy: ${{ steps.set-env.outputs.should_deploy }}
+      should_apply: ${{ steps.set-env.outputs.should_apply }}
     steps:
       - name: Determine Environment
         id: set-env
         run: |
+          ENV=""
+          APPLY="false"
+
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            # Manual trigger - use selected environment
-            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
-            echo "should_deploy=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/prod" ]]; then
-            # Push to prod branch - deploy to prod
-            echo "environment=prod" >> $GITHUB_OUTPUT
-            echo "should_deploy=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
-            # Push to dev branch - deploy to dev
-            echo "environment=dev" >> $GITHUB_OUTPUT
-            echo "should_deploy=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            # Pull request - determine target environment but don't deploy
-            if [[ "${{ github.base_ref }}" == "prod" ]]; then
-              echo "environment=prod" >> $GITHUB_OUTPUT
-            else
-              echo "environment=dev" >> $GITHUB_OUTPUT
+            ENV="${{ github.event.inputs.environment }}"
+            # Manual apply allowed for both envs (prod gated by GitHub Environment reviewers).
+            if [[ "${{ github.event.inputs.action }}" == "apply" ]]; then
+              APPLY="true"
             fi
-            echo "should_deploy=false" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/prod" ]]; then
+            # CRITICAL: prod push runs PLAN ONLY. Apply requires manual
+            # workflow_dispatch with reviewer approval (B5).
+            ENV="prod"
+            APPLY="false"
+          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            ENV="dev"
+            APPLY="true"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            if [[ "${{ github.base_ref }}" == "prod" ]]; then
+              ENV="prod"
+            else
+              ENV="dev"
+            fi
+            APPLY="false"
           else
-            echo "environment=dev" >> $GITHUB_OUTPUT
-            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            ENV="dev"
+            APPLY="false"
           fi
 
-          echo "Detected environment: $(cat $GITHUB_OUTPUT | grep environment | cut -d'=' -f2)"
-          echo "Should deploy: $(cat $GITHUB_OUTPUT | grep should_deploy | cut -d'=' -f2)"
+          echo "environment=${ENV}" >> $GITHUB_OUTPUT
+          echo "should_apply=${APPLY}" >> $GITHUB_OUTPUT
+          echo "Detected environment: ${ENV}"
+          echo "Should apply: ${APPLY}"
 
   terraform-plan:
     name: Terraform Plan
@@ -85,19 +97,18 @@ jobs:
     needs: detect-environment
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.action !=
       'destroy'
+    # Plan binds to the env so the role secret resolves; prod plan does NOT
+    # require reviewer approval (read-only).
     environment: ${{ needs.detect-environment.outputs.environment }}
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          role-session-name: gha-tofu-plan-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup OpenTofu
@@ -117,29 +128,14 @@ jobs:
         run: |
           cd infra/tofu/envs/${{ needs.detect-environment.outputs.environment }}
 
-          # Check if backend config exists
+          # Bootstrap (state bucket + lock table + OIDC role) is a one-shot
+          # operation done out-of-band by an operator. CI is NOT permitted to
+          # bootstrap because it would require admin credentials. Fail fast
+          # if the backend config is missing.
           if [ ! -f "backend-${{ needs.detect-environment.outputs.environment }}.hcl" ]; then
-            echo "Backend config not found. Creating backend resources..."
-            cd ../../bootstrap
-            tofu init
-            tofu apply -auto-approve \
-              -var="project_name=${{ env.PROJECT_NAME }}" \
-              -var="environment=${{ needs.detect-environment.outputs.environment }}" \
-              -var="aws_region=${{ env.AWS_REGION }}"
-            
-            # Get backend config
-            BUCKET=$(tofu output -raw state_bucket_name)
-            TABLE=$(tofu output -raw lock_table_name)
-            
-            # Create backend config
-            cd ../envs/${{ needs.detect-environment.outputs.environment }}
-            cat > backend-${{ needs.detect-environment.outputs.environment }}.hcl <<EOF
-          bucket         = "${BUCKET}"
-          key            = "${{ env.PROJECT_NAME }}/${{ needs.detect-environment.outputs.environment }}/terraform.tfstate"
-          region         = "${{ env.AWS_REGION }}"
-          dynamodb_table = "${TABLE}"
-          encrypt        = true
-          EOF
+            echo "::error::Backend config backend-${{ needs.detect-environment.outputs.environment }}.hcl not found." \
+                 "Run infra/tofu/bootstrap manually first (see docs/oidc-bootstrap.md)."
+            exit 1
           fi
 
           tofu init -backend-config=backend-${{ needs.detect-environment.outputs.environment }}.hcl
@@ -152,13 +148,14 @@ jobs:
 
       - name: Terraform Plan
         id: plan
+        env:
+          TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
         run: |
           cd infra/tofu/envs/${{ needs.detect-environment.outputs.environment }}
           tofu plan -no-color -out=tfplan \
             -var="project_name=${{ env.PROJECT_NAME }}" \
             -var="ami_id=${{ env.EC2_AMI_ID }}" \
             -var="key_name=${{ env.EC2_KEY_NAME }}"
-        continue-on-error: false
 
       - name: Upload Plan
         uses: actions/upload-artifact@v4
@@ -202,24 +199,23 @@ jobs:
     name: Terraform Apply
     runs-on: ubuntu-latest
     needs: [ detect-environment, terraform-plan ]
-    if: |
-      needs.detect-environment.outputs.should_deploy == 'true' &&
-      (github.event_name == 'push' || 
-       (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'))
+    # Apply runs only when:
+    #   - dev push (auto), OR
+    #   - workflow_dispatch with action=apply (gated by GitHub Environment
+    #     reviewers for prod -- configure required-reviewers on `prod`).
+    if: needs.detect-environment.outputs.should_apply == 'true'
     environment:
       name: ${{ needs.detect-environment.outputs.environment }}
       url: ${{ steps.output.outputs.ec2_url }}
-    permissions:
-      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          role-session-name: gha-tofu-apply-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup OpenTofu
@@ -249,19 +245,21 @@ jobs:
         run: |
           cd infra/tofu/envs/${{ needs.detect-environment.outputs.environment }}
           EC2_IP=$(tofu output -raw ec2_public_ip)
-          PROMETHEUS_EBS=$(tofu output -raw prometheus_ebs_volume_id)
+          PROMETHEUS_EBS=$(tofu output -raw prometheus_ebs_volume_id 2>/dev/null || echo "n/a")
           echo "ec2_ip=${EC2_IP}" >> $GITHUB_OUTPUT
           echo "ec2_url=https://${EC2_IP}/v1" >> $GITHUB_OUTPUT
 
-          echo "### Infrastructure Deployed Successfully! 🚀" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ needs.detect-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**EC2 Public IP:** ${EC2_IP}" >> $GITHUB_STEP_SUMMARY
-          echo "**Application URL:** https://${EC2_IP}/v1" >> $GITHUB_STEP_SUMMARY
-          echo "**Health Check:** https://${EC2_IP}/v1/health" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### Resources" >> $GITHUB_STEP_SUMMARY
-          echo "**Prometheus EBS Volume:** ${PROMETHEUS_EBS}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### Infrastructure Deployed Successfully! 🚀"
+            echo ""
+            echo "**Environment:** ${{ needs.detect-environment.outputs.environment }}"
+            echo "**EC2 Public IP:** ${EC2_IP}"
+            echo "**Application URL:** https://${EC2_IP}/v1"
+            echo "**Health Check:** https://${EC2_IP}/v1/health"
+            echo ""
+            echo "#### Resources"
+            echo "**Prometheus EBS Volume:** ${PROMETHEUS_EBS}"
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Save Infrastructure Outputs
         run: |
@@ -282,19 +280,19 @@ jobs:
     needs: detect-environment
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.action ==
       'destroy'
+    # Destroy uses a separate environment so you can require additional
+    # reviewers on `<env>-destroy` independently of normal applies.
     environment:
       name: ${{ needs.detect-environment.outputs.environment }}-destroy
-    permissions:
-      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          role-session-name: gha-tofu-destroy-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup OpenTofu
@@ -308,6 +306,8 @@ jobs:
           tofu init -backend-config=backend-${{ needs.detect-environment.outputs.environment }}.hcl
 
       - name: Terraform Destroy
+        env:
+          TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
         run: |
           cd infra/tofu/envs/${{ needs.detect-environment.outputs.environment }}
           tofu destroy -auto-approve \
@@ -315,6 +315,8 @@ jobs:
             -var="ami_id=${{ env.EC2_AMI_ID }}" \
             -var="key_name=${{ env.EC2_KEY_NAME }}"
 
-          echo "### Infrastructure Destroyed 💥" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ needs.detect-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### Infrastructure Destroyed 💥"
+            echo ""
+            echo "**Environment:** ${{ needs.detect-environment.outputs.environment }}"
+          } >> $GITHUB_STEP_SUMMARY
