@@ -194,8 +194,7 @@ if [ "$SKIP_SEED" = "0" ]; then
   log "person: Robert Downey Jr. → ${_person_id[542131]}"
 
 
-  _resp=$(_api_post /v1/a/movies \
-    -F "title=Eternals" \
+  _resp=$(_api_post /v1/a/content \ \
     -F "overview=The Eternals, a race of immortal beings with superhuman powers who have secretly lived on Earth for thousands of years, reunite to battle the monstrous Deviants and uncover a startling secret about their own existence." \
     -F "content_type=MOVIE" \
     -F "status=RELEASED" \
@@ -219,8 +218,7 @@ if [ "$SKIP_SEED" = "0" ]; then
   _eternals_id=$(echo "$_resp" | jq -r '.data.id')
   log "movie: Eternals → ${_eternals_id}"
 
-  _resp=$(_api_post /v1/a/movies \
-    -F "title=Marvel Anime: Iron Man" \
+  _resp=$(_api_post /v1/a/content \ \
     -F "overview=Tony Stark travels to Japan to build a new arc reactor and unveil Iron Man Dio. When the villainous ZODIAC steals the suit, Tony dons the original armor to stop them in an epic clash across the neon-lit streets of Tokyo." \
     -F "content_type=TV" \
     -F "status=ENDED" \
