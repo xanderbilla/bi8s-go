@@ -1,0 +1,46 @@
+auth_enabled: false
+
+common:
+  path_prefix: /loki
+  replication_factor: 1
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+
+ingester:
+  max_chunk_age: 1h
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+
+limits_config:
+  retention_period: 720h
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+storage_config:
+  filesystem:
+    directory: /loki
+  tsdb_shipper:
+    active_index_directory: /loki/tsdb-shipper-active
+    cache_location: /loki/tsdb-shipper-cache
+
+compactor:
+  delete_request_store: filesystem
+  working_directory: /loki/compactor

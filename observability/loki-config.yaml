@@ -7,11 +7,9 @@ server:
 common:
   path_prefix: /loki
   storage:
-    s3:
-      endpoint: s3.${AWS_REGION}.amazonaws.com
-      region: ${AWS_REGION}
-      bucketnames: ${S3_BUCKET}
-      s3forcepathstyle: false
+    filesystem:
+      chunk_directory: /loki/chunks
+      rules_directory: /loki/rules
   replication_factor: 1
   ring:
     kvstore:
@@ -21,7 +19,7 @@ schema_config:
   configs:
     - from: 2024-01-01
       store: tsdb
-      object_store: aws
+      object_store: filesystem
       schema: v13
       index:
         prefix: index_
@@ -44,14 +42,12 @@ compactor:
   retention_enabled: true
   retention_delete_delay: 2h
   retention_delete_worker_count: 150
-  delete_request_store: s3
+  delete_request_store: filesystem
 
 storage_config:
-  aws:
-    bucketnames: ${S3_BUCKET}
-    region: ${AWS_REGION}
-    endpoint: s3.${AWS_REGION}.amazonaws.com
-    s3forcepathstyle: false
+  filesystem:
+    chunks_directory: /loki/chunks
+    rules_directory: /loki/rules
   tsdb_shipper:
     active_index_directory: /loki/tsdb-active
     cache_location: /loki/tsdb-cache

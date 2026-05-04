@@ -32,7 +32,7 @@ services:
     networks:
       - bi8s-net
 
-  # ────────────────────────────── Application ─────────────────────────────
+  # Application
   api:
     <<: [ *restart-policy, *default-logging ]
     build:
@@ -41,21 +41,18 @@ services:
       target: runtime
     container_name: bi8s_api_local
     env_file:
-      - path: .env
-        required: false
+      - .env
     environment:
       APP_ENV: ${APP_ENV:-dev}
       PORT: ${PORT:-:8080}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      STARTUP_HEALTH_CHECK: ${STARTUP_HEALTH_CHECK:-false}
       DYNAMODB_MOVIE_TABLE: ${DYNAMODB_MOVIE_TABLE:-bi8s-content-table-dev}
       DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE:-bi8s-person-table-dev}
       DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE:-bi8s-attributes-table-dev}
       DYNAMODB_ATTRIBUTE_NAME_INDEX: ${DYNAMODB_ATTRIBUTE_NAME_INDEX:-name-index}
       DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE:-bi8s-video-table-dev}
       DYNAMODB_ENCODER_CONTENT_ID_INDEX: ${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       S3_BUCKET: ${S3_BUCKET:-bi8s-storage-dev}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8443,http://127.0.0.1:8443}
       CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
@@ -108,9 +105,8 @@ services:
       - bi8s-net
     profiles: [ "ui" ]
 
-  # ────────────────────────────── Redis ───────────────────────────────────
-  # Shared rate-limit backend. Single replica for local; in prod use a
-  # managed Redis (ElastiCache / Upstash) and set REDIS_URL accordingly.
+  # Redis - Shared rate-limit backend. Single replica for local; in prod use
+  # a managed Redis (ElastiCache / Upstash) and set REDIS_URL accordingly.
   redis:
     <<: [ *restart-policy, *default-logging ]
     image: redis:7-alpine
@@ -137,7 +133,7 @@ services:
     networks:
       - bi8s-net
 
-  # ────────────────────────── Observability stack ─────────────────────────
+  # Observability stack
   otel-collector:
     <<: [ *restart-policy, *default-logging ]
     image: otel/opentelemetry-collector-contrib:0.111.0
@@ -199,14 +195,9 @@ services:
     <<: [ *restart-policy, *default-logging ]
     image: grafana/loki:3.2.1
     container_name: bi8s_loki
-    command: [ "-config.file=/etc/loki/loki-config.yaml", "-config.expand-env=true" ]
-    environment:
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      S3_BUCKET: ${S3_BUCKET:-bi8s-storage-dev}
+    command: [ "-config.file=/etc/loki/loki-config.yaml" ]
     volumes:
-      - ./observability/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - ./observability/loki-config-local.yaml:/etc/loki/loki-config.yaml:ro
       - loki-data:/loki
     ports:
       - "${LOKI_PORT:-3100}:3100"
@@ -257,7 +248,7 @@ services:
     networks:
       - bi8s-net
 
-  # ─────────────────────── Infrastructure exporters ───────────────────────
+  # Infrastructure exporters
   cadvisor:
     <<: [ *restart-policy, *default-logging ]
     image: gcr.io/cadvisor/cadvisor:v0.50.0
@@ -272,6 +263,7 @@ services:
     command:
       - --docker_only=true
       - --store_container_labels=true
+      - --disable_metrics=disk,diskIO
     ports:
       - "${CADVISOR_PORT:-8090}:8080"
     networks:
@@ -289,8 +281,13 @@ services:
       - "--path.procfs=/host/proc"
       - "--path.sysfs=/host/sys"
       - "--path.rootfs=/rootfs"
-      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)(\
-        $$|/)"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|r\
+        un/host_.*|host_mnt)($$|/)"
+      - "--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgrou\
+        p2?|configfs|debugfs|devpts|devtmpfs|efivarfs|fusectl|hugetlbfs|iso9660\
+        |mqueue|nsfs|overlay|proc|procfs|pstore|ramfs|rpc_pipefs|securityfs|sel\
+        inuxfs|squashfs|sysfs|tmpfs|tracefs|fakeowner|selfowner|fuse\\..*|virti\
+        ofs.*)$"
     ports:
       - "${NODE_EXPORTER_PORT:-9100}:9100"
     networks:
