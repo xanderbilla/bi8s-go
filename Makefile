@@ -171,8 +171,10 @@ lint:
 		cd app && golangci-lint run; \
 		printf "$(GREEN)✓ lint$(RESET)\n"; \
 	else \
-		printf "$(YELLOW)⚠ golangci-lint not installed$(RESET)\n"; \
-		exit 1; \
+		printf "$(YELLOW)→ Installing golangci-lint...$(RESET)\n"; \
+		go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
+		cd app && golangci-lint run; \
+		printf "$(GREEN)✓ lint$(RESET)\n"; \
 	fi
 
 staticcheck:
@@ -180,8 +182,10 @@ staticcheck:
 		cd app && staticcheck ./...; \
 		printf "$(GREEN)✓ staticcheck$(RESET)\n"; \
 	else \
-		printf "$(YELLOW)⚠ staticcheck not installed$(RESET)\n"; \
-		exit 1; \
+		printf "$(YELLOW)→ Installing staticcheck...$(RESET)\n"; \
+		go install honnef.co/go/tools/cmd/staticcheck@latest; \
+		cd app && staticcheck ./...; \
+		printf "$(GREEN)✓ staticcheck$(RESET)\n"; \
 	fi
 
 govulncheck:
@@ -189,8 +193,10 @@ govulncheck:
 		cd app && govulncheck ./...; \
 		printf "$(GREEN)✓ govulncheck$(RESET)\n"; \
 	else \
-		printf "$(YELLOW)⚠ govulncheck not installed$(RESET)\n"; \
-		exit 1; \
+		printf "$(YELLOW)→ Installing govulncheck...$(RESET)\n"; \
+		go install golang.org/x/vuln/cmd/govulncheck@latest; \
+		cd app && govulncheck ./...; \
+		printf "$(GREEN)✓ govulncheck$(RESET)\n"; \
 	fi
 format:
 	@cd app && go fmt ./...
