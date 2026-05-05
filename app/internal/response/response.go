@@ -19,6 +19,14 @@ type ErrorPayload struct {
 	Context     any    `json:"context,omitempty"`
 }
 
+// PagedData wraps a paginated list response. NextCursor is omitted when there
+// are no further pages.
+type PagedData[T any] struct {
+	Items      []T    `json:"items"`
+	NextCursor string `json:"nextCursor,omitempty"`
+	Count      int    `json:"count"`
+}
+
 // Envelope is the single response shape used by every endpoint. Data is null
 // on errors; Error is null on success. Both fields are always present so
 // clients can rely on the schema.
