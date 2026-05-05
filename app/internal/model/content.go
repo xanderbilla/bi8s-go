@@ -24,9 +24,11 @@ type Content struct {
 	Tagline          string           `json:"tagline,omitempty" dynamodbav:"tagline,omitempty" validate:"omitempty,max=255"`
 	Studios          []EntityRef      `json:"studios,omitempty" dynamodbav:"studios,omitempty" validate:"omitempty,dive"`
 	Visibility       Visibility       `json:"visibility,omitempty" dynamodbav:"visibility,omitempty" validate:"omitempty,oneof=PUBLIC PRIVATE"`
-	Assets           []Asset          `json:"assets,omitempty" dynamodbav:"assets,omitempty" validate:"omitempty,dive"`
-	Stats            ContentStats     `json:"stats,omitempty" dynamodbav:"stats,omitempty"`
-	Audit            Audit            `json:"audit,omitempty" dynamodbav:"audit,omitempty"`
+	// CreatedAt is a denormalized top-level copy of Audit.CreatedAt (RFC3339) used as the GSI sort key.
+	CreatedAt string       `json:"-" dynamodbav:"createdAt,omitempty"`
+	Assets    []Asset      `json:"assets,omitempty" dynamodbav:"assets,omitempty" validate:"omitempty,dive"`
+	Stats     ContentStats `json:"stats,omitempty" dynamodbav:"stats,omitempty"`
+	Audit     Audit        `json:"audit,omitempty" dynamodbav:"audit,omitempty"`
 }
 
 type Asset struct {
