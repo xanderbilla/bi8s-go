@@ -27,7 +27,7 @@ Server runs on `:8080`.
 
 ## Documentation
 
-Detailed documentation is available in the `docs/` directory, including API reference, architecture, configuration, deployment, and local development guides.
+Detailed documentation is available in the [`docs`](https://github.com/xanderbilla/bi8s-go/tree/main/docs) directory, including API reference, architecture, configuration, deployment, and local development guides.
 
 The corresponding frontend application (streaming UI) is available in the EnternFlix repository:
 
@@ -37,11 +37,11 @@ Ensure the frontend is configured to use this API for proper integration.
 
 ## Screenshot
 
-![alt text](image.png)
+<img width="1906" height="994" alt="image" src="https://github.com/user-attachments/assets/b900e990-acd0-4851-858b-97aa2501f575" />
 
 ## Contributing
 
-Refer to `CONTRIBUTING.md`.
+Refer to [`CONTRIBUTING.md`](https://github.com/xanderbilla/bi8s-go/tree/main/CONTRIBUTING.md).
 
 ## License
 
