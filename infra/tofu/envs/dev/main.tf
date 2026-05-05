@@ -29,11 +29,13 @@ locals {
   ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 
   # Resource names
-  dynamodb_movie_table     = "${var.project_name}-content-table-${var.environment}"
-  dynamodb_person_table    = "${var.project_name}-person-table-${var.environment}"
-  dynamodb_attribute_table = "${var.project_name}-attributes-table-${var.environment}"
-  dynamodb_encoder_table   = "${var.project_name}-video-table-${var.environment}"
-  s3_bucket                = "${var.project_name}-storage-${var.environment}"
+  dynamodb_movie_table             = "${var.project_name}-content-table-${var.environment}"
+  dynamodb_person_table            = "${var.project_name}-person-table-${var.environment}"
+  dynamodb_attribute_table         = "${var.project_name}-attributes-table-${var.environment}"
+  dynamodb_encoder_table           = "${var.project_name}-video-table-${var.environment}"
+  dynamodb_content_cast_table      = "${var.project_name}-content-cast-table-${var.environment}"
+  dynamodb_content_attribute_table = "${var.project_name}-content-attribute-table-${var.environment}"
+  s3_bucket                        = "${var.project_name}-storage-${var.environment}"
 
   common_tags = merge(
     var.tags,
@@ -102,10 +104,29 @@ module "security_group" {
 module "dynamodb_movie" {
   source = "../../modules/dynamodb"
 
-  table_name                    = local.dynamodb_movie_table
-  billing_mode                  = var.dynamodb_billing_mode
-  hash_key                      = "id"
-  attributes                    = [{ name = "id", type = "S" }]
+  table_name   = local.dynamodb_movie_table
+  billing_mode = var.dynamodb_billing_mode
+  hash_key     = "id"
+  attributes = [
+    { name = "id", type = "S" },
+    { name = "visibility", type = "S" },
+    { name = "createdAt", type = "S" },
+    { name = "contentType", type = "S" },
+  ]
+  global_secondary_indexes = [
+    {
+      name            = "visibility-createdAt-index"
+      hash_key        = "visibility"
+      range_key       = "createdAt"
+      projection_type = "ALL"
+    },
+    {
+      name            = "visibility-contentType-index"
+      hash_key        = "visibility"
+      range_key       = "contentType"
+      projection_type = "ALL"
+    },
+  ]
   read_capacity                 = var.dynamodb_read_capacity
   write_capacity                = var.dynamodb_write_capacity
   enable_point_in_time_recovery = true
@@ -167,6 +188,42 @@ module "dynamodb_encoder" {
       hash_key        = "contentId"
       projection_type = "ALL"
     },
+  ]
+  read_capacity                 = var.dynamodb_read_capacity
+  write_capacity                = var.dynamodb_write_capacity
+  enable_point_in_time_recovery = true
+  enable_encryption             = true
+  tags                          = local.common_tags
+}
+
+module "dynamodb_content_cast" {
+  source = "../../modules/dynamodb"
+
+  table_name   = local.dynamodb_content_cast_table
+  billing_mode = var.dynamodb_billing_mode
+  hash_key     = "personId"
+  range_key    = "contentId"
+  attributes = [
+    { name = "personId", type = "S" },
+    { name = "contentId", type = "S" },
+  ]
+  read_capacity                 = var.dynamodb_read_capacity
+  write_capacity                = var.dynamodb_write_capacity
+  enable_point_in_time_recovery = true
+  enable_encryption             = true
+  tags                          = local.common_tags
+}
+
+module "dynamodb_content_attribute" {
+  source = "../../modules/dynamodb"
+
+  table_name   = local.dynamodb_content_attribute_table
+  billing_mode = var.dynamodb_billing_mode
+  hash_key     = "attributeId"
+  range_key    = "contentId"
+  attributes = [
+    { name = "attributeId", type = "S" },
+    { name = "contentId", type = "S" },
   ]
   read_capacity                 = var.dynamodb_read_capacity
   write_capacity                = var.dynamodb_write_capacity
@@ -321,27 +378,29 @@ module "ec2" {
   create_eip           = true
 
   user_data = base64gzip(templatefile("${path.module}/../_shared/user-data.sh.tpl", {
-    project_name                  = var.project_name
-    environment                   = var.environment
-    aws_region                    = var.aws_region
-    dynamodb_movie_table          = local.dynamodb_movie_table
-    dynamodb_person_table         = local.dynamodb_person_table
-    dynamodb_attribute_table      = local.dynamodb_attribute_table
-    dynamodb_attribute_name_index = "name-index"
-    dynamodb_encoder_table        = local.dynamodb_encoder_table
-    s3_bucket                     = local.s3_bucket
-    prometheus_device             = "/dev/xvdb"
-    repo_url                      = var.repo_url
-    repo_branch                   = var.repo_branch
-    image_name                    = "${local.ecr_registry}/${local.name_prefix}:latest"
-    ecr_registry                  = local.ecr_registry
-    grafana_admin_user            = var.grafana_admin_user
-    grafana_admin_password        = var.grafana_admin_password
-    grafana_domain_name           = var.grafana_domain_name
-    storage_domain_name           = var.storage_domain_name
-    domain_name                   = var.domain_name
-    admin_email                   = var.admin_email
-    enable_public_dns             = var.enable_public_dns
+    project_name                     = var.project_name
+    environment                      = var.environment
+    aws_region                       = var.aws_region
+    dynamodb_movie_table             = local.dynamodb_movie_table
+    dynamodb_person_table            = local.dynamodb_person_table
+    dynamodb_attribute_table         = local.dynamodb_attribute_table
+    dynamodb_attribute_name_index    = "name-index"
+    dynamodb_encoder_table           = local.dynamodb_encoder_table
+    dynamodb_content_cast_table      = local.dynamodb_content_cast_table
+    dynamodb_content_attribute_table = local.dynamodb_content_attribute_table
+    s3_bucket                        = local.s3_bucket
+    prometheus_device                = "/dev/xvdb"
+    repo_url                         = var.repo_url
+    repo_branch                      = var.repo_branch
+    image_name                       = "${local.ecr_registry}/${local.name_prefix}:latest"
+    ecr_registry                     = local.ecr_registry
+    grafana_admin_user               = var.grafana_admin_user
+    grafana_admin_password           = var.grafana_admin_password
+    grafana_domain_name              = var.grafana_domain_name
+    storage_domain_name              = var.storage_domain_name
+    domain_name                      = var.domain_name
+    admin_email                      = var.admin_email
+    enable_public_dns                = var.enable_public_dns
   }))
 
   tags = local.common_tags
