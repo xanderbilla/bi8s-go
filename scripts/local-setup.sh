@@ -9,11 +9,13 @@
 #   LOCALSTACK_ENDPOINT      — e.g. http://localhost:4566  (omit for real AWS)
 #   PROJECT_NAME             — default: bi8s
 #   APP_ENV                  — default: dev
-#   DYNAMODB_MOVIE_TABLE
+#   DYNAMODB_CONTENT_TABLE
 #   DYNAMODB_PERSON_TABLE
 #   DYNAMODB_ATTRIBUTE_TABLE
 #   DYNAMODB_ENCODER_TABLE
 #   DYNAMODB_ENCODER_CONTENT_ID_INDEX
+#   DYNAMODB_CONTENT_CAST_TABLE
+#   DYNAMODB_CONTENT_ATTRIBUTE_TABLE
 #   S3_BUCKET
 #
 # Usage:
@@ -45,11 +47,13 @@ if [ -n "$ENDPOINT" ]; then
   export AWS_DEFAULT_REGION="$REGION"
 fi
 
-MOVIE_TABLE="${DYNAMODB_MOVIE_TABLE:-${_project}-content-table-${_env}}"
+CONTENT_TABLE="${DYNAMODB_CONTENT_TABLE:-${_project}-content-table-${_env}}"
 PERSON_TABLE="${DYNAMODB_PERSON_TABLE:-${_project}-person-table-${_env}}"
 ATTRIBUTE_TABLE="${DYNAMODB_ATTRIBUTE_TABLE:-${_project}-attributes-table-${_env}}"
 ENCODER_TABLE="${DYNAMODB_ENCODER_TABLE:-${_project}-video-table-${_env}}"
 ENCODER_GSI="${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}"
+CONTENT_CAST_TABLE="${DYNAMODB_CONTENT_CAST_TABLE:-${_project}-content-cast-table-${_env}}"
+CONTENT_ATTRIBUTE_TABLE="${DYNAMODB_CONTENT_ATTRIBUTE_TABLE:-${_project}-content-attribute-table-${_env}}"
 BUCKET="${S3_BUCKET:-${_project}-storage-${_env}}"
 
 # Build endpoint flag (empty string when using real AWS).
@@ -77,6 +81,133 @@ _create_simple_table() {
     --table-name "$table" \
     --attribute-definitions AttributeName=id,AttributeType=S \
     --key-schema AttributeName=id,KeyType=HASH \
+    --billing-mode PAY_PER_REQUEST \
+    --region "$REGION" \
+    "${_ep_flag[@]}" \
+    --output json > /dev/null
+  aws dynamodb wait table-exists \
+    --table-name "$table" \
+    --region "$REGION" \
+    "${_ep_flag[@]}"
+  ok "Created: $table"
+}
+
+_create_content_table() {
+  local table="$1"
+  if _table_exists "$table"; then
+    ok "DynamoDB table already exists: $table"
+    return
+  fi
+  log "Creating DynamoDB table: $table (with visibility GSIs)"
+  aws dynamodb create-table \
+    --table-name "$table" \
+    --attribute-definitions \
+      AttributeName=id,AttributeType=S \
+      AttributeName=visibility,AttributeType=S \
+      AttributeName=createdAt,AttributeType=S \
+      AttributeName=contentType,AttributeType=S \
+    --key-schema AttributeName=id,KeyType=HASH \
+    --global-secondary-indexes '[
+      {
+        "IndexName": "visibility-createdAt-index",
+        "KeySchema": [
+          {"AttributeName": "visibility", "KeyType": "HASH"},
+          {"AttributeName": "createdAt", "KeyType": "RANGE"}
+        ],
+        "Projection": {"ProjectionType": "ALL"}
+      },
+      {
+        "IndexName": "visibility-contentType-index",
+        "KeySchema": [
+          {"AttributeName": "visibility", "KeyType": "HASH"},
+          {"AttributeName": "contentType", "KeyType": "RANGE"}
+        ],
+        "Projection": {"ProjectionType": "ALL"}
+      }
+    ]' \
+    --billing-mode PAY_PER_REQUEST \
+    --region "$REGION" \
+    "${_ep_flag[@]}" \
+    --output json > /dev/null
+  aws dynamodb wait table-exists \
+    --table-name "$table" \
+    --region "$REGION" \
+    "${_ep_flag[@]}"
+  ok "Created: $table"
+}
+
+_create_attribute_table() {
+  local table="$1"
+  if _table_exists "$table"; then
+    ok "DynamoDB table already exists: $table"
+    return
+  fi
+  log "Creating DynamoDB table: $table (with name-index GSI)"
+  aws dynamodb create-table \
+    --table-name "$table" \
+    --attribute-definitions \
+      AttributeName=id,AttributeType=S \
+      AttributeName=name,AttributeType=S \
+    --key-schema AttributeName=id,KeyType=HASH \
+    --global-secondary-indexes '[
+      {
+        "IndexName": "name-index",
+        "KeySchema": [{"AttributeName": "name", "KeyType": "HASH"}],
+        "Projection": {"ProjectionType": "ALL"}
+      }
+    ]' \
+    --billing-mode PAY_PER_REQUEST \
+    --region "$REGION" \
+    "${_ep_flag[@]}" \
+    --output json > /dev/null
+  aws dynamodb wait table-exists \
+    --table-name "$table" \
+    --region "$REGION" \
+    "${_ep_flag[@]}"
+  ok "Created: $table"
+}
+
+_create_content_cast_table() {
+  local table="$1"
+  if _table_exists "$table"; then
+    ok "DynamoDB table already exists: $table"
+    return
+  fi
+  log "Creating DynamoDB table: $table (PK=personId, SK=contentId)"
+  aws dynamodb create-table \
+    --table-name "$table" \
+    --attribute-definitions \
+      AttributeName=personId,AttributeType=S \
+      AttributeName=contentId,AttributeType=S \
+    --key-schema \
+      AttributeName=personId,KeyType=HASH \
+      AttributeName=contentId,KeyType=RANGE \
+    --billing-mode PAY_PER_REQUEST \
+    --region "$REGION" \
+    "${_ep_flag[@]}" \
+    --output json > /dev/null
+  aws dynamodb wait table-exists \
+    --table-name "$table" \
+    --region "$REGION" \
+    "${_ep_flag[@]}"
+  ok "Created: $table"
+}
+
+_create_content_attribute_table() {
+  local table="$1"
+  if _table_exists "$table"; then
+    ok "DynamoDB table already exists: $table"
+    return
+  fi
+  log "Creating DynamoDB table: $table (PK=attributeId, SK=contentId)"
+  aws dynamodb create-table \
+    --table-name "$table" \
+    --attribute-definitions \
+      AttributeName=attributeId,AttributeType=S \
+      AttributeName=contentId,AttributeType=S \
+    --key-schema \
+      AttributeName=attributeId,KeyType=HASH \
+      AttributeName=contentId,KeyType=RANGE \
     --billing-mode PAY_PER_REQUEST \
     --region "$REGION" \
     "${_ep_flag[@]}" \
@@ -228,10 +359,12 @@ fi
 echo ""
 
 log "--- DynamoDB tables ---"
-_create_simple_table  "$MOVIE_TABLE"
-_create_simple_table  "$PERSON_TABLE"
-_create_simple_table  "$ATTRIBUTE_TABLE"
-_create_encoder_table "$ENCODER_TABLE" "$ENCODER_GSI"
+_create_content_table      "$CONTENT_TABLE"
+_create_simple_table       "$PERSON_TABLE"
+_create_attribute_table    "$ATTRIBUTE_TABLE"
+_create_encoder_table      "$ENCODER_TABLE" "$ENCODER_GSI"
+_create_content_cast_table "$CONTENT_CAST_TABLE"
+_create_content_attribute_table "$CONTENT_ATTRIBUTE_TABLE"
 
 echo ""
 log "--- S3 bucket ---"
