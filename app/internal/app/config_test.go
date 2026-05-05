@@ -7,15 +7,19 @@ import (
 
 func baseConfig() Config {
 	return Config{
-		Addr:                  ":8080",
-		Env:                   "dev",
-		TableName:             "movies",
-		PersonTableName:       "people",
-		AttributeTableName:    "attrs",
-		EncoderTableName:      "encoder",
-		EncoderContentIDIndex: "encoder-content-id-index",
-		S3Bucket:              "bucket",
-		AWS:                   AWSCredentials{Region: "us-east-1"},
+		Addr:                              ":8080",
+		Env:                               "dev",
+		TableName:                         "movies",
+		PersonTableName:                   "people",
+		AttributeTableName:                "attrs",
+		EncoderTableName:                  "encoder",
+		EncoderContentIDIndex:             "encoder-content-id-index",
+		ContentCastTableName:              "content-cast",
+		ContentAttributeTableName:         "content-attribute",
+		ContentVisibilityCreatedAtIndex:   "visibility-createdAt-index",
+		ContentVisibilityContentTypeIndex: "visibility-contentType-index",
+		S3Bucket:                          "bucket",
+		AWS:                               AWSCredentials{Region: "us-east-1"},
 	}
 }
 

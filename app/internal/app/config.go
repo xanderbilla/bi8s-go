@@ -26,6 +26,11 @@ type Config struct {
 	EncoderContentIDIndex string
 	AttributeNameIndex    string
 
+	ContentCastTableName              string
+	ContentAttributeTableName         string
+	ContentVisibilityCreatedAtIndex   string
+	ContentVisibilityContentTypeIndex string
+
 	S3Bucket string
 
 	CORSAllowedOrigins      []string
@@ -74,6 +79,15 @@ func (c Config) Validate() error {
 	}
 	if strings.TrimSpace(c.EncoderContentIDIndex) == "" {
 		return errors.New("DYNAMODB_ENCODER_CONTENT_ID_INDEX is required")
+	}
+	if strings.TrimSpace(c.ContentCastTableName) == "" {
+		return errors.New("DYNAMODB_CONTENT_CAST_TABLE is required")
+	}
+	if strings.TrimSpace(c.ContentAttributeTableName) == "" {
+		return errors.New("DYNAMODB_CONTENT_ATTRIBUTE_TABLE is required")
+	}
+	if strings.TrimSpace(c.ContentVisibilityCreatedAtIndex) == "" {
+		return errors.New("DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX is required")
 	}
 	switch strings.ToLower(strings.TrimSpace(c.RateLimitBackend)) {
 	case "", "memory":
