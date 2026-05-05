@@ -68,6 +68,19 @@ func WithTimeoutResult[T any](ctx context.Context, operation string, fn func(con
 	return result, nil
 }
 
+// WithTimeoutResultPage wraps a paginated operation that returns (T, nextKey, error).
+func WithTimeoutResultPage[T any](ctx context.Context, operation string, fn func(context.Context) (T, map[string]types.AttributeValue, error)) (T, map[string]types.AttributeValue, error) {
+	ctx, cancel := ctxutil.WithDBTimeout(ctx)
+	defer cancel()
+
+	result, nextKey, err := fn(ctx)
+	if err != nil {
+		var zero T
+		return zero, nil, fmt.Errorf("%s: %w", operation, err)
+	}
+	return result, nextKey, nil
+}
+
 func ScanAllPaged(ctx context.Context, client DynamoAPI, input *dynamodb.ScanInput, maxPages int) ([]map[string]types.AttributeValue, error) {
 	if maxPages <= 0 {
 		maxPages = DefaultMaxScanPages
@@ -108,4 +121,24 @@ func QueryAllPaged(ctx context.Context, client DynamoAPI, input *dynamodb.QueryI
 		}
 		input.ExclusiveStartKey = out.LastEvaluatedKey
 	}
+}
+
+// QueryPage executes a single DynamoDB Query page and returns (items, lastKey, error).
+// lastKey is nil when there are no more pages.
+func QueryPage(ctx context.Context, client DynamoAPI, input *dynamodb.QueryInput) ([]map[string]types.AttributeValue, map[string]types.AttributeValue, error) {
+	out, err := client.Query(ctx, input)
+	if err != nil {
+		return nil, nil, err
+	}
+	return out.Items, out.LastEvaluatedKey, nil
+}
+
+// ScanPage executes a single DynamoDB Scan page and returns (items, lastKey, error).
+// lastKey is nil when there are no more pages.
+func ScanPage(ctx context.Context, client DynamoAPI, input *dynamodb.ScanInput) ([]map[string]types.AttributeValue, map[string]types.AttributeValue, error) {
+	out, err := client.Scan(ctx, input)
+	if err != nil {
+		return nil, nil, err
+	}
+	return out.Items, out.LastEvaluatedKey, nil
 }
