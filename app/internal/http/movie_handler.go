@@ -9,6 +9,7 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/errs"
 	"github.com/xanderbilla/bi8s-go/internal/logger"
 	"github.com/xanderbilla/bi8s-go/internal/model"
+	"github.com/xanderbilla/bi8s-go/internal/repository"
 	"github.com/xanderbilla/bi8s-go/internal/response"
 	"github.com/xanderbilla/bi8s-go/internal/service"
 )
@@ -28,28 +29,48 @@ func contentTypeFromQuery(r *http.Request, key string) string {
 	case "tv":
 		return "tv"
 	default:
-		return "all"
+		return ""
 	}
 }
 
 func (h *ContentHandler) GetAllContentAdmin(w http.ResponseWriter, r *http.Request) {
-	movies, err := h.movieService.GetAllAdmin(r.Context())
+	limit, startKey, err := parsePaginationParams(r)
+	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+	movies, nextKey, err := h.movieService.GetAllAdmin(r.Context(), limit, startKey)
 	if err != nil {
 		errs.Write(w, r, err)
 		return
 	}
-	if err := response.Success(w, r, http.StatusOK, "movies fetched", movies); err != nil {
+	cursor, _ := repository.EncodeCursor(nextKey)
+	if err := response.Success(w, r, http.StatusOK, "movies fetched", response.PagedData[model.Movie]{
+		Items:      movies,
+		NextCursor: cursor,
+		Count:      len(movies),
+	}); err != nil {
 		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
 	}
 }
 
 func (h *ContentHandler) GetRecentContent(w http.ResponseWriter, r *http.Request) {
-	movies, err := h.movieService.GetRecentContent(r.Context(), contentTypeFromQuery(r, "type"))
+	limit, startKey, err := parsePaginationParams(r)
+	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+	movies, nextKey, err := h.movieService.GetRecentContent(r.Context(), contentTypeFromQuery(r, "type"), limit, startKey)
 	if err != nil {
 		errs.Write(w, r, err)
 		return
 	}
-	if err := response.Success(w, r, http.StatusOK, "content fetched", convertToPublicList(movies)); err != nil {
+	cursor, _ := repository.EncodeCursor(nextKey)
+	if err := response.Success(w, r, http.StatusOK, "content fetched", response.PagedData[model.MoviePublicList]{
+		Items:      convertToPublicList(movies),
+		NextCursor: cursor,
+		Count:      len(movies),
+	}); err != nil {
 		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
 	}
 }
@@ -121,46 +142,82 @@ func (h *ContentHandler) DeleteContent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ContentHandler) GetContentByPersonIdAdmin(w http.ResponseWriter, r *http.Request) {
-	movies, err := h.movieService.GetContentByPersonIdAdmin(
+	limit, startKey, err := parsePaginationParams(r)
+	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+	movies, nextKey, err := h.movieService.GetContentByPersonIdAdmin(
 		r.Context(),
 		chi.URLParam(r, "peopleId"),
 		contentTypeFromQuery(r, "type"),
+		limit,
+		startKey,
 	)
 	if err != nil {
 		errs.Write(w, r, err)
 		return
 	}
-	if err := response.Success(w, r, http.StatusOK, "content fetched", convertToMinimalList(movies)); err != nil {
+	cursor, _ := repository.EncodeCursor(nextKey)
+	if err := response.Success(w, r, http.StatusOK, "content fetched", response.PagedData[model.MoviesByPersonList]{
+		Items:      convertToMinimalList(movies),
+		NextCursor: cursor,
+		Count:      len(movies),
+	}); err != nil {
 		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
 	}
 }
 
 func (h *ContentHandler) GetContentByPersonId(w http.ResponseWriter, r *http.Request) {
-	movies, err := h.movieService.GetContentByPersonId(
+	limit, startKey, err := parsePaginationParams(r)
+	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+	movies, nextKey, err := h.movieService.GetContentByPersonId(
 		r.Context(),
 		chi.URLParam(r, "peopleId"),
 		contentTypeFromQuery(r, "type"),
+		limit,
+		startKey,
 	)
 	if err != nil {
 		errs.Write(w, r, err)
 		return
 	}
-	if err := response.Success(w, r, http.StatusOK, "content fetched", convertToMinimalList(movies)); err != nil {
+	cursor, _ := repository.EncodeCursor(nextKey)
+	if err := response.Success(w, r, http.StatusOK, "content fetched", response.PagedData[model.MoviesByPersonList]{
+		Items:      convertToMinimalList(movies),
+		NextCursor: cursor,
+		Count:      len(movies),
+	}); err != nil {
 		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
 	}
 }
 
 func (h *ContentHandler) GetContentByAttributeId(w http.ResponseWriter, r *http.Request) {
-	movies, err := h.movieService.GetMoviesByAttributeId(
+	limit, startKey, err := parsePaginationParams(r)
+	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+	movies, nextKey, err := h.movieService.GetMoviesByAttributeId(
 		r.Context(),
 		chi.URLParam(r, "id"),
 		contentTypeFromQuery(r, "content"),
+		limit,
+		startKey,
 	)
 	if err != nil {
 		errs.Write(w, r, err)
 		return
 	}
-	if err := response.Success(w, r, http.StatusOK, "content fetched", convertToMinimalList(movies)); err != nil {
+	cursor, _ := repository.EncodeCursor(nextKey)
+	if err := response.Success(w, r, http.StatusOK, "content fetched", response.PagedData[model.MoviesByPersonList]{
+		Items:      convertToMinimalList(movies),
+		NextCursor: cursor,
+		Count:      len(movies),
+	}); err != nil {
 		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
 	}
 }
@@ -192,12 +249,22 @@ func (h *ContentHandler) GetDiscoverContent(w http.ResponseWriter, r *http.Reque
 	if discoverType == "" {
 		discoverType = "latest"
 	}
-	movies, err := h.movieService.GetDiscoverContent(r.Context(), discoverType, contentTypeFromQuery(r, "content"))
+	limit, startKey, err := parsePaginationParams(r)
+	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+	movies, nextKey, err := h.movieService.GetDiscoverContent(r.Context(), discoverType, contentTypeFromQuery(r, "content"), limit, startKey)
 	if err != nil {
 		errs.Write(w, r, err)
 		return
 	}
-	if err := response.Success(w, r, http.StatusOK, "content discovered", convertToPublicList(movies)); err != nil {
+	cursor, _ := repository.EncodeCursor(nextKey)
+	if err := response.Success(w, r, http.StatusOK, "content discovered", response.PagedData[model.MoviePublicList]{
+		Items:      convertToPublicList(movies),
+		NextCursor: cursor,
+		Count:      len(movies),
+	}); err != nil {
 		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
 	}
 }
