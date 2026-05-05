@@ -2,13 +2,16 @@ package http
 
 import (
 	"errors"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
 	"github.com/xanderbilla/bi8s-go/internal/model"
+	"github.com/xanderbilla/bi8s-go/internal/repository"
 	"github.com/xanderbilla/bi8s-go/internal/validation"
 )
 
@@ -117,4 +120,31 @@ func parseStringArray(formValues url.Values, fieldName string) []string {
 		}
 	}
 	return result
+}
+
+const (
+	defaultPageLimit int32 = 20
+	maxPageLimit     int32 = 100
+)
+
+func parsePaginationParams(r *http.Request) (limit int32, startKey map[string]types.AttributeValue, err error) {
+	limit = defaultPageLimit
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		n, parseErr := strconv.ParseInt(raw, 10, 32)
+		if parseErr != nil || n <= 0 {
+			return 0, nil, errors.New("limit must be a positive integer")
+		}
+		limit = int32(n)
+		if limit > maxPageLimit {
+			limit = maxPageLimit
+		}
+	}
+
+	if cursor := strings.TrimSpace(r.URL.Query().Get("cursor")); cursor != "" {
+		startKey, err = repository.DecodeCursor(cursor)
+		if err != nil {
+			return 0, nil, errors.New("invalid cursor")
+		}
+	}
+	return limit, startKey, nil
 }
