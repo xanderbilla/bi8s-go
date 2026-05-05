@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/xanderbilla/bi8s-go/internal/model"
 )
 
@@ -313,16 +314,17 @@ func newMockMovieRepository() *mockMovieRepository {
 	}
 }
 
-func (m *mockMovieRepository) GetAllAdmin(ctx context.Context) ([]model.Movie, error) {
+func (m *mockMovieRepository) GetAllAdmin(ctx context.Context, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
 	var movies []model.Movie
 	for _, movie := range m.movies {
 		movies = append(movies, movie)
 	}
-	return movies, nil
+	return movies, nil, nil
 }
 
-func (m *mockMovieRepository) GetRecentContent(ctx context.Context, contentTypeFilter string) ([]model.Movie, error) {
-	return m.GetAllAdmin(ctx)
+func (m *mockMovieRepository) GetRecentContent(ctx context.Context, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	result, _, err := m.GetAllAdmin(ctx, limit, startKey)
+	return result, nil, err
 }
 
 func (m *mockMovieRepository) Get(ctx context.Context, id string) (*model.Movie, error) {
@@ -356,24 +358,24 @@ func (m *mockMovieRepository) GetMoviesByPersonId(ctx context.Context, personId 
 	return []model.Movie{}, nil
 }
 
-func (m *mockMovieRepository) GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string) ([]model.Movie, error) {
-	return []model.Movie{}, nil
+func (m *mockMovieRepository) GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	return []model.Movie{}, nil, nil
 }
 
-func (m *mockMovieRepository) GetContentByPersonIdAdmin(ctx context.Context, personId string, contentTypeFilter string) ([]model.Movie, error) {
-	return []model.Movie{}, nil
+func (m *mockMovieRepository) GetContentByPersonIdAdmin(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	return []model.Movie{}, nil, nil
 }
 
-func (m *mockMovieRepository) GetMoviesByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string) ([]model.Movie, error) {
-	return []model.Movie{}, nil
+func (m *mockMovieRepository) GetMoviesByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	return []model.Movie{}, nil, nil
 }
 
 func (m *mockMovieRepository) GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error) {
 	return nil, nil
 }
 
-func (m *mockMovieRepository) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string) ([]model.Movie, error) {
-	return []model.Movie{}, nil
+func (m *mockMovieRepository) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	return []model.Movie{}, nil, nil
 }
 
 func buildMultipartFileHeaders(t *testing.T, field string, names []string) []*multipart.FileHeader {
