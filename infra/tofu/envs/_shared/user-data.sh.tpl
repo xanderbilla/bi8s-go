@@ -289,11 +289,16 @@ echo "Setting up environment variables..."
 cat > /etc/profile.d/${project_name}.sh <<EOF
 export APP_ENV="${environment}"
 export AWS_REGION="${aws_region}"
-export DYNAMODB_MOVIE_TABLE="${dynamodb_movie_table}"
+export DYNAMODB_CONTENT_TABLE="${dynamodb_movie_table}"
 export DYNAMODB_PERSON_TABLE="${dynamodb_person_table}"
 export DYNAMODB_ATTRIBUTE_TABLE="${dynamodb_attribute_table}"
 export DYNAMODB_ATTRIBUTE_NAME_INDEX="${dynamodb_attribute_name_index}"
 export DYNAMODB_ENCODER_TABLE="${dynamodb_encoder_table}"
+export DYNAMODB_ENCODER_CONTENT_ID_INDEX="contentId-index"
+export DYNAMODB_CONTENT_CAST_TABLE="${dynamodb_content_cast_table}"
+export DYNAMODB_CONTENT_ATTRIBUTE_TABLE="${dynamodb_content_attribute_table}"
+export DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX="visibility-createdAt-index"
+export DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX="visibility-contentType-index"
 export S3_BUCKET="${s3_bucket}"
 export CORS_ALLOWED_ORIGINS="%{ if domain_name != "" }https://${domain_name},http://${domain_name},%{ endif }%{ if grafana_domain_name != "" }https://${grafana_domain_name},%{ endif }http://localhost:3000,http://localhost:8080,http://$PUBLIC_IP"
 export CORS_ALLOW_PRIVATE_NETWORK="true"
@@ -309,12 +314,16 @@ PORT=:8080
 LOG_LEVEL=info
 LOG_ADD_SOURCE=false
 AWS_REGION=${aws_region}
-DYNAMODB_MOVIE_TABLE=${dynamodb_movie_table}
+DYNAMODB_CONTENT_TABLE=${dynamodb_movie_table}
 DYNAMODB_PERSON_TABLE=${dynamodb_person_table}
 DYNAMODB_ATTRIBUTE_TABLE=${dynamodb_attribute_table}
 DYNAMODB_ATTRIBUTE_NAME_INDEX=${dynamodb_attribute_name_index}
 DYNAMODB_ENCODER_TABLE=${dynamodb_encoder_table}
 DYNAMODB_ENCODER_CONTENT_ID_INDEX=contentId-index
+DYNAMODB_CONTENT_CAST_TABLE=${dynamodb_content_cast_table}
+DYNAMODB_CONTENT_ATTRIBUTE_TABLE=${dynamodb_content_attribute_table}
+DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX=visibility-createdAt-index
+DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX=visibility-contentType-index
 DYNAMODB_MAX_SCAN_PAGES=1000
 CTX_DB_TIMEOUT_MS=30000
 S3_BUCKET=${s3_bucket}

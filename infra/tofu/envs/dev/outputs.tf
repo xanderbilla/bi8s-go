@@ -26,25 +26,31 @@ output "s3_bucket_name" {
 output "dynamodb_tables" {
   description = "DynamoDB table names"
   value = {
-    movie     = module.dynamodb_movie.table_name
-    person    = module.dynamodb_person.table_name
-    attribute = module.dynamodb_attribute.table_name
-    encoder   = module.dynamodb_encoder.table_name
+    movie             = module.dynamodb_movie.table_name
+    person            = module.dynamodb_person.table_name
+    attribute         = module.dynamodb_attribute.table_name
+    encoder           = module.dynamodb_encoder.table_name
+    content_cast      = module.dynamodb_content_cast.table_name
+    content_attribute = module.dynamodb_content_attribute.table_name
   }
 }
 
 output "environment_variables" {
   description = "Environment variables for application"
   value = {
-    APP_ENV                           = var.environment
-    AWS_REGION                        = var.aws_region
-    DYNAMODB_MOVIE_TABLE              = module.dynamodb_movie.table_name
-    DYNAMODB_PERSON_TABLE             = module.dynamodb_person.table_name
-    DYNAMODB_ATTRIBUTE_TABLE          = module.dynamodb_attribute.table_name
-    DYNAMODB_ATTRIBUTE_NAME_INDEX     = "name-index"
-    DYNAMODB_ENCODER_TABLE            = module.dynamodb_encoder.table_name
-    DYNAMODB_ENCODER_CONTENT_ID_INDEX = "contentId-index"
-    S3_BUCKET                         = module.s3.bucket_name
+    APP_ENV                                        = var.environment
+    AWS_REGION                                     = var.aws_region
+    DYNAMODB_CONTENT_TABLE                         = module.dynamodb_movie.table_name
+    DYNAMODB_PERSON_TABLE                          = module.dynamodb_person.table_name
+    DYNAMODB_ATTRIBUTE_TABLE                       = module.dynamodb_attribute.table_name
+    DYNAMODB_ATTRIBUTE_NAME_INDEX                  = "name-index"
+    DYNAMODB_ENCODER_TABLE                         = module.dynamodb_encoder.table_name
+    DYNAMODB_ENCODER_CONTENT_ID_INDEX              = "contentId-index"
+    DYNAMODB_CONTENT_CAST_TABLE                    = module.dynamodb_content_cast.table_name
+    DYNAMODB_CONTENT_ATTRIBUTE_TABLE               = module.dynamodb_content_attribute.table_name
+    DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX   = "visibility-createdAt-index"
+    DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX = "visibility-contentType-index"
+    S3_BUCKET                                      = module.s3.bucket_name
   }
 }
 
