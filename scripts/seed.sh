@@ -12,7 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
-API_URL="${API_URL:-https://api.xanderbilla.com}"
+API_URL="${API_URL:-http://localhost:8080}"
 S3_BUCKET="${S3_BUCKET:-bi8s-storage-dev}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 SKIP_WIPE="${SKIP_WIPE:-0}"
@@ -37,11 +37,17 @@ _wipe_dynamo_table() {
   local total_deleted=0
   local start_key=""
 
+  local key_attrs
+  key_attrs=$(aws dynamodb describe-table \
+    --table-name "$table_name" \
+    --region "$AWS_REGION" \
+    --query 'Table.KeySchema[].AttributeName' \
+    --output json)
+
   while :; do
     local scan_args=(
       --table-name "$table_name"
       --region "$AWS_REGION"
-      --projection-expression "id"
       --output json
     )
     if [ -n "$start_key" ]; then
@@ -51,27 +57,15 @@ _wipe_dynamo_table() {
     local scan_result
     scan_result=$(aws dynamodb scan "${scan_args[@]}")
 
-    local items count
-    items=$(echo "$scan_result" | jq '.Items')
-    count=$(echo "$items" | jq 'length')
-
-    if [ "$count" -gt 0 ]; then
-      local chunk=0
-      while [ $(( chunk * 25 )) -lt "$count" ]; do
-        local offset=$(( chunk * 25 ))
-        local request_items
-        request_items=$(echo "$items" | jq -c \
-          --arg table "$table_name" \
-          --argjson offset "$offset" \
-          '{($table): [.[$offset:($offset+25)][] | {DeleteRequest: {Key: {id: .id}}}]}')
-        aws dynamodb batch-write-item \
-          --request-items "$request_items" \
-          --region "$AWS_REGION" \
-          --output json > /dev/null
-        chunk=$(( chunk + 1 ))
-      done
-      total_deleted=$(( total_deleted + count ))
-    fi
+    while IFS= read -r key_json; do
+      [ -z "$key_json" ] && continue
+      aws dynamodb delete-item \
+        --table-name "$table_name" \
+        --key "$key_json" \
+        --region "$AWS_REGION" \
+        --output json > /dev/null
+      total_deleted=$(( total_deleted + 1 ))
+    done < <(echo "$scan_result" | jq -c --argjson keys "$key_attrs" '.Items[] | . as $it | (reduce $keys[] as $k ({}; . + {($k): $it[$k]}))')
 
     local next_key
     next_key=$(echo "$scan_result" | jq -rc '.LastEvaluatedKey // ""')
@@ -87,8 +81,11 @@ _wipe_dynamo_table() {
 if [ "$SKIP_WIPE" = "0" ]; then
   log "Phase 1: wipe"
   _wipe_dynamo_table "${DYNAMODB_ATTRIBUTE_TABLE:-${_project}-attributes-table-${_env}}"
-  _wipe_dynamo_table "${DYNAMODB_MOVIE_TABLE:-${_project}-content-table-${_env}}"
+  _wipe_dynamo_table "${DYNAMODB_CONTENT_TABLE:-${_project}-content-table-${_env}}"
   _wipe_dynamo_table "${DYNAMODB_PERSON_TABLE:-${_project}-person-table-${_env}}"
+  _wipe_dynamo_table "${DYNAMODB_CONTENT_CAST_TABLE:-${_project}-content-cast-table-${_env}}"
+  _wipe_dynamo_table "${DYNAMODB_CONTENT_ATTRIBUTE_TABLE:-${_project}-content-attribute-table-${_env}}"
+  _wipe_dynamo_table "${DYNAMODB_ENCODER_TABLE:-${_project}-video-table-${_env}}"
   aws s3 rm "s3://$S3_BUCKET/movies/"  --recursive --region "$AWS_REGION" 2>&1 | grep -v "^$" || true
   aws s3 rm "s3://$S3_BUCKET/persons/" --recursive --region "$AWS_REGION" 2>&1 | grep -v "^$" || true
   log "wipe done"
@@ -180,6 +177,9 @@ if [ "$SKIP_SEED" = "0" ]; then
     -F "debut_year=1970" \
     -F "career_status=Active" \
     -F "measurements_unit=cm" \
+    -F "measurements_bust=102" \
+    -F "measurements_waist=81" \
+    -F "measurements_hips=99" \
     -F "measurements_body_type=Athletic" \
     -F "measurements_eye_color=Brown" \
     -F "measurements_hair_color=Brown" \
@@ -194,7 +194,8 @@ if [ "$SKIP_SEED" = "0" ]; then
   log "person: Robert Downey Jr. → ${_person_id[542131]}"
 
 
-  _resp=$(_api_post /v1/a/content \ \
+  _resp=$(_api_post /v1/a/content \
+    -F "title=Eternals" \
     -F "overview=The Eternals, a race of immortal beings with superhuman powers who have secretly lived on Earth for thousands of years, reunite to battle the monstrous Deviants and uncover a startling secret about their own existence." \
     -F "content_type=MOVIE" \
     -F "status=RELEASED" \
@@ -218,7 +219,8 @@ if [ "$SKIP_SEED" = "0" ]; then
   _eternals_id=$(echo "$_resp" | jq -r '.data.id')
   log "movie: Eternals → ${_eternals_id}"
 
-  _resp=$(_api_post /v1/a/content \ \
+  _resp=$(_api_post /v1/a/content \
+    -F "title=Marvel Anime: Iron Man" \
     -F "overview=Tony Stark travels to Japan to build a new arc reactor and unveil Iron Man Dio. When the villainous ZODIAC steals the suit, Tony dons the original armor to stop them in an epic clash across the neon-lit streets of Tokyo." \
     -F "content_type=TV" \
     -F "status=ENDED" \
@@ -226,6 +228,7 @@ if [ "$SKIP_SEED" = "0" ]; then
     -F "adult=false" \
     -F "content_rating=18_PLUS" \
     -F "original_language=ja" \
+    -F "runtime=24" \
     -F "first_air_date=2010-10-01" \
     -F "tagline=Forged in fire. Reborn in iron." \
     -F "origin_country=JP" \
