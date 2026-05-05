@@ -1,7 +1,7 @@
 {
   "dynamodb": [
     {
-      "table_env": "DYNAMODB_MOVIE_TABLE",
+      "table_env": "DYNAMODB_CONTENT_TABLE",
       "file": "assets/data/bi8s-content-table-dev.json"
     },
     {
