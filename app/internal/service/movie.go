@@ -6,8 +6,10 @@ import (
 	"mime/multipart"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
 	"github.com/xanderbilla/bi8s-go/internal/logger"
 	"github.com/xanderbilla/bi8s-go/internal/model"
@@ -17,12 +19,18 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/validation"
 )
 
+type bannerCacheEntry struct {
+	movie     *model.Movie
+	expiresAt time.Time
+}
+
 type MovieService struct {
 	repo          repository.MovieRepository
 	personRepo    repository.PersonRepository
 	attributeRepo repository.AttributeRepository
 	encoderRepo   repository.EncoderRepository
 	fileUploader  storage.FileUploader
+	bannerCache   sync.Map
 }
 
 func NewMovieService(repo repository.MovieRepository, personRepo repository.PersonRepository, attributeRepo repository.AttributeRepository, encoderRepo repository.EncoderRepository, fileUploader storage.FileUploader) *MovieService {
@@ -35,12 +43,12 @@ func NewMovieService(repo repository.MovieRepository, personRepo repository.Pers
 	}
 }
 
-func (s *MovieService) GetAllAdmin(ctx context.Context) ([]model.Movie, error) {
-	return s.repo.GetAllAdmin(ctx)
+func (s *MovieService) GetAllAdmin(ctx context.Context, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	return s.repo.GetAllAdmin(ctx, limit, startKey)
 }
 
-func (s *MovieService) GetRecentContent(ctx context.Context, contentTypeFilter string) ([]model.Movie, error) {
-	return s.repo.GetRecentContent(ctx, contentTypeFilter)
+func (s *MovieService) GetRecentContent(ctx context.Context, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	return s.repo.GetRecentContent(ctx, contentTypeFilter, limit, startKey)
 }
 
 func (s *MovieService) Get(ctx context.Context, id string) (*model.Movie, error) {
@@ -115,6 +123,7 @@ func (s *MovieService) Create(ctx context.Context, movie model.Movie, posterInpu
 		CreatedAt: now,
 		Version:   1,
 	}
+	movie.CreatedAt = now.UTC().Format(time.RFC3339)
 
 	movie.Stats = model.ContentStats{
 		TotalViews:    0,
@@ -168,24 +177,39 @@ func (s *MovieService) GetMoviesByPersonId(ctx context.Context, personId string)
 	return s.repo.GetMoviesByPersonId(ctx, personId)
 }
 
-func (s *MovieService) GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string) ([]model.Movie, error) {
-	return s.repo.GetContentByPersonId(ctx, personId, contentTypeFilter)
+func (s *MovieService) GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	return s.repo.GetContentByPersonId(ctx, personId, contentTypeFilter, limit, startKey)
 }
 
-func (s *MovieService) GetContentByPersonIdAdmin(ctx context.Context, personId string, contentTypeFilter string) ([]model.Movie, error) {
-	return s.repo.GetContentByPersonIdAdmin(ctx, personId, contentTypeFilter)
+func (s *MovieService) GetContentByPersonIdAdmin(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	return s.repo.GetContentByPersonIdAdmin(ctx, personId, contentTypeFilter, limit, startKey)
 }
 
-func (s *MovieService) GetMoviesByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string) ([]model.Movie, error) {
-	return s.repo.GetMoviesByAttributeId(ctx, attributeId, contentTypeFilter)
+func (s *MovieService) GetMoviesByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	return s.repo.GetMoviesByAttributeId(ctx, attributeId, contentTypeFilter, limit, startKey)
 }
 
 func (s *MovieService) GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error) {
-	return s.repo.GetBanner(ctx, contentTypeFilter)
+	if entry, ok := s.bannerCache.Load(contentTypeFilter); ok {
+		if e := entry.(bannerCacheEntry); time.Now().Before(e.expiresAt) {
+			return e.movie, nil
+		}
+	}
+	movie, err := s.repo.GetBanner(ctx, contentTypeFilter)
+	if err != nil {
+		return nil, err
+	}
+	if movie != nil {
+		s.bannerCache.Store(contentTypeFilter, bannerCacheEntry{
+			movie:     movie,
+			expiresAt: time.Now().Add(5 * time.Second),
+		})
+	}
+	return movie, nil
 }
 
-func (s *MovieService) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string) ([]model.Movie, error) {
-	return s.repo.GetDiscoverContent(ctx, discoverType, contentTypeFilter)
+func (s *MovieService) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	return s.repo.GetDiscoverContent(ctx, discoverType, contentTypeFilter, limit, startKey)
 }
 
 func (s *MovieService) UploadAssets(ctx context.Context, contentID string, assetType model.AssetType, files []*multipart.FileHeader) ([]string, error) {
