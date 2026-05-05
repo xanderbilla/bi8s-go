@@ -64,7 +64,6 @@ func TestShutdown_OrderingAndBounds(t *testing.T) {
 		_ = srv.Serve(ln)
 	}()
 
-	// --- Application with real encoder + miniredis ------------------------
 	mr, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("miniredis: %v", err)
@@ -83,7 +82,6 @@ func TestShutdown_OrderingAndBounds(t *testing.T) {
 		RedisClient:    rdb,
 	}
 
-	// --- Fire an in-flight request and a readiness watcher ---------------
 	respDone := make(chan struct{})
 	go func() {
 		defer close(respDone)
@@ -96,8 +94,6 @@ func TestShutdown_OrderingAndBounds(t *testing.T) {
 		_, _ = io.Copy(io.Discard, resp.Body)
 	}()
 
-	// Wait until the handler is actually executing so the request is truly
-	// in-flight when we trigger shutdown.
 	deadline := time.Now().Add(2 * time.Second)
 	for handlerStartedAt.Load() == 0 && time.Now().Before(deadline) {
 		time.Sleep(2 * time.Millisecond)
@@ -118,35 +114,30 @@ func TestShutdown_OrderingAndBounds(t *testing.T) {
 		}
 	}()
 
-	// --- Run shutdown ----------------------------------------------------
 	start := time.Now()
 	if err := shutdown(srv, application); err != nil {
 		t.Fatalf("shutdown returned error: %v", err)
 	}
 	shutdownReturnedAt := time.Now()
 
-	// Server goroutine must exit because Shutdown was called.
 	select {
 	case <-serverDone:
 	case <-time.After(2 * time.Second):
 		t.Fatal("http server goroutine did not exit after Shutdown")
 	}
 
-	// Watcher goroutine must observe ready=false.
 	select {
 	case <-readyWatcherDone:
 	case <-time.After(2 * time.Second):
 		t.Fatal("readiness watcher never observed ready=false")
 	}
 
-	// In-flight request must have completed before we call shutdown done.
 	select {
 	case <-respDone:
 	case <-time.After(2 * time.Second):
 		t.Fatal("in-flight request did not complete")
 	}
 
-	// --- Ordering assertions --------------------------------------------
 	readyFalse := readyFalseAt.Load()
 	handlerEnded := handlerEndedAt.Load()
 
@@ -157,28 +148,20 @@ func TestShutdown_OrderingAndBounds(t *testing.T) {
 		t.Fatal("handlerEndedAt was never recorded")
 	}
 
-	// Readiness flipped before the in-flight handler finished (proves the
-	// readiness flip happens early, allowing the platform to stop routing
-	// while the existing request still drains).
 	if readyFalse > handlerEnded {
 		t.Errorf("readiness flipped to false AFTER handler ended: readyFalse=%d handlerEnded=%d",
 			readyFalse, handlerEnded)
 	}
 
-	// Handler must have finished before shutdown returned (proves srv.Shutdown
-	// drained the connection rather than killing it).
 	if handlerEnded > shutdownReturnedAt.UnixNano() {
 		t.Errorf("handler ended AFTER shutdown returned: handlerEnded=%d shutdownReturnedAt=%d",
 			handlerEnded, shutdownReturnedAt.UnixNano())
 	}
 
-	// Redis client must be closed after shutdown completes.
 	if err := rdb.Ping(context.Background()).Err(); err == nil {
 		t.Error("redis client expected to be closed after shutdown, ping succeeded")
 	}
 
-	// Bounded total runtime: SHUTDOWN_TIMEOUT_SECONDS + ENCODER_DRAIN +
-	// generous slack. With no real jobs in flight this should be sub-second.
 	elapsed := shutdownReturnedAt.Sub(start)
 	if elapsed > 3*time.Second {
 		t.Errorf("shutdown exceeded bounded duration: %s", elapsed)

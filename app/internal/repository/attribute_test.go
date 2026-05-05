@@ -120,7 +120,7 @@ func TestAttributeRepository_GetByName_NotFoundReturnsNil(t *testing.T) {
 	if got != nil {
 		t.Fatalf("expected nil, got %+v", got)
 	}
-	// queryByName returned (nil, nil) so scanByName should also be invoked.
+
 	if fake.queryCall != 1 || fake.scanCall != 1 {
 		t.Fatalf("expected 1 query + 1 scan, got query=%d scan=%d", fake.queryCall, fake.scanCall)
 	}

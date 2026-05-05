@@ -52,7 +52,7 @@ func TestRedisBackend_AllowsBurstThenDenies(t *testing.T) {
 
 func TestRedisBackend_RefillsOverTime(t *testing.T) {
 	client, _ := newTestRedis(t)
-	// Use a very high refill rate so a short real-time sleep yields a token.
+
 	b, _ := NewRedisBackend(RedisBackendOptions{
 		Client: client, Name: "rf", Burst: 1, RefillPerSec: 100, Timeout: time.Second,
 	})
@@ -60,7 +60,7 @@ func TestRedisBackend_RefillsOverTime(t *testing.T) {
 	if ok, _, _ := b.Allow(ctx, "k"); !ok {
 		t.Fatalf("first allow failed")
 	}
-	// Bucket is now empty. Wait ~50ms; with rate=100/s that yields ~5 tokens.
+
 	time.Sleep(50 * time.Millisecond)
 	if ok, _, _ := b.Allow(ctx, "k"); !ok {
 		t.Fatalf("expected allow after refill")
@@ -75,11 +75,11 @@ func TestRedisBackend_KeysAreScopedByName(t *testing.T) {
 	if ok, _, _ := a.Allow(ctx, "shared"); !ok {
 		t.Fatalf("a first should allow")
 	}
-	// Different name -> different bucket; should still allow.
+
 	if ok, _, _ := bb.Allow(ctx, "shared"); !ok {
 		t.Fatalf("b first should allow (separate namespace)")
 	}
-	// Re-hitting a's bucket must be denied.
+
 	if ok, _, _ := a.Allow(ctx, "shared"); ok {
 		t.Fatalf("a second should deny")
 	}
@@ -88,7 +88,7 @@ func TestRedisBackend_KeysAreScopedByName(t *testing.T) {
 func TestRedisBackend_FailModes(t *testing.T) {
 	client, mr := newTestRedis(t)
 	b, _ := NewRedisBackend(RedisBackendOptions{Client: client, Name: "fo", Burst: 5, RefillPerSec: 1, Timeout: 100 * time.Millisecond, FailMode: FailOpen})
-	mr.Close() // simulate outage
+	mr.Close()
 	ok, _, err := b.Allow(context.Background(), "k")
 	if err == nil {
 		t.Fatalf("expected error when redis is down")

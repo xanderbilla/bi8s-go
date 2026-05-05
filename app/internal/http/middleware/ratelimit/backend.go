@@ -65,9 +65,7 @@ func Middleware(backend Backend, burst, refillPerSec float64, opts Options) func
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			key := GetClientIP(r)
 			allowed, retryAfter, err := backend.Allow(r.Context(), key)
-			// Backend errors are surfaced via the backend's own decision
-			// (fail-open or fail-closed reflected in `allowed`); the err
-			// value is intentionally ignored here.
+
 			_ = err
 			if !allowed {
 				w.Header().Set("X-RateLimit-Limit", limitHeader)

@@ -41,14 +41,13 @@ func TestShutdown_NilProvider(t *testing.T) {
 }
 
 func TestInit_EnabledUnreachableEndpoint_DoesNotBlock(t *testing.T) {
-	// gRPC dial is non-blocking by default, so Init must succeed even if the
-	// collector is unreachable. Spans/metrics will simply fail to export.
+
 	cfg := Config{
 		Enabled:              true,
 		ServiceName:          "test-service",
 		ServiceVersion:       "0.0.0",
 		Environment:          "test",
-		Endpoint:             "127.0.0.1:1", // intentionally unreachable
+		Endpoint:             "127.0.0.1:1",
 		Insecure:             true,
 		TracesEnabled:        true,
 		MetricsEnabled:       true,

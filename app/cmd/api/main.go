@@ -56,8 +56,6 @@ func run() error {
 	)
 	defer cancel()
 
-	// Initialize OpenTelemetry BEFORE building AWS clients so otelaws
-	// middleware has live providers to record startup health-check traces.
 	obsCfg := observability.LoadConfig(
 		env.GetString("OTEL_SERVICE_NAME", "bi8s-api"),
 		env.GetString("BUILD_VERSION", "dev"),

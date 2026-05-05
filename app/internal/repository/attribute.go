@@ -85,9 +85,7 @@ func (r *AttributeDynamoRepository) GetByName(ctx context.Context, name string) 
 				return attr, nil
 			}
 			if err != nil {
-				// Fall through to Scan fallback so a transient GSI issue
-				// does not break the request entirely. Operators can grep
-				// for this in logs to confirm the index is healthy.
+
 				_ = err
 			}
 		}

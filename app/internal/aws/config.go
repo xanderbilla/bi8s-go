@@ -40,9 +40,6 @@ func LoadConfig(ctx context.Context, region, accessKey, secretKey string) (aws.C
 		return aws.Config{}, err
 	}
 
-	// Instrument all AWS SDK calls so each operation produces an OTel span
-	// linked to the parent HTTP request. Telemetry is exported via the OTel
-	// collector configured by internal/observability.
 	otelaws.AppendMiddlewares(&cfg.APIOptions)
 
 	return cfg, nil

@@ -202,8 +202,7 @@ func (f RedisFactory) NewBackend(name string, burst, refillPerSec float64) Backe
 		Logger:       f.Logger,
 	})
 	if err != nil {
-		// Configuration error — fall back to memory so the server still
-		// boots; loud log so the operator notices.
+
 		slog.Error("ratelimit: redis factory misconfigured; falling back to memory backend",
 			"name", name, "err", err)
 		return NewMemoryBackend(burst, refillPerSec)

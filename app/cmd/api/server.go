@@ -83,8 +83,6 @@ func shutdown(srv *http.Server, application *app.Application) error {
 		slog.Info("all encoding jobs completed")
 	}
 
-	// Close Redis only after the encoder drain so any in-flight rate-limit
-	// checks during drain can still reach the backend.
 	if application.RedisClient != nil {
 		if err := application.RedisClient.Close(); err != nil {
 			slog.Warn("redis client close error", "error", err)
