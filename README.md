@@ -4,25 +4,16 @@ Bi8s is a REST API built with Go and chi, designed to manage movies and persons 
 
 ## Requirements
 
-* Go 1.25+
-* Docker and Docker Compose
-* AWS account
-* air (optional, for live reload)
+- Go 1.25+
+- Docker and Docker Compose
+- AWS account (DynamoDB, EC2, S3, VPC, Route53, ACM Cert, etc.)
+- Grafana, Prometheus, Loki, OTel, Tempo
+- Swagger
+- air (optional, for live reload)
 
 Environment variables, defaults, and validation rules are defined in `docs/CONFIGURATION.md`.
 
 ## Local Development
-
-```sh
-make test
-make build
-make run
-make run-docker
-```
-
-Server runs on `:8080`.
-
-## Quick Start
 
 ```sh
 make help
@@ -32,36 +23,21 @@ make run
 make run-docker
 ```
 
-## Frontend
+Server runs on `:8080`.
+
+## Documentation
+
+Detailed documentation is available in the `docs/` directory, including API reference, architecture, configuration, deployment, and local development guides.
 
 The corresponding frontend application (streaming UI) is available in the EnternFlix repository:
 
 [https://github.com/xanderbilla/enternflix](https://github.com/xanderbilla/enternflix)
+
 Ensure the frontend is configured to use this API for proper integration.
 
-## Project Structure
+## Screenshot
 
-```text
-app/
-  cmd/api/
-  internal/
-    http/
-    service/
-    repository/
-    model/
-
-infra/
-  tofu/
-  docker/
-  scripts/
-
-test/
-docs/
-```
-
-## Documentation
-
-Detailed documentation is available in the `docs/` directory, including API reference, architecture, configuration, and deployment guides.
+![alt text](image.png)
 
 ## Contributing
 
