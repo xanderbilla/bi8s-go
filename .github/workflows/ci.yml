@@ -117,7 +117,7 @@ jobs:
               env:
                   AWS_REGION: us-east-1
                   APP_ENV: prod
-                  DYNAMODB_MOVIE_TABLE: bi8s-content-table-prod
+                  DYNAMODB_CONTENT_TABLE: bi8s-content-table-prod
                   DYNAMODB_PERSON_TABLE: bi8s-person-table-prod
                   DYNAMODB_ATTRIBUTE_TABLE: bi8s-attributes-table-prod
                   DYNAMODB_ENCODER_TABLE: bi8s-video-table-prod

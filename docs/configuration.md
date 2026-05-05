@@ -47,7 +47,7 @@ Everything else is optional with the default shown.
 
 | Variable                            | Required | Default      | Notes                                        |
 | ----------------------------------- | -------- | ------------ | -------------------------------------------- |
-| `DYNAMODB_MOVIE_TABLE`              | yes      | —            | Movie / content table name.                  |
+| `DYNAMODB_CONTENT_TABLE`              | yes      | —            | Movie / content table name.                  |
 | `DYNAMODB_PERSON_TABLE`             | yes      | —            | Person table name.                           |
 | `DYNAMODB_ATTRIBUTE_TABLE`          | yes      | —            | Attribute table name.                        |
 | `DYNAMODB_ENCODER_TABLE`            | yes      | —            | Encoder job table name.                      |

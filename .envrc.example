@@ -13,7 +13,7 @@ export AWS_ACCESS_KEY_ID=""
 export AWS_SECRET_ACCESS_KEY=""
 
 # --- DynamoDB tables --------------------------------------------------------
-export DYNAMODB_MOVIE_TABLE="bi8s-content-table-dev"
+export DYNAMODB_CONTENT_TABLE="bi8s-content-table-dev"
 export DYNAMODB_PERSON_TABLE="bi8s-person-table-dev"
 export DYNAMODB_ATTRIBUTE_TABLE="bi8s-attributes-table-dev"
 export DYNAMODB_ATTRIBUTE_NAME_INDEX="name-index"
