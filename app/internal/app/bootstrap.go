@@ -38,21 +38,25 @@ func LoadConfigFromEnv() Config {
 	defaultCORSOrigins := env.GetString("DEFAULT_CORS_ORIGINS", DefaultCORSOrigins)
 
 	return Config{
-		Addr:                    env.GetString("PORT", ":8080"),
-		Env:                     env.GetString("APP_ENV", "prod"),
-		TableName:               env.GetString("DYNAMODB_MOVIE_TABLE", "bi8s-dev"),
-		PersonTableName:         env.GetString("DYNAMODB_PERSON_TABLE", "bi8s-person-dev"),
-		AttributeTableName:      env.GetString("DYNAMODB_ATTRIBUTE_TABLE", "bi8s-attribute-dev"),
-		EncoderTableName:        env.GetString("DYNAMODB_ENCODER_TABLE", "bi8s-video-dev"),
-		EncoderContentIDIndex:   env.GetString("DYNAMODB_ENCODER_CONTENT_ID_INDEX", "contentId-index"),
-		AttributeNameIndex:      env.GetString("DYNAMODB_ATTRIBUTE_NAME_INDEX", "name-index"),
-		S3Bucket:                env.GetSecret("S3_BUCKET"),
-		CORSAllowedOrigins:      env.ParseCommaSeparated(env.GetString("CORS_ALLOWED_ORIGINS", defaultCORSOrigins)),
-		CORSAllowPrivateNetwork: env.GetBool("CORS_ALLOW_PRIVATE_NETWORK", true),
-		RateLimitBackend:        env.GetString("RATE_LIMIT_BACKEND", "memory"),
-		RateLimitRedisFailMode:  env.GetString("RATE_LIMIT_REDIS_FAIL_MODE", "fail-open"),
-		RateLimitRedisTimeoutMS: env.GetInt("RATE_LIMIT_REDIS_TIMEOUT_MS", 50),
-		RedisURL:                env.GetString("REDIS_URL", ""),
+		Addr:                              env.GetString("PORT", ":8080"),
+		Env:                               env.GetString("APP_ENV", "prod"),
+		TableName:                         env.GetString("DYNAMODB_CONTENT_TABLE", "bi8s-dev"),
+		PersonTableName:                   env.GetString("DYNAMODB_PERSON_TABLE", "bi8s-person-dev"),
+		AttributeTableName:                env.GetString("DYNAMODB_ATTRIBUTE_TABLE", "bi8s-attribute-dev"),
+		EncoderTableName:                  env.GetString("DYNAMODB_ENCODER_TABLE", "bi8s-video-dev"),
+		EncoderContentIDIndex:             env.GetString("DYNAMODB_ENCODER_CONTENT_ID_INDEX", "contentId-index"),
+		AttributeNameIndex:                env.GetString("DYNAMODB_ATTRIBUTE_NAME_INDEX", "name-index"),
+		ContentCastTableName:              env.GetString("DYNAMODB_CONTENT_CAST_TABLE", "bi8s-content-cast-table-dev"),
+		ContentAttributeTableName:         env.GetString("DYNAMODB_CONTENT_ATTRIBUTE_TABLE", "bi8s-content-attribute-table-dev"),
+		ContentVisibilityCreatedAtIndex:   env.GetString("DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX", "visibility-createdAt-index"),
+		ContentVisibilityContentTypeIndex: env.GetString("DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX", "visibility-contentType-index"),
+		S3Bucket:                          env.GetSecret("S3_BUCKET"),
+		CORSAllowedOrigins:                env.ParseCommaSeparated(env.GetString("CORS_ALLOWED_ORIGINS", defaultCORSOrigins)),
+		CORSAllowPrivateNetwork:           env.GetBool("CORS_ALLOW_PRIVATE_NETWORK", true),
+		RateLimitBackend:                  env.GetString("RATE_LIMIT_BACKEND", "memory"),
+		RateLimitRedisFailMode:            env.GetString("RATE_LIMIT_REDIS_FAIL_MODE", "fail-open"),
+		RateLimitRedisTimeoutMS:           env.GetInt("RATE_LIMIT_REDIS_TIMEOUT_MS", 50),
+		RedisURL:                          env.GetString("REDIS_URL", ""),
 		AWS: AWSCredentials{
 			AccessKey:       env.GetSecret("AWS_ACCESS_KEY_ID"),
 			SecretAccessKey: env.GetSecret("AWS_SECRET_ACCESS_KEY"),
@@ -93,7 +97,16 @@ func Build(ctx context.Context, cfg Config) (*Application, error) {
 
 	attributeRepo := repository.NewAttributeDynamoRepository(clients.Dynamo, cfg.AttributeTableName, cfg.AttributeNameIndex)
 	personRepo := repository.NewPersonDynamoRepository(clients.Dynamo, cfg.PersonTableName)
-	movieRepo := repository.NewMovieRepository(clients.Dynamo, cfg.TableName)
+	contentCastRepo := repository.NewContentCastRepository(clients.Dynamo, cfg.ContentCastTableName)
+	contentAttributeRepo := repository.NewContentAttributeRepository(clients.Dynamo, cfg.ContentAttributeTableName)
+	movieRepo := repository.NewMovieRepository(
+		clients.Dynamo,
+		cfg.TableName,
+		cfg.ContentVisibilityCreatedAtIndex,
+		cfg.ContentVisibilityContentTypeIndex,
+		contentCastRepo,
+		contentAttributeRepo,
+	)
 	encoderRepo := repository.NewEncoderRepository(clients.Dynamo, cfg.EncoderTableName, cfg.EncoderContentIDIndex)
 
 	attributeService := service.NewAttributeService(attributeRepo)
