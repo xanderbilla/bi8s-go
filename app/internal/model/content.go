@@ -3,7 +3,7 @@ package model
 type Content struct {
 	ID               string           `json:"id" dynamodbav:"id" validate:"omitempty,min=1,max=64"`
 	Title            string           `json:"title,omitempty" dynamodbav:"title,omitempty" validate:"omitempty,min=1,max=128"`
-	Overview         string           `json:"overview" dynamodbav:"overview" validate:"required,min=1,max=1000"`
+	Overview         string           `json:"overview" dynamodbav:"overview" validate:"required,min=1,max=150"`
 	BackdropPath     string           `json:"backdropPath,omitempty" dynamodbav:"backdropPath,omitempty" validate:"omitempty,max=512"`
 	PosterPath       string           `json:"posterPath,omitempty" dynamodbav:"posterPath,omitempty" validate:"omitempty,max=512"`
 	ReleaseDate      string           `json:"releaseDate,omitempty" dynamodbav:"releaseDate,omitempty" validate:"omitempty,daterange"`
@@ -24,11 +24,20 @@ type Content struct {
 	Tagline          string           `json:"tagline,omitempty" dynamodbav:"tagline,omitempty" validate:"omitempty,max=255"`
 	Studios          []EntityRef      `json:"studios,omitempty" dynamodbav:"studios,omitempty" validate:"omitempty,dive"`
 	Visibility       Visibility       `json:"visibility,omitempty" dynamodbav:"visibility,omitempty" validate:"omitempty,oneof=PUBLIC PRIVATE"`
-	// CreatedAt is a denormalized top-level copy of Audit.CreatedAt (RFC3339) used as the GSI sort key.
-	CreatedAt string       `json:"-" dynamodbav:"createdAt,omitempty"`
-	Assets    []Asset      `json:"assets,omitempty" dynamodbav:"assets,omitempty" validate:"omitempty,dive"`
-	Stats     ContentStats `json:"stats,omitempty" dynamodbav:"stats,omitempty"`
-	Audit     Audit        `json:"audit,omitempty" dynamodbav:"audit,omitempty"`
+	CreatedAt        string           `json:"-" dynamodbav:"createdAt,omitempty"`
+	Assets           []Asset          `json:"assets,omitempty" dynamodbav:"assets,omitempty" validate:"omitempty,dive"`
+	Stats            ContentStats     `json:"stats,omitempty" dynamodbav:"stats,omitempty"`
+	Audit            Audit            `json:"audit,omitempty" dynamodbav:"audit,omitempty"`
+}
+
+func (c *Content) EffectiveReleaseDate() string {
+	if c.ReleaseDate != "" {
+		return c.ReleaseDate
+	}
+	if c.ContentType == ContentTypeTV {
+		return c.FirstAirDate
+	}
+	return ""
 }
 
 type Asset struct {
@@ -48,6 +57,7 @@ type ContentPublicList struct {
 	BackdropPath  string      `json:"backdropPath,omitempty"`
 	PosterPath    string      `json:"posterPath,omitempty"`
 	ReleaseDate   string      `json:"releaseDate,omitempty"`
+	FirstAirDate  string      `json:"firstAirDate,omitempty"`
 	Tags          []EntityRef `json:"tags,omitempty"`
 	ContentRating Rating      `json:"contentRating,omitempty"`
 	ContentType   ContentType `json:"contentType,omitempty"`
@@ -76,6 +86,7 @@ type ContentPublicDetail struct {
 	Tagline          string           `json:"tagline,omitempty"`
 	Studios          []EntityRef      `json:"studios,omitempty"`
 	Assets           []Asset          `json:"assets,omitempty"`
+	Stats            ContentStats     `json:"stats"`
 }
 
 type ContentsByPersonList struct {

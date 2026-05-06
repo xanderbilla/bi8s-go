@@ -47,7 +47,7 @@ type Person struct {
 	Name         string       `json:"name" dynamodbav:"name" validate:"required,min=1,max=128"`
 	Roles        []EntityType `json:"roles" dynamodbav:"roles" validate:"required,min=1,dive,oneof=PERFORMER CONTENT_CREATOR"`
 	StageName    string       `json:"stageName,omitempty" dynamodbav:"stageName,omitempty" validate:"omitempty,max=128"`
-	Bio          string       `json:"bio,omitempty" dynamodbav:"bio,omitempty" validate:"omitempty,max=2000"`
+	Bio          string       `json:"bio,omitempty" dynamodbav:"bio,omitempty" validate:"omitempty,max=150"`
 	BirthDate    string       `json:"birthDate,omitempty" dynamodbav:"birthDate,omitempty" validate:"omitempty,age18plus"`
 	BirthPlace   string       `json:"birthPlace,omitempty" dynamodbav:"birthPlace,omitempty" validate:"omitempty,max=256"`
 	Nationality  string       `json:"nationality,omitempty" dynamodbav:"nationality,omitempty" validate:"omitempty,max=64"`
