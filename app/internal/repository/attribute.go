@@ -5,7 +5,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/xanderbilla/bi8s-go/internal/model"
@@ -21,9 +20,7 @@ type AttributeRepository interface {
 
 type AttributeDynamoRepository struct {
 	*BaseRepository
-	// nameIndex is the GSI hashed on `name`. When empty, GetByName falls
-	// back to a filtered Scan (legacy path) so existing dev environments
-	// still work until the GSI is provisioned.
+
 	nameIndex string
 }
 
@@ -52,48 +49,23 @@ func (r *AttributeDynamoRepository) GetAll(ctx context.Context) ([]model.Attribu
 }
 
 func (r *AttributeDynamoRepository) Get(ctx context.Context, id string) (*model.Attribute, error) {
-	return WithTimeoutResult(ctx, "attribute.Get", func(ctx context.Context) (*model.Attribute, error) {
-		out, err := r.GetClient().GetItem(ctx, &dynamodb.GetItemInput{
-			TableName:      aws.String(r.GetTableName()),
-			ConsistentRead: aws.Bool(true),
-			Key: map[string]types.AttributeValue{
-				"id": &types.AttributeValueMemberS{Value: id},
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		if out.Item == nil {
-			return nil, nil
-		}
-
-		var attribute model.Attribute
-		if err := attributevalue.UnmarshalMap(out.Item, &attribute); err != nil {
-			return nil, err
-		}
-
-		return &attribute, nil
-	})
+	return GetByID[model.Attribute](ctx, r.BaseRepository, "attribute.Get", id)
 }
 
 func (r *AttributeDynamoRepository) GetByName(ctx context.Context, name string) (*model.Attribute, error) {
 	return WithTimeoutResult(ctx, "attribute.GetByName", func(ctx context.Context) (*model.Attribute, error) {
 		if r.nameIndex != "" {
 			attr, err := r.queryByName(ctx, name)
-			if err == nil && attr != nil {
+			if err == nil {
+
 				return attr, nil
 			}
-			if err != nil {
 
-				_ = err
-			}
 		}
 		return r.scanByName(ctx, name)
 	})
 }
 
-// queryByName uses the name-index GSI for an O(1) point lookup.
 func (r *AttributeDynamoRepository) queryByName(ctx context.Context, name string) (*model.Attribute, error) {
 	out, err := r.GetClient().Query(ctx, &dynamodb.QueryInput{
 		TableName:              aws.String(r.GetTableName()),
@@ -120,8 +92,6 @@ func (r *AttributeDynamoRepository) queryByName(ctx context.Context, name string
 	return &attribute, nil
 }
 
-// scanByName is the legacy fallback path used when the name-index GSI is
-// not configured (dev/test) or returned an error.
 func (r *AttributeDynamoRepository) scanByName(ctx context.Context, name string) (*model.Attribute, error) {
 	items, err := ScanAllPaged(ctx, r.GetClient(), &dynamodb.ScanInput{
 		TableName:        aws.String(r.GetTableName()),
@@ -148,48 +118,9 @@ func (r *AttributeDynamoRepository) scanByName(ctx context.Context, name string)
 }
 
 func (r *AttributeDynamoRepository) Create(ctx context.Context, attribute model.Attribute) error {
-	return r.WithTimeout(ctx, "attribute.Create", func(ctx context.Context) error {
-		item, err := attributevalue.MarshalMap(attribute)
-		if err != nil {
-			return err
-		}
-
-		condition := expression.AttributeNotExists(expression.Name("id"))
-		expr, err := expression.NewBuilder().WithCondition(condition).Build()
-		if err != nil {
-			return err
-		}
-
-		_, err = r.GetClient().PutItem(ctx, &dynamodb.PutItemInput{
-			TableName:                 aws.String(r.GetTableName()),
-			Item:                      item,
-			ConditionExpression:       expr.Condition(),
-			ExpressionAttributeNames:  expr.Names(),
-			ExpressionAttributeValues: expr.Values(),
-		})
-
-		return err
-	})
+	return CreateWithIDCondition(ctx, r.BaseRepository, "attribute.Create", attribute)
 }
 
 func (r *AttributeDynamoRepository) Delete(ctx context.Context, id string) error {
-	return r.WithTimeout(ctx, "attribute.Delete", func(ctx context.Context) error {
-		condition := expression.AttributeExists(expression.Name("id"))
-		expr, err := expression.NewBuilder().WithCondition(condition).Build()
-		if err != nil {
-			return err
-		}
-
-		_, err = r.GetClient().DeleteItem(ctx, &dynamodb.DeleteItemInput{
-			TableName: aws.String(r.GetTableName()),
-			Key: map[string]types.AttributeValue{
-				"id": &types.AttributeValueMemberS{Value: id},
-			},
-			ConditionExpression:       expr.Condition(),
-			ExpressionAttributeNames:  expr.Names(),
-			ExpressionAttributeValues: expr.Values(),
-		})
-
-		return err
-	})
+	return DeleteByID(ctx, r.BaseRepository, "attribute.Delete", id)
 }

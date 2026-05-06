@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/xanderbilla/bi8s-go/internal/ctxutil"
@@ -68,7 +71,6 @@ func WithTimeoutResult[T any](ctx context.Context, operation string, fn func(con
 	return result, nil
 }
 
-// WithTimeoutResultPage wraps a paginated operation that returns (T, nextKey, error).
 func WithTimeoutResultPage[T any](ctx context.Context, operation string, fn func(context.Context) (T, map[string]types.AttributeValue, error)) (T, map[string]types.AttributeValue, error) {
 	ctx, cancel := ctxutil.WithDBTimeout(ctx)
 	defer cancel()
@@ -123,8 +125,6 @@ func QueryAllPaged(ctx context.Context, client DynamoAPI, input *dynamodb.QueryI
 	}
 }
 
-// QueryPage executes a single DynamoDB Query page and returns (items, lastKey, error).
-// lastKey is nil when there are no more pages.
 func QueryPage(ctx context.Context, client DynamoAPI, input *dynamodb.QueryInput) ([]map[string]types.AttributeValue, map[string]types.AttributeValue, error) {
 	out, err := client.Query(ctx, input)
 	if err != nil {
@@ -133,12 +133,75 @@ func QueryPage(ctx context.Context, client DynamoAPI, input *dynamodb.QueryInput
 	return out.Items, out.LastEvaluatedKey, nil
 }
 
-// ScanPage executes a single DynamoDB Scan page and returns (items, lastKey, error).
-// lastKey is nil when there are no more pages.
 func ScanPage(ctx context.Context, client DynamoAPI, input *dynamodb.ScanInput) ([]map[string]types.AttributeValue, map[string]types.AttributeValue, error) {
 	out, err := client.Scan(ctx, input)
 	if err != nil {
 		return nil, nil, err
 	}
 	return out.Items, out.LastEvaluatedKey, nil
+}
+
+func GetByID[T any](ctx context.Context, b *BaseRepository, operation, id string) (*T, error) {
+	return WithTimeoutResult(ctx, operation, func(ctx context.Context) (*T, error) {
+		out, err := b.GetClient().GetItem(ctx, &dynamodb.GetItemInput{
+			TableName:      aws.String(b.GetTableName()),
+			ConsistentRead: aws.Bool(true),
+			Key: map[string]types.AttributeValue{
+				"id": &types.AttributeValueMemberS{Value: id},
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		if out.Item == nil {
+			return nil, nil
+		}
+		var item T
+		if err := attributevalue.UnmarshalMap(out.Item, &item); err != nil {
+			return nil, err
+		}
+		return &item, nil
+	})
+}
+
+func CreateWithIDCondition[T any](ctx context.Context, b *BaseRepository, operation string, item T) error {
+	return b.WithTimeout(ctx, operation, func(ctx context.Context) error {
+		av, err := attributevalue.MarshalMap(item)
+		if err != nil {
+			return err
+		}
+		condition := expression.AttributeNotExists(expression.Name("id"))
+		expr, err := expression.NewBuilder().WithCondition(condition).Build()
+		if err != nil {
+			return err
+		}
+		_, err = b.GetClient().PutItem(ctx, &dynamodb.PutItemInput{
+			TableName:                 aws.String(b.GetTableName()),
+			Item:                      av,
+			ConditionExpression:       expr.Condition(),
+			ExpressionAttributeNames:  expr.Names(),
+			ExpressionAttributeValues: expr.Values(),
+		})
+		return err
+	})
+}
+
+func DeleteByID(ctx context.Context, b *BaseRepository, operation, id string) error {
+	return b.WithTimeout(ctx, operation, func(ctx context.Context) error {
+		condition := expression.AttributeExists(expression.Name("id"))
+		expr, err := expression.NewBuilder().WithCondition(condition).Build()
+		if err != nil {
+			return err
+		}
+		_, err = b.GetClient().DeleteItem(ctx, &dynamodb.DeleteItemInput{
+			TableName: aws.String(b.GetTableName()),
+			Key: map[string]types.AttributeValue{
+				"id": &types.AttributeValueMemberS{Value: id},
+			},
+			ConditionExpression:       expr.Condition(),
+			ExpressionAttributeNames:  expr.Names(),
+			ExpressionAttributeValues: expr.Values(),
+		})
+		return err
+	})
 }

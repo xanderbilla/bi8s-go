@@ -11,8 +11,6 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/model"
 )
 
-// ContentCastEntry represents a row in the content_cast relation table.
-// PK: personId, SK: contentId — enables efficient lookups by person.
 type ContentCastEntry struct {
 	PersonID    string `dynamodbav:"personId"`
 	ContentID   string `dynamodbav:"contentId"`
@@ -21,13 +19,12 @@ type ContentCastEntry struct {
 }
 
 type ContentCastRepository interface {
-	// GetContentIdsByPersonId returns contentIds for a person, with optional contentType filter.
 	GetContentIdsByPersonId(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]string, map[string]types.AttributeValue, error)
-	// PutEntry writes a cast relation entry.
+
 	PutEntry(ctx context.Context, entry ContentCastEntry) error
-	// DeleteEntry removes a single cast relation.
+
 	DeleteEntry(ctx context.Context, personId, contentId string) error
-	// DeleteAllByContentId removes all cast entries for a given content item.
+
 	DeleteAllByContentId(ctx context.Context, contentId string, castIds []string) error
 }
 

@@ -106,7 +106,6 @@ func TestAttributeRepository_GetByName_NotFoundReturnsNil(t *testing.T) {
 
 	fake := &fakeDynamo{
 		queryOuts: []*dynamodb.QueryOutput{{Items: nil}},
-		scanOuts:  []*dynamodb.ScanOutput{{Items: nil}},
 	}
 	repo := &AttributeDynamoRepository{
 		BaseRepository: NewBaseRepository(fake, "attributes"),
@@ -121,7 +120,7 @@ func TestAttributeRepository_GetByName_NotFoundReturnsNil(t *testing.T) {
 		t.Fatalf("expected nil, got %+v", got)
 	}
 
-	if fake.queryCall != 1 || fake.scanCall != 1 {
-		t.Fatalf("expected 1 query + 1 scan, got query=%d scan=%d", fake.queryCall, fake.scanCall)
+	if fake.queryCall != 1 || fake.scanCall != 0 {
+		t.Fatalf("expected 1 query + 0 scan, got query=%d scan=%d", fake.queryCall, fake.scanCall)
 	}
 }

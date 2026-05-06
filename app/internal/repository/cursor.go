@@ -8,14 +8,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// rawAV is a minimal JSON-serialisable form of an AttributeValue (S or N only).
 type rawAV struct {
 	S *string `json:"S,omitempty"`
 	N *string `json:"N,omitempty"`
 }
 
-// EncodeCursor converts a DynamoDB LastEvaluatedKey to a URL-safe base64 cursor string.
-// Returns an empty string if key is nil/empty.
 func EncodeCursor(key map[string]types.AttributeValue) (string, error) {
 	if len(key) == 0 {
 		return "", nil
@@ -40,8 +37,6 @@ func EncodeCursor(key map[string]types.AttributeValue) (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-// DecodeCursor parses a cursor string back into a DynamoDB ExclusiveStartKey map.
-// Returns nil (no error) for an empty cursor.
 func DecodeCursor(cursor string) (map[string]types.AttributeValue, error) {
 	if cursor == "" {
 		return nil, nil

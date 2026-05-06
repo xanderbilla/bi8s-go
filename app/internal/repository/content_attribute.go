@@ -11,8 +11,6 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/model"
 )
 
-// ContentAttributeEntry represents a row in the content_attribute relation table.
-// PK: attributeId, SK: contentId -- enables efficient lookups by attribute.
 type ContentAttributeEntry struct {
 	AttributeID string `dynamodbav:"attributeId"`
 	ContentID   string `dynamodbav:"contentId"`
@@ -21,13 +19,12 @@ type ContentAttributeEntry struct {
 }
 
 type ContentAttributeRepository interface {
-	// GetContentIdsByAttributeId returns contentIds for an attribute, with optional contentType filter.
 	GetContentIdsByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]string, map[string]types.AttributeValue, error)
-	// PutEntry writes an attribute relation entry.
+
 	PutEntry(ctx context.Context, entry ContentAttributeEntry) error
-	// DeleteEntry removes a single attribute relation.
+
 	DeleteEntry(ctx context.Context, attributeId, contentId string) error
-	// DeleteAllByContentId removes all attribute entries for a given content item.
+
 	DeleteAllByContentId(ctx context.Context, contentId string, attributeIds []string) error
 }
 
