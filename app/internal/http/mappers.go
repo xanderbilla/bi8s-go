@@ -2,7 +2,7 @@ package http
 
 import "github.com/xanderbilla/bi8s-go/internal/model"
 
-func toMoviePublicDetail(m *model.Movie) model.MoviePublicDetail {
+func toContentPublicDetail(m *model.Movie) model.MoviePublicDetail {
 	return model.MoviePublicDetail{
 		ID:               m.ID,
 		Title:            m.Title,
@@ -25,6 +25,7 @@ func toMoviePublicDetail(m *model.Movie) model.MoviePublicDetail {
 		Tagline:          m.Tagline,
 		Studios:          m.Studios,
 		Assets:           m.Assets,
+		Stats:            m.Stats,
 	}
 }
 
@@ -72,7 +73,8 @@ func convertToPublicList(movies []model.Movie) []model.MoviePublicList {
 			Title:         m.Title,
 			BackdropPath:  m.BackdropPath,
 			PosterPath:    m.PosterPath,
-			ReleaseDate:   m.ReleaseDate,
+			ReleaseDate:   m.EffectiveReleaseDate(),
+			FirstAirDate:  m.FirstAirDate,
 			Tags:          m.Tags,
 			ContentRating: m.ContentRating,
 			ContentType:   m.ContentType,

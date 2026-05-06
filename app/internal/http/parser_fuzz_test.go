@@ -26,7 +26,7 @@ func FuzzParseMovieFromForm(f *testing.F) {
 		v.Set("adult", adult)
 		v.Set("content_type", contentType)
 		v.Set("genres", genres)
-		_, _ = ParseMovieFromForm(v)
+		_, _ = ParseContentFromForm(v)
 	})
 }
 

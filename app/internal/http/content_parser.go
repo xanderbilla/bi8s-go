@@ -15,7 +15,7 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/validation"
 )
 
-func ParseMovieFromForm(formValues url.Values) (model.Movie, error) {
+func ParseContentFromForm(formValues url.Values) (model.Movie, error) {
 	var releaseDate string
 	if rd := strings.TrimSpace(formValues.Get("release_date")); rd != "" {
 
@@ -49,7 +49,7 @@ func ParseMovieFromForm(formValues url.Values) (model.Movie, error) {
 	movie := model.Movie{
 		ID:               strings.TrimSpace(formValues.Get("id")),
 		Title:            strings.TrimSpace(formValues.Get("title")),
-		Overview:         strings.TrimSpace(formValues.Get("overview")),
+		Overview:         clampMaxChars(formValues.Get("overview"), 150),
 		ReleaseDate:      releaseDate,
 		FirstAirDate:     firstAirDate,
 		Adult:            adult,
@@ -127,17 +127,26 @@ const (
 	maxPageLimit     int32 = 100
 )
 
+func parseLimitParam(raw string) (int32, error) {
+	limit := defaultPageLimit
+	if strings.TrimSpace(raw) == "" {
+		return limit, nil
+	}
+	n, parseErr := strconv.ParseInt(raw, 10, 32)
+	if parseErr != nil || n <= 0 {
+		return 0, errors.New("limit must be a positive integer")
+	}
+	limit = int32(n)
+	if limit > maxPageLimit {
+		limit = maxPageLimit
+	}
+	return limit, nil
+}
+
 func parsePaginationParams(r *http.Request) (limit int32, startKey map[string]types.AttributeValue, err error) {
-	limit = defaultPageLimit
-	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
-		n, parseErr := strconv.ParseInt(raw, 10, 32)
-		if parseErr != nil || n <= 0 {
-			return 0, nil, errors.New("limit must be a positive integer")
-		}
-		limit = int32(n)
-		if limit > maxPageLimit {
-			limit = maxPageLimit
-		}
+	limit, err = parseLimitParam(r.URL.Query().Get("limit"))
+	if err != nil {
+		return 0, nil, err
 	}
 
 	if cursor := strings.TrimSpace(r.URL.Query().Get("cursor")); cursor != "" {

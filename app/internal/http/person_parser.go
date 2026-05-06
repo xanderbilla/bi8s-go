@@ -39,7 +39,7 @@ func ParsePersonFromForm(formValues url.Values) (model.Person, error) {
 		Name:         strings.TrimSpace(formValues.Get("name")),
 		Roles:        roles,
 		StageName:    strings.TrimSpace(formValues.Get("stage_name")),
-		Bio:          strings.TrimSpace(formValues.Get("bio")),
+		Bio:          clampMaxChars(formValues.Get("bio"), 150),
 		BirthDate:    birthDate,
 		BirthPlace:   strings.TrimSpace(formValues.Get("birth_place")),
 		Nationality:  strings.TrimSpace(formValues.Get("nationality")),

@@ -5,8 +5,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
-	"github.com/xanderbilla/bi8s-go/internal/logger"
-	"github.com/xanderbilla/bi8s-go/internal/response"
 	"github.com/xanderbilla/bi8s-go/internal/service"
 )
 
@@ -27,9 +25,7 @@ func (h *PersonHandler) GetAllPeople(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := response.Success(w, r, http.StatusOK, "people fetched", persons); err != nil {
-		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
-	}
+	writeOK(w, r, http.StatusOK, "people fetched", persons)
 }
 
 func (h *PersonHandler) GetPerson(w http.ResponseWriter, r *http.Request) {
@@ -41,9 +37,7 @@ func (h *PersonHandler) GetPerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := response.Success(w, r, http.StatusOK, "person fetched", toPersonPublicDetail(person)); err != nil {
-		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
-	}
+	writeOK(w, r, http.StatusOK, "person fetched", toPersonPublicDetail(person))
 }
 
 func (h *PersonHandler) CreatePerson(w http.ResponseWriter, r *http.Request) {
@@ -65,9 +59,7 @@ func (h *PersonHandler) CreatePerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := response.Success(w, r, http.StatusCreated, "person created", newPerson); err != nil {
-		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
-	}
+	writeOK(w, r, http.StatusCreated, "person created", newPerson)
 }
 
 func (h *PersonHandler) DeletePerson(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +74,5 @@ func (h *PersonHandler) DeletePerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := response.Success(w, r, http.StatusOK, "person deleted", nil); err != nil {
-		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
-	}
+	writeOK(w, r, http.StatusOK, "person deleted", nil)
 }

@@ -38,8 +38,13 @@ func TestToMoviePublicDetailCopiesScalarFields(t *testing.T) {
 		OriginalLanguage: "en",
 		Runtime:          120,
 		Tagline:          "tagline",
+		Stats: model.ContentStats{
+			TotalViews:    99,
+			TotalLikes:    5,
+			AverageRating: 8.5,
+		},
 	}
-	got := toMoviePublicDetail(src)
+	got := toContentPublicDetail(src)
 	if got.ID != src.ID ||
 		got.Title != src.Title ||
 		got.Overview != src.Overview ||
@@ -51,6 +56,11 @@ func TestToMoviePublicDetailCopiesScalarFields(t *testing.T) {
 		got.Runtime != src.Runtime ||
 		got.Tagline != src.Tagline {
 		t.Fatalf("toMoviePublicDetail mismatch: %+v", got)
+	}
+	if got.Stats.TotalViews != src.Stats.TotalViews ||
+		got.Stats.TotalLikes != src.Stats.TotalLikes ||
+		got.Stats.AverageRating != src.Stats.AverageRating {
+		t.Fatalf("Stats not copied: %+v", got.Stats)
 	}
 }
 

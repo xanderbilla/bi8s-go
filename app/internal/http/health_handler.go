@@ -8,9 +8,8 @@ import (
 	"time"
 
 	"github.com/xanderbilla/bi8s-go/internal/app"
+	"github.com/xanderbilla/bi8s-go/internal/buildinfo"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
-	"github.com/xanderbilla/bi8s-go/internal/logger"
-	"github.com/xanderbilla/bi8s-go/internal/response"
 )
 
 var readyFlag atomic.Bool
@@ -66,18 +65,18 @@ func (h *HealthHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := response.Success(w, r, http.StatusOK, "health check passed", map[string]any{
-		"env":    h.env,
-		"checks": checks,
-	}); err != nil {
-		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
-	}
+	writeOK(w, r, http.StatusOK, "health check passed", map[string]any{
+		"env":     h.env,
+		"version": buildinfo.Version,
+		"commit":  buildinfo.Commit,
+		"checks":  checks,
+	})
 }
 
 func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) {
-	if err := response.Success(w, r, http.StatusOK, "alive", nil); err != nil {
-		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
-	}
+	writeOK(w, r, http.StatusOK, "alive", map[string]any{
+		"version": buildinfo.Version,
+	})
 }
 
 func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {

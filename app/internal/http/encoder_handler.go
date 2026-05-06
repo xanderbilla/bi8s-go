@@ -6,9 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
-	"github.com/xanderbilla/bi8s-go/internal/logger"
 	"github.com/xanderbilla/bi8s-go/internal/model"
-	"github.com/xanderbilla/bi8s-go/internal/response"
 	"github.com/xanderbilla/bi8s-go/internal/service"
 	"github.com/xanderbilla/bi8s-go/internal/validation"
 )
@@ -69,9 +67,7 @@ func (h *EncoderHandler) CreateEncodingJob(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := response.Success(w, r, http.StatusAccepted, "encoding job queued", job); err != nil {
-		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
-	}
+	writeOK(w, r, http.StatusAccepted, "encoding job queued", job)
 }
 
 func (h *EncoderHandler) GetEncodingJob(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +79,5 @@ func (h *EncoderHandler) GetEncodingJob(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := response.Success(w, r, http.StatusOK, "encoding job fetched", job); err != nil {
-		logger.ErrorContext(r.Context(), "failed to write response", "error", err)
-	}
+	writeOK(w, r, http.StatusOK, "encoding job fetched", job)
 }
