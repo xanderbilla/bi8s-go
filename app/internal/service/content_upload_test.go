@@ -9,20 +9,21 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/xanderbilla/bi8s-go/internal/model"
 )
 
-func TestMovieService_UploadAssets_PartialSuccess(t *testing.T) {
+func TestContentService_UploadAssets_PartialSuccess(t *testing.T) {
 
-	movieRepo := newMockMovieRepository()
+	contentRepo := newMockContentRepository()
 	personRepo := newMockPersonRepository()
 	attributeRepo := newMockAttributeRepository()
 	encoderRepo := newMockEncoderRepository()
 	fileUploader := &failingMockFileUploader{failAfter: 2}
 
-	service := NewMovieService(movieRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
+	service := NewContentService(contentRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
 
 	movie := model.Movie{
 		ID:          "movie123",
@@ -30,7 +31,7 @@ func TestMovieService_UploadAssets_PartialSuccess(t *testing.T) {
 		ContentType: model.ContentTypeMovie,
 		Assets:      []model.Asset{},
 	}
-	movieRepo.movies["movie123"] = movie
+	contentRepo.movies["movie123"] = movie
 
 	files := buildMultipartFileHeaders(t, "videos", []string{"trailer1.mp4", "trailer2.mp4", "trailer3.mp4", "trailer4.mp4"})
 
@@ -45,7 +46,7 @@ func TestMovieService_UploadAssets_PartialSuccess(t *testing.T) {
 		t.Errorf("Expected 2 successful uploads, got %d", len(uploadedPaths))
 	}
 
-	updatedMovie, exists := movieRepo.movies["movie123"]
+	updatedMovie, exists := contentRepo.movies["movie123"]
 	if !exists {
 		t.Fatal("Movie should exist in repository")
 	}
@@ -64,14 +65,14 @@ func TestMovieService_UploadAssets_PartialSuccess(t *testing.T) {
 	}
 }
 
-func TestMovieService_UploadAssets_AllSuccess(t *testing.T) {
-	movieRepo := newMockMovieRepository()
+func TestContentService_UploadAssets_AllSuccess(t *testing.T) {
+	contentRepo := newMockContentRepository()
 	personRepo := newMockPersonRepository()
 	attributeRepo := newMockAttributeRepository()
 	encoderRepo := newMockEncoderRepository()
 	fileUploader := newMockFileUploader()
 
-	service := NewMovieService(movieRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
+	service := NewContentService(contentRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
 
 	movie := model.Movie{
 		ID:          "movie123",
@@ -79,7 +80,7 @@ func TestMovieService_UploadAssets_AllSuccess(t *testing.T) {
 		ContentType: model.ContentTypeMovie,
 		Assets:      []model.Asset{},
 	}
-	movieRepo.movies["movie123"] = movie
+	contentRepo.movies["movie123"] = movie
 
 	files := buildMultipartFileHeaders(t, "videos", []string{"trailer1.mp4", "trailer2.mp4", "trailer3.mp4"})
 
@@ -94,7 +95,7 @@ func TestMovieService_UploadAssets_AllSuccess(t *testing.T) {
 		t.Errorf("Expected 3 successful uploads, got %d", len(uploadedPaths))
 	}
 
-	updatedMovie, exists := movieRepo.movies["movie123"]
+	updatedMovie, exists := contentRepo.movies["movie123"]
 	if !exists {
 		t.Fatal("Movie should exist in repository")
 	}
@@ -110,14 +111,14 @@ func TestMovieService_UploadAssets_AllSuccess(t *testing.T) {
 	}
 }
 
-func TestMovieService_UploadAssets_FirstFileFails(t *testing.T) {
-	movieRepo := newMockMovieRepository()
+func TestContentService_UploadAssets_FirstFileFails(t *testing.T) {
+	contentRepo := newMockContentRepository()
 	personRepo := newMockPersonRepository()
 	attributeRepo := newMockAttributeRepository()
 	encoderRepo := newMockEncoderRepository()
 	fileUploader := &failingMockFileUploader{failAfter: 0}
 
-	service := NewMovieService(movieRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
+	service := NewContentService(contentRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
 
 	movie := model.Movie{
 		ID:          "movie123",
@@ -125,7 +126,7 @@ func TestMovieService_UploadAssets_FirstFileFails(t *testing.T) {
 		ContentType: model.ContentTypeMovie,
 		Assets:      []model.Asset{},
 	}
-	movieRepo.movies["movie123"] = movie
+	contentRepo.movies["movie123"] = movie
 
 	files := buildMultipartFileHeaders(t, "videos", []string{"trailer1.mp4", "trailer2.mp4"})
 
@@ -140,7 +141,7 @@ func TestMovieService_UploadAssets_FirstFileFails(t *testing.T) {
 		t.Errorf("Expected 0 successful uploads, got %d", len(uploadedPaths))
 	}
 
-	updatedMovie, exists := movieRepo.movies["movie123"]
+	updatedMovie, exists := contentRepo.movies["movie123"]
 	if !exists {
 		t.Fatal("Movie should exist in repository")
 	}
@@ -150,14 +151,14 @@ func TestMovieService_UploadAssets_FirstFileFails(t *testing.T) {
 	}
 }
 
-func TestMovieService_UploadAssets_AppendToExisting(t *testing.T) {
-	movieRepo := newMockMovieRepository()
+func TestContentService_UploadAssets_AppendToExisting(t *testing.T) {
+	contentRepo := newMockContentRepository()
 	personRepo := newMockPersonRepository()
 	attributeRepo := newMockAttributeRepository()
 	encoderRepo := newMockEncoderRepository()
 	fileUploader := newMockFileUploader()
 
-	service := NewMovieService(movieRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
+	service := NewContentService(contentRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
 
 	movie := model.Movie{
 		ID:          "movie123",
@@ -170,7 +171,7 @@ func TestMovieService_UploadAssets_AppendToExisting(t *testing.T) {
 			},
 		},
 	}
-	movieRepo.movies["movie123"] = movie
+	contentRepo.movies["movie123"] = movie
 
 	files := buildMultipartFileHeaders(t, "videos", []string{"trailer3.mp4", "trailer4.mp4"})
 
@@ -185,7 +186,7 @@ func TestMovieService_UploadAssets_AppendToExisting(t *testing.T) {
 		t.Errorf("Expected 2 successful uploads, got %d", len(uploadedPaths))
 	}
 
-	updatedMovie, exists := movieRepo.movies["movie123"]
+	updatedMovie, exists := contentRepo.movies["movie123"]
 	if !exists {
 		t.Fatal("Movie should exist in repository")
 	}
@@ -226,7 +227,15 @@ func (m *failingMockFileUploader) Delete(ctx context.Context, key string) error 
 	return nil
 }
 
-type mockMovieRepository struct {
+func (m *failingMockFileUploader) DeletePrefix(ctx context.Context, prefix string) error {
+	return nil
+}
+
+func (m *failingMockFileUploader) GeneratePresignedGetURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
+	return "https://example.com/signed/" + key, nil
+}
+
+type mockContentRepository struct {
 	movies map[string]model.Movie
 }
 
@@ -308,13 +317,13 @@ func (m *mockAttributeRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func newMockMovieRepository() *mockMovieRepository {
-	return &mockMovieRepository{
+func newMockContentRepository() *mockContentRepository {
+	return &mockContentRepository{
 		movies: make(map[string]model.Movie),
 	}
 }
 
-func (m *mockMovieRepository) GetAllAdmin(ctx context.Context, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+func (m *mockContentRepository) GetAllAdmin(ctx context.Context, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
 	var movies []model.Movie
 	for _, movie := range m.movies {
 		movies = append(movies, movie)
@@ -322,12 +331,7 @@ func (m *mockMovieRepository) GetAllAdmin(ctx context.Context, limit int32, star
 	return movies, nil, nil
 }
 
-func (m *mockMovieRepository) GetRecentContent(ctx context.Context, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
-	result, _, err := m.GetAllAdmin(ctx, limit, startKey)
-	return result, nil, err
-}
-
-func (m *mockMovieRepository) Get(ctx context.Context, id string) (*model.Movie, error) {
+func (m *mockContentRepository) Get(ctx context.Context, id string) (*model.Movie, error) {
 	movie, exists := m.movies[id]
 	if !exists {
 		return nil, nil
@@ -335,46 +339,46 @@ func (m *mockMovieRepository) Get(ctx context.Context, id string) (*model.Movie,
 	return &movie, nil
 }
 
-func (m *mockMovieRepository) GetAdmin(ctx context.Context, id string) (*model.Movie, error) {
+func (m *mockContentRepository) GetAdmin(ctx context.Context, id string) (*model.Movie, error) {
 	return m.Get(ctx, id)
 }
 
-func (m *mockMovieRepository) Create(ctx context.Context, movie model.Movie) error {
+func (m *mockContentRepository) Create(ctx context.Context, movie model.Movie) error {
 	m.movies[movie.ID] = movie
 	return nil
 }
 
-func (m *mockMovieRepository) Update(ctx context.Context, movie model.Movie) error {
+func (m *mockContentRepository) Update(ctx context.Context, movie model.Movie) error {
 	m.movies[movie.ID] = movie
 	return nil
 }
 
-func (m *mockMovieRepository) Delete(ctx context.Context, id string) error {
+func (m *mockContentRepository) Delete(ctx context.Context, id string) error {
 	delete(m.movies, id)
 	return nil
 }
 
-func (m *mockMovieRepository) GetMoviesByPersonId(ctx context.Context, personId string) ([]model.Movie, error) {
+func (m *mockContentRepository) GetContentByPersonIdSimple(ctx context.Context, personId string) ([]model.Movie, error) {
 	return []model.Movie{}, nil
 }
 
-func (m *mockMovieRepository) GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+func (m *mockContentRepository) GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
 	return []model.Movie{}, nil, nil
 }
 
-func (m *mockMovieRepository) GetContentByPersonIdAdmin(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+func (m *mockContentRepository) GetContentByPersonIdAdmin(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
 	return []model.Movie{}, nil, nil
 }
 
-func (m *mockMovieRepository) GetMoviesByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+func (m *mockContentRepository) GetContentByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
 	return []model.Movie{}, nil, nil
 }
 
-func (m *mockMovieRepository) GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error) {
+func (m *mockContentRepository) GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error) {
 	return nil, nil
 }
 
-func (m *mockMovieRepository) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+func (m *mockContentRepository) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
 	return []model.Movie{}, nil, nil
 }
 

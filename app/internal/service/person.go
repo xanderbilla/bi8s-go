@@ -4,7 +4,10 @@ import (
 	"context"
 	"time"
 
+	goredis "github.com/redis/go-redis/v9"
+
 	"github.com/xanderbilla/bi8s-go/internal/errs"
+	"github.com/xanderbilla/bi8s-go/internal/logger"
 	"github.com/xanderbilla/bi8s-go/internal/model"
 	"github.com/xanderbilla/bi8s-go/internal/repository"
 	"github.com/xanderbilla/bi8s-go/internal/storage"
@@ -16,14 +19,31 @@ type PersonService struct {
 	repo          repository.PersonRepository
 	attributeRepo repository.AttributeRepository
 	fileUploader  storage.FileUploader
+	redisClient   *goredis.Client
+	searchService *SearchService
 }
+
+const personRedisTTL = 60 * time.Second
 
 func NewPersonService(repo repository.PersonRepository, attributeRepo repository.AttributeRepository, fileUploader storage.FileUploader) *PersonService {
 	return &PersonService{
 		repo:          repo,
 		attributeRepo: attributeRepo,
 		fileUploader:  fileUploader,
+		searchService: NewSearchService(nil, false),
 	}
+}
+
+func (s *PersonService) SetSearchService(searchService *SearchService) {
+	if searchService == nil {
+		s.searchService = NewSearchService(nil, false)
+		return
+	}
+	s.searchService = searchService
+}
+
+func (s *PersonService) SetRedisClient(client *goredis.Client) {
+	s.redisClient = client
 }
 
 func (s *PersonService) GetAll(ctx context.Context) ([]model.Person, error) {
@@ -31,6 +51,10 @@ func (s *PersonService) GetAll(ctx context.Context) ([]model.Person, error) {
 }
 
 func (s *PersonService) Get(ctx context.Context, id string) (*model.Person, error) {
+	if p, ok := cacheGetJSON[model.Person](ctx, s.redisClient, personCacheKey(id)); ok {
+		return p, nil
+	}
+
 	p, err := s.repo.Get(ctx, id)
 	if err != nil {
 		return nil, err
@@ -38,6 +62,8 @@ func (s *PersonService) Get(ctx context.Context, id string) (*model.Person, erro
 	if p == nil {
 		return nil, errs.ErrContentNotFound
 	}
+
+	cacheSetJSON(ctx, s.redisClient, personCacheKey(p.ID), p, personRedisTTL, "person", "personId", p.ID)
 	return p, nil
 }
 
@@ -102,6 +128,10 @@ func (s *PersonService) Create(ctx context.Context, person model.Person, profile
 		s.cleanupUploadedKeys(ctx, uploadedKeys)
 		return model.Person{}, err
 	}
+	cacheSetJSON(ctx, s.redisClient, personCacheKey(person.ID), &person, personRedisTTL, "person", "personId", person.ID)
+	if err := s.searchService.IndexPerson(ctx, person); err != nil {
+		logger.WarnContext(ctx, "search person indexing failed", "personId", person.ID, "error", err.Error())
+	}
 
 	return person, nil
 }
@@ -115,5 +145,16 @@ func (s *PersonService) uploadFileToStorage(ctx context.Context, personID, purpo
 }
 
 func (s *PersonService) Delete(ctx context.Context, id string) error {
-	return s.repo.Delete(ctx, id)
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+	cacheDel(ctx, s.redisClient, personCacheKey(id), "person", "personId", id)
+	if err := s.searchService.DeletePerson(ctx, id); err != nil {
+		logger.WarnContext(ctx, "search person delete indexing failed", "personId", id, "error", err.Error())
+	}
+	return nil
+}
+
+func personCacheKey(id string) string {
+	return "bi8s:person:" + id
 }

@@ -21,6 +21,12 @@ import (
 
 const defaultMaxConcurrentJobs = 3
 
+func removeTempFile(ctx context.Context, jobID, tempFile string) {
+	if rmErr := os.Remove(tempFile); rmErr != nil && !os.IsNotExist(rmErr) {
+		logger.WarnContext(ctx, "failed to remove temp file", "job_id", jobID, "temp_file", tempFile, "error", rmErr.Error())
+	}
+}
+
 type EncoderService struct {
 	repo         repository.EncoderRepository
 	fileUploader storage.FileUploader
@@ -102,9 +108,7 @@ func (s *EncoderService) CreateEncodingJob(
 
 	fileHandle, err := os.Open(tempFile)
 	if err != nil {
-		if rmErr := os.Remove(tempFile); rmErr != nil && !os.IsNotExist(rmErr) {
-			logger.WarnContext(ctx, "failed to remove temp file", "job_id", jobID, "temp_file", tempFile, "error", rmErr.Error())
-		}
+		removeTempFile(ctx, jobID, tempFile)
 		logger.ErrorContext(ctx, "failed to open temporary file for upload",
 			"job_id", jobID,
 			"temp_file", tempFile,
@@ -136,9 +140,7 @@ func (s *EncoderService) CreateEncodingJob(
 		)
 	}()
 	if err != nil {
-		if rmErr := os.Remove(tempFile); rmErr != nil && !os.IsNotExist(rmErr) {
-			logger.WarnContext(ctx, "failed to remove temp file", "job_id", jobID, "temp_file", tempFile, "error", rmErr.Error())
-		}
+		removeTempFile(ctx, jobID, tempFile)
 		logger.ErrorContext(ctx, "failed to upload input video",
 			"job_id", jobID,
 			"content_id", contentID,
@@ -170,9 +172,7 @@ func (s *EncoderService) CreateEncodingJob(
 	}
 
 	if err := s.repo.Create(ctx, job); err != nil {
-		if rmErr := os.Remove(tempFile); rmErr != nil && !os.IsNotExist(rmErr) {
-			logger.WarnContext(ctx, "failed to remove temp file", "job_id", jobID, "temp_file", tempFile, "error", rmErr.Error())
-		}
+		removeTempFile(ctx, jobID, tempFile)
 		logger.ErrorContext(ctx, "failed to create job record",
 			"job_id", jobID,
 			"content_id", contentID,
@@ -195,11 +195,7 @@ func (s *EncoderService) CreateEncodingJob(
 	go func(jobPtr *model.EncoderJob, tempFilePath string, ctx context.Context, cancelFn context.CancelFunc) {
 		defer s.wg.Done()
 		defer cancelFn()
-		defer func() {
-			if rmErr := os.Remove(tempFilePath); rmErr != nil && !os.IsNotExist(rmErr) {
-				logger.WarnContext(ctx, "failed to remove temp file", "job_id", jobPtr.JobID, "temp_file", tempFilePath, "error", rmErr.Error())
-			}
-		}()
+		defer removeTempFile(ctx, jobPtr.JobID, tempFilePath)
 
 		select {
 		case s.sem <- struct{}{}:
@@ -261,9 +257,7 @@ func (s *EncoderService) ensureTempFile(ctx context.Context, jobID string, video
 		if closeErr := tmp.Close(); closeErr != nil {
 			logger.WarnContext(ctx, "failed to close temp file after write error", "job_id", jobID, "temp_file", tempFile, "error", closeErr.Error())
 		}
-		if rmErr := os.Remove(tempFile); rmErr != nil && !os.IsNotExist(rmErr) {
-			logger.WarnContext(ctx, "failed to remove temp file", "job_id", jobID, "temp_file", tempFile, "error", rmErr.Error())
-		}
+		removeTempFile(ctx, jobID, tempFile)
 		logger.ErrorContext(ctx, "failed to write temporary file",
 			"job_id", jobID,
 			"temp_file", tempFile,
@@ -272,15 +266,11 @@ func (s *EncoderService) ensureTempFile(ctx context.Context, jobID string, video
 		return "", fmt.Errorf("write temporary file: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		if rmErr := os.Remove(tempFile); rmErr != nil && !os.IsNotExist(rmErr) {
-			logger.WarnContext(ctx, "failed to remove temp file", "job_id", jobID, "temp_file", tempFile, "error", rmErr.Error())
-		}
+		removeTempFile(ctx, jobID, tempFile)
 		return "", fmt.Errorf("close temporary file: %w", err)
 	}
 	if err := os.Chmod(tempFile, 0o600); err != nil {
-		if rmErr := os.Remove(tempFile); rmErr != nil && !os.IsNotExist(rmErr) {
-			logger.WarnContext(ctx, "failed to remove temp file", "job_id", jobID, "temp_file", tempFile, "error", rmErr.Error())
-		}
+		removeTempFile(ctx, jobID, tempFile)
 		return "", fmt.Errorf("chmod temporary file: %w", err)
 	}
 

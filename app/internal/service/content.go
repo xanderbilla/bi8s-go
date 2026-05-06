@@ -17,6 +17,8 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/storage"
 	"github.com/xanderbilla/bi8s-go/internal/utils"
 	"github.com/xanderbilla/bi8s-go/internal/validation"
+
+	goredis "github.com/redis/go-redis/v9"
 )
 
 type bannerCacheEntry struct {
@@ -24,34 +26,62 @@ type bannerCacheEntry struct {
 	expiresAt time.Time
 }
 
-type MovieService struct {
-	repo          repository.MovieRepository
-	personRepo    repository.PersonRepository
-	attributeRepo repository.AttributeRepository
-	encoderRepo   repository.EncoderRepository
-	fileUploader  storage.FileUploader
-	bannerCache   sync.Map
+type ContentService struct {
+	repo           repository.ContentRepository
+	personRepo     repository.PersonRepository
+	attributeRepo  repository.AttributeRepository
+	encoderRepo    repository.EncoderRepository
+	fileUploader   storage.FileUploader
+	searchService  *SearchService
+	bannerCache    sync.Map
+	redisClient    *goredis.Client
+	playbackURLTTL time.Duration
 }
 
-func NewMovieService(repo repository.MovieRepository, personRepo repository.PersonRepository, attributeRepo repository.AttributeRepository, encoderRepo repository.EncoderRepository, fileUploader storage.FileUploader) *MovieService {
-	return &MovieService{
-		repo:          repo,
-		personRepo:    personRepo,
-		attributeRepo: attributeRepo,
-		encoderRepo:   encoderRepo,
-		fileUploader:  fileUploader,
+func NewContentService(repo repository.ContentRepository, personRepo repository.PersonRepository, attributeRepo repository.AttributeRepository, encoderRepo repository.EncoderRepository, fileUploader storage.FileUploader) *ContentService {
+	return &ContentService{
+		repo:           repo,
+		personRepo:     personRepo,
+		attributeRepo:  attributeRepo,
+		encoderRepo:    encoderRepo,
+		fileUploader:   fileUploader,
+		searchService:  NewSearchService(nil, false),
+		playbackURLTTL: 20 * time.Minute,
 	}
 }
 
-func (s *MovieService) GetAllAdmin(ctx context.Context, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+const bannerRedisTTL = 5 * time.Minute
+
+const bannerLocalTTL = 5 * time.Second
+const contentRedisTTL = 60 * time.Second
+
+func (s *ContentService) SetRedisClient(client *goredis.Client) {
+	s.redisClient = client
+}
+
+func (s *ContentService) SetPlaybackURLTTL(ttl time.Duration) {
+	if ttl > 0 {
+		s.playbackURLTTL = ttl
+	}
+}
+
+func (s *ContentService) SetSearchService(searchService *SearchService) {
+	if searchService == nil {
+		s.searchService = NewSearchService(nil, false)
+		return
+	}
+	s.searchService = searchService
+}
+
+func (s *ContentService) GetAllAdmin(ctx context.Context, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
 	return s.repo.GetAllAdmin(ctx, limit, startKey)
 }
 
-func (s *MovieService) GetRecentContent(ctx context.Context, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
-	return s.repo.GetRecentContent(ctx, contentTypeFilter, limit, startKey)
-}
+func (s *ContentService) Get(ctx context.Context, id string) (*model.Movie, error) {
+	if cached, ok := cacheGetJSON[model.Movie](ctx, s.redisClient, contentCacheKey(id)); ok {
+		return cached, nil
+	}
 
-func (s *MovieService) Get(ctx context.Context, id string) (*model.Movie, error) {
 	m, err := s.repo.Get(ctx, id)
 	if err != nil {
 		return nil, err
@@ -59,10 +89,12 @@ func (s *MovieService) Get(ctx context.Context, id string) (*model.Movie, error)
 	if m == nil {
 		return nil, errs.ErrContentNotFound
 	}
+
+	cacheSetJSON(ctx, s.redisClient, contentCacheKey(m.ID), m, contentRedisTTL, "content", "contentId", m.ID)
 	return m, nil
 }
 
-func (s *MovieService) GetAdmin(ctx context.Context, id string) (*model.Movie, error) {
+func (s *ContentService) GetAdmin(ctx context.Context, id string) (*model.Movie, error) {
 	m, err := s.repo.GetAdmin(ctx, id)
 	if err != nil {
 		return nil, err
@@ -73,7 +105,7 @@ func (s *MovieService) GetAdmin(ctx context.Context, id string) (*model.Movie, e
 	return m, nil
 }
 
-func (s *MovieService) Create(ctx context.Context, movie model.Movie, posterInput, coverInput *model.FileUploadInput) (model.Movie, error) {
+func (s *ContentService) Create(ctx context.Context, movie model.Movie, posterInput, coverInput *model.FileUploadInput) (model.Movie, error) {
 	if movie.ID == "" {
 		movie.ID = utils.GenerateID()
 	}
@@ -153,43 +185,113 @@ func (s *MovieService) Create(ctx context.Context, movie model.Movie, posterInpu
 		uploadedKeys = append(uploadedKeys, coverKey)
 	}
 
+	if movie.ContentType == model.ContentTypeTV && movie.ReleaseDate == "" {
+		movie.ReleaseDate = movie.FirstAirDate
+	}
+
 	if err := s.repo.Create(ctx, movie); err != nil {
 		s.cleanupUploadedKeys(ctx, uploadedKeys)
 		return model.Movie{}, err
+	}
+	if err := s.searchService.IndexContent(ctx, movie); err != nil {
+		logger.WarnContext(ctx, "search content indexing failed", "contentId", movie.ID, "error", err.Error())
 	}
 
 	return movie, nil
 }
 
-func (s *MovieService) cleanupUploadedKeys(ctx context.Context, keys []string) {
+func (s *ContentService) cleanupUploadedKeys(ctx context.Context, keys []string) {
 	cleanupUploadedKeys(ctx, s.fileUploader, keys)
 }
 
-func (s *MovieService) uploadFileToStorage(ctx context.Context, movieID, purpose string, input *model.FileUploadInput) (string, error) {
+func (s *ContentService) uploadFileToStorage(ctx context.Context, movieID, purpose string, input *model.FileUploadInput) (string, error) {
 	return uploadInputToStorage(ctx, s.fileUploader, "movies", movieID, purpose, input)
 }
 
-func (s *MovieService) Delete(ctx context.Context, id string) error {
-	return s.repo.Delete(ctx, id)
+func (s *ContentService) Delete(ctx context.Context, id string) error {
+	movie, err := s.repo.GetAdmin(ctx, id)
+	if err != nil {
+		return err
+	}
+	if movie == nil {
+		return errs.ErrContentNotFound
+	}
+
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+
+	cleanupKeys := make([]string, 0, 2)
+	if strings.TrimSpace(movie.PosterPath) != "" {
+		cleanupKeys = append(cleanupKeys, movie.PosterPath)
+	}
+	if strings.TrimSpace(movie.BackdropPath) != "" {
+		cleanupKeys = append(cleanupKeys, movie.BackdropPath)
+	}
+	for _, asset := range movie.Assets {
+		for _, key := range asset.Keys {
+			if strings.TrimSpace(key) == "" {
+				continue
+			}
+			cleanupKeys = append(cleanupKeys, key)
+		}
+	}
+
+	for _, key := range cleanupKeys {
+		if err := s.fileUploader.Delete(ctx, key); err != nil {
+			logger.WarnContext(ctx, "failed deleting content asset key from s3", "contentId", id, "key", key, "error", err.Error())
+		}
+	}
+
+	prefixes := []string{"movies/" + id + "/", "videos/" + id + "/"}
+	for _, prefix := range prefixes {
+		if err := s.fileUploader.DeletePrefix(ctx, prefix); err != nil {
+			logger.WarnContext(ctx, "failed deleting content prefix from s3", "contentId", id, "prefix", prefix, "error", err.Error())
+		}
+	}
+
+	if s.redisClient != nil {
+		cacheDel(ctx, s.redisClient, contentCacheKey(id), "content", "contentId", id)
+	}
+	if err := s.searchService.DeleteContent(ctx, id); err != nil {
+		logger.WarnContext(ctx, "search content delete indexing failed", "contentId", id, "error", err.Error())
+	}
+	return nil
 }
 
-func (s *MovieService) GetMoviesByPersonId(ctx context.Context, personId string) ([]model.Movie, error) {
-	return s.repo.GetMoviesByPersonId(ctx, personId)
+func (s *ContentService) GetContentByPersonIdSimple(ctx context.Context, personId string) ([]model.Movie, error) {
+	return s.repo.GetContentByPersonIdSimple(ctx, personId)
 }
 
-func (s *MovieService) GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+func (s *ContentService) GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
 	return s.repo.GetContentByPersonId(ctx, personId, contentTypeFilter, limit, startKey)
 }
 
-func (s *MovieService) GetContentByPersonIdAdmin(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+func (s *ContentService) GetContentByPersonIdAdmin(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
 	return s.repo.GetContentByPersonIdAdmin(ctx, personId, contentTypeFilter, limit, startKey)
 }
 
-func (s *MovieService) GetMoviesByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
-	return s.repo.GetMoviesByAttributeId(ctx, attributeId, contentTypeFilter, limit, startKey)
+func (s *ContentService) GetContentByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	return s.repo.GetContentByAttributeId(ctx, attributeId, contentTypeFilter, limit, startKey)
 }
 
-func (s *MovieService) GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error) {
+func (s *ContentService) GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error) {
+	if s.redisClient != nil {
+		key := bannerCacheKey(contentTypeFilter)
+		if cached, ok := cacheGetJSON[model.Movie](ctx, s.redisClient, key); ok {
+			return cached, nil
+		}
+
+		movie, err := s.repo.GetBanner(ctx, contentTypeFilter)
+		if err != nil {
+			return nil, err
+		}
+		if movie != nil {
+			cacheSetJSON(ctx, s.redisClient, key, movie, bannerRedisTTL, "banner", "key", key)
+		}
+		return movie, nil
+	}
+
 	if entry, ok := s.bannerCache.Load(contentTypeFilter); ok {
 		if e := entry.(bannerCacheEntry); time.Now().Before(e.expiresAt) {
 			return e.movie, nil
@@ -202,17 +304,17 @@ func (s *MovieService) GetBanner(ctx context.Context, contentTypeFilter string) 
 	if movie != nil {
 		s.bannerCache.Store(contentTypeFilter, bannerCacheEntry{
 			movie:     movie,
-			expiresAt: time.Now().Add(5 * time.Second),
+			expiresAt: time.Now().Add(bannerLocalTTL),
 		})
 	}
 	return movie, nil
 }
 
-func (s *MovieService) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+func (s *ContentService) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
 	return s.repo.GetDiscoverContent(ctx, discoverType, contentTypeFilter, limit, startKey)
 }
 
-func (s *MovieService) UploadAssets(ctx context.Context, contentID string, assetType model.AssetType, files []*multipart.FileHeader) ([]string, error) {
+func (s *ContentService) UploadAssets(ctx context.Context, contentID string, assetType model.AssetType, files []*multipart.FileHeader) ([]string, error) {
 
 	content, err := s.repo.Get(ctx, contentID)
 	if err != nil {
@@ -273,6 +375,12 @@ func (s *MovieService) UploadAssets(ctx context.Context, contentID string, asset
 		if err := s.repo.Update(ctx, *content); err != nil {
 			return uploadedPaths, fmt.Errorf("failed to update content: %w", err)
 		}
+		if err := s.searchService.IndexContent(ctx, *content); err != nil {
+			logger.WarnContext(ctx, "search content indexing failed after asset upload", "contentId", content.ID, "error", err.Error())
+		}
+		if s.redisClient != nil {
+			cacheSetJSON(ctx, s.redisClient, contentCacheKey(content.ID), content, contentRedisTTL, "content", "contentId", content.ID)
+		}
 	}
 
 	if uploadErr != nil {
@@ -282,7 +390,15 @@ func (s *MovieService) UploadAssets(ctx context.Context, contentID string, asset
 	return uploadedPaths, nil
 }
 
-func (s *MovieService) uploadSingleAsset(
+func contentCacheKey(id string) string {
+	return "bi8s:content:" + id
+}
+
+func bannerCacheKey(contentTypeFilter string) string {
+	return "bi8s:banner:" + contentTypeFilter
+}
+
+func (s *ContentService) uploadSingleAsset(
 	ctx context.Context,
 	fh *multipart.FileHeader,
 	s3Path, fileName string,

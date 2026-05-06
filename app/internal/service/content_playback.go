@@ -3,12 +3,15 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/xanderbilla/bi8s-go/internal/errs"
+	"github.com/xanderbilla/bi8s-go/internal/logger"
 	"github.com/xanderbilla/bi8s-go/internal/model"
 )
 
-func (s *MovieService) GetPlaybackInfo(ctx context.Context, contentID string) (*model.PlaybackInfo, error) {
+func (s *ContentService) GetPlaybackInfo(ctx context.Context, contentID string) (*model.PlaybackInfo, error) {
 	content, err := s.repo.Get(ctx, contentID)
 	if err != nil {
 		return nil, err
@@ -28,6 +31,21 @@ func (s *MovieService) GetPlaybackInfo(ctx context.Context, contentID string) (*
 		return nil, errs.ErrPlaybackNotAvailable
 	}
 
+	playback := *latestJob.Playback
+	if signer, ok := s.fileUploader.(interface {
+		GeneratePresignedGetURL(ctx context.Context, key string, expiry time.Duration) (string, error)
+	}); ok {
+		master := strings.TrimSpace(playback.Streaming.MasterPlaylist)
+		if master != "" && !strings.HasPrefix(strings.ToLower(master), "http://") && !strings.HasPrefix(strings.ToLower(master), "https://") {
+			signed, signErr := signer.GeneratePresignedGetURL(ctx, strings.TrimPrefix(master, "/"), s.playbackURLTTL)
+			if signErr != nil {
+				logger.WarnContext(ctx, "failed to presign playback URL", "contentId", contentID, "error", signErr)
+			} else {
+				playback.Streaming.MasterPlaylist = signed
+			}
+		}
+	}
+
 	return &model.PlaybackInfo{
 		ContentID:   contentID,
 		ContentType: content.ContentType,
@@ -36,11 +54,11 @@ func (s *MovieService) GetPlaybackInfo(ctx context.Context, contentID string) (*
 			Overview: content.Overview,
 			Casts:    content.Casts,
 		},
-		Playback: latestJob.Playback,
+		Playback: &playback,
 	}, nil
 }
 
-func (s *MovieService) findLatestCompletedJob(ctx context.Context, contentID string) (*model.EncoderJob, error) {
+func (s *ContentService) findLatestCompletedJob(ctx context.Context, contentID string) (*model.EncoderJob, error) {
 	jobs, err := s.encoderRepo.GetByContentId(ctx, contentID)
 	if err != nil {
 		return nil, err

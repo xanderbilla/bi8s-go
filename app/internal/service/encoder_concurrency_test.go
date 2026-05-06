@@ -199,3 +199,11 @@ func (m *panicMockFileUploader) UploadFileStream(ctx context.Context, prefix, re
 func (m *panicMockFileUploader) Delete(ctx context.Context, key string) error {
 	return nil
 }
+
+func (m *panicMockFileUploader) DeletePrefix(ctx context.Context, prefix string) error {
+	return nil
+}
+
+func (m *panicMockFileUploader) GeneratePresignedGetURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
+	return "", nil
+}

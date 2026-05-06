@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -101,6 +102,21 @@ func (m *mockFileUploader) DeleteFile(ctx context.Context, key string) error {
 
 func (m *mockFileUploader) Delete(ctx context.Context, key string) error {
 	return m.DeleteFile(ctx, key)
+}
+
+func (m *mockFileUploader) DeletePrefix(ctx context.Context, prefix string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for key := range m.uploadedFiles {
+		if strings.HasPrefix(key, prefix) {
+			delete(m.uploadedFiles, key)
+		}
+	}
+	return nil
+}
+
+func (m *mockFileUploader) GeneratePresignedGetURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
+	return "https://example.com/signed/" + key, nil
 }
 
 func TestNewEncoderService(t *testing.T) {
