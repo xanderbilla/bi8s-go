@@ -8,6 +8,30 @@ import (
 	"strings"
 )
 
+func GetIntStrict(key string, fallback int) (int, error) {
+	val, ok := os.LookupEnv(key)
+	if !ok || strings.TrimSpace(val) == "" {
+		return fallback, nil
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(val))
+	if err != nil {
+		return 0, fmt.Errorf("env var %q must be a valid int: %w", key, err)
+	}
+	return v, nil
+}
+
+func GetBoolStrict(key string, fallback bool) (bool, error) {
+	val, ok := os.LookupEnv(key)
+	if !ok || strings.TrimSpace(val) == "" {
+		return fallback, nil
+	}
+	v, err := strconv.ParseBool(strings.TrimSpace(val))
+	if err != nil {
+		return false, fmt.Errorf("env var %q must be a valid bool: %w", key, err)
+	}
+	return v, nil
+}
+
 func GetString(key, fallback string) string {
 	val, ok := os.LookupEnv(key)
 	if !ok {

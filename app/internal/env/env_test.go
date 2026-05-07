@@ -1,6 +1,10 @@
 package env
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestGetString(t *testing.T) {
 	t.Setenv("BI8S_TEST_STR", "hello")
@@ -23,6 +27,84 @@ func TestGetInt(t *testing.T) {
 	}
 	if got := GetInt("BI8S_TEST_INT_MISSING", 9); got != 9 {
 		t.Fatalf("missing fallback = %d", got)
+	}
+}
+
+func TestGetIntStrict(t *testing.T) {
+	t.Setenv("BI8S_TEST_INT_STRICT", "42")
+	got, err := GetIntStrict("BI8S_TEST_INT_STRICT", 7)
+	if err != nil || got != 42 {
+		t.Fatalf("GetIntStrict = %d, %v", got, err)
+	}
+
+	got, err = GetIntStrict("BI8S_TEST_INT_STRICT_MISSING", 9)
+	if err != nil || got != 9 {
+		t.Fatalf("GetIntStrict missing = %d, %v", got, err)
+	}
+
+	t.Setenv("BI8S_TEST_INT_STRICT_BAD", "x")
+	if _, err := GetIntStrict("BI8S_TEST_INT_STRICT_BAD", 1); err == nil {
+		t.Fatal("expected parse error for invalid int")
+	}
+}
+
+func TestGetBoolStrict(t *testing.T) {
+	t.Setenv("BI8S_TEST_BOOL_STRICT", "true")
+	got, err := GetBoolStrict("BI8S_TEST_BOOL_STRICT", false)
+	if err != nil || !got {
+		t.Fatalf("GetBoolStrict true = %v, %v", got, err)
+	}
+
+	got, err = GetBoolStrict("BI8S_TEST_BOOL_STRICT_MISSING", false)
+	if err != nil || got {
+		t.Fatalf("GetBoolStrict missing = %v, %v", got, err)
+	}
+
+	t.Setenv("BI8S_TEST_BOOL_STRICT_BAD", "truthy")
+	if _, err := GetBoolStrict("BI8S_TEST_BOOL_STRICT_BAD", false); err == nil {
+		t.Fatal("expected parse error for invalid bool")
+	}
+}
+
+func TestLoadDotEnv(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".env")
+	content := "# comment\nA=1\nB=hello\nC=\"a b\"\nD='x y'\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write dotenv: %v", err)
+	}
+
+	t.Setenv("B", "already-set")
+	loaded, err := LoadDotEnv(path)
+	if err != nil {
+		t.Fatalf("LoadDotEnv error: %v", err)
+	}
+	if !loaded {
+		t.Fatal("expected loaded=true")
+	}
+
+	if got := os.Getenv("A"); got != "1" {
+		t.Fatalf("A = %q", got)
+	}
+	if got := os.Getenv("B"); got != "already-set" {
+		t.Fatalf("B should not be overridden, got %q", got)
+	}
+	if got := os.Getenv("C"); got != "a b" {
+		t.Fatalf("C = %q", got)
+	}
+	if got := os.Getenv("D"); got != "x y" {
+		t.Fatalf("D = %q", got)
+	}
+}
+
+func TestLoadDotEnv_InvalidLine(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".env")
+	if err := os.WriteFile(path, []byte("NOT_VALID"), 0o600); err != nil {
+		t.Fatalf("write dotenv: %v", err)
+	}
+	if _, err := LoadDotEnv(path); err == nil {
+		t.Fatal("expected parse error")
 	}
 }
 
