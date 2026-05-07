@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -14,6 +15,10 @@ import (
 )
 
 func main() {
+	if _, err := env.LoadDotEnv(".env"); err != nil {
+		fmt.Fprintln(os.Stderr, "failed to load .env:", err)
+		os.Exit(1)
+	}
 	app.SetupLogger()
 
 	if err := run(); err != nil {
@@ -23,7 +28,10 @@ func main() {
 }
 
 func run() error {
-	cfg := app.LoadConfigFromEnv()
+	cfg, err := app.LoadConfigFromEnv()
+	if err != nil {
+		return err
+	}
 	if err := cfg.Validate(); err != nil {
 		return err
 	}

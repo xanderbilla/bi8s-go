@@ -17,24 +17,10 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/service"
 )
 
-// TestShutdown_OrderingAndBounds verifies the documented graceful-shutdown
-// contract enforced by the production-readiness review:
-//
-//  1. readiness flips to false immediately so the platform stops routing
-//     new traffic before any draining begins;
-//  2. in-flight HTTP requests are allowed to complete before srv.Shutdown
-//     returns (no premature connection termination);
-//  3. encoder Shutdown is signalled and Wait blocks until in-flight jobs
-//     finish (we simulate one with a 60ms hold);
-//  4. Redis is closed only after the encoder drain completes so that
-//     in-flight rate-limit checks during drain can still reach the backend;
-//  5. the entire sequence completes within SHUTDOWN_TIMEOUT_SECONDS plus a
-//     bounded encoder-drain window.
 func TestShutdown_OrderingAndBounds(t *testing.T) {
 	t.Setenv("SHUTDOWN_TIMEOUT_SECONDS", "5")
 	t.Setenv("ENCODER_DRAIN_TIMEOUT_SECONDS", "5")
 
-	// --- HTTP server with a deliberately slow handler ---------------------
 	const handlerDelay = 80 * time.Millisecond
 	var (
 		handlerStartedAt atomic.Int64
@@ -168,8 +154,6 @@ func TestShutdown_OrderingAndBounds(t *testing.T) {
 	}
 }
 
-// TestShutdown_NilRedisIsSafe ensures the shutdown path tolerates the
-// memory rate-limit-backend configuration where RedisClient is nil.
 func TestShutdown_NilRedisIsSafe(t *testing.T) {
 	t.Setenv("SHUTDOWN_TIMEOUT_SECONDS", "2")
 	t.Setenv("ENCODER_DRAIN_TIMEOUT_SECONDS", "2")
