@@ -9,43 +9,21 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/response"
 )
 
-// Backend computes whether a single request bound to key is allowed under
-// the configured token-bucket parameters. Allow MUST be safe for concurrent
-// use across many requests and many keys. Implementations may consult
-// shared state (e.g. Redis) but should treat ctx as a hard deadline.
-//
-// retryAfter is a hint emitted to clients via the Retry-After header when
-// allowed is false; implementations may return zero to fall back to the
-// middleware default.
 type Backend interface {
 	Allow(ctx context.Context, key string) (allowed bool, retryAfter time.Duration, err error)
 	Close() error
 }
 
-// Factory builds a Backend bound to a named bucket configuration. Each
-// route family (global, encoder write, …) calls NewBackend exactly once
-// during router construction; the returned Backend is reused for the life
-// of the process and Close()d on shutdown.
 type Factory interface {
-	// NewBackend returns a backend keyed by name with the given burst
-	// (max tokens) and steady-state refill rate (tokens per second).
 	NewBackend(name string, burst, refillPerSec float64) Backend
 }
 
-// Options drive Middleware behaviour. Most callers can leave them at the
-// zero value.
 type Options struct {
-	// LimitHeaderValue is the verbatim string sent in X-RateLimit-Limit
-	// when a request is denied. Empty means derive from burst.
 	LimitHeaderValue string
-	// DefaultRetryAfterSeconds is used when the backend reports zero
-	// retryAfter. Must be > 0.
+
 	DefaultRetryAfterSeconds int
 }
 
-// Middleware returns an HTTP middleware that consults backend on every
-// request keyed by the trusted-proxy-aware client IP. Burst and refillPerSec
-// are used only to render headers; the backend itself owns the policy.
 func Middleware(backend Backend, burst, refillPerSec float64, opts Options) func(http.Handler) http.Handler {
 	limitHeader := opts.LimitHeaderValue
 	if limitHeader == "" {
