@@ -8,20 +8,24 @@ import (
 	"io"
 	"path"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/google/uuid"
 )
 
 type FileUploader interface {
 	UploadFile(ctx context.Context, prefix, resourceID, purpose, fileName, contentType string, data []byte) (string, error)
 	UploadFileStream(ctx context.Context, prefix, resourceID, purpose, fileName, contentType string, body io.Reader, size int64) (string, error)
+	GeneratePresignedGetURL(ctx context.Context, key string, expiry time.Duration) (string, error)
 
 	Delete(ctx context.Context, key string) error
+	DeletePrefix(ctx context.Context, prefix string) error
 }
 
 type S3FileUploader struct {
@@ -50,6 +54,55 @@ func (u *S3FileUploader) Delete(ctx context.Context, key string) error {
 		Key:    aws.String(key),
 	})
 	return err
+}
+
+func (u *S3FileUploader) DeletePrefix(ctx context.Context, prefix string) error {
+	if u.bucket == "" {
+		return errors.New("s3 bucket is not configured")
+	}
+	cleanPrefix := strings.TrimPrefix(strings.TrimSpace(prefix), "/")
+	if cleanPrefix == "" {
+		return errors.New("prefix is required")
+	}
+
+	var token *string
+	for {
+		out, err := u.rawS3.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:            aws.String(u.bucket),
+			Prefix:            aws.String(cleanPrefix),
+			ContinuationToken: token,
+		})
+		if err != nil {
+			return err
+		}
+
+		if len(out.Contents) > 0 {
+			objects := make([]s3types.ObjectIdentifier, 0, len(out.Contents))
+			for _, obj := range out.Contents {
+				if obj.Key == nil || strings.TrimSpace(*obj.Key) == "" {
+					continue
+				}
+				objects = append(objects, s3types.ObjectIdentifier{Key: obj.Key})
+			}
+
+			if len(objects) > 0 {
+				_, err = u.rawS3.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+					Bucket: aws.String(u.bucket),
+					Delete: &s3types.Delete{Objects: objects, Quiet: aws.Bool(true)},
+				})
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		if !aws.ToBool(out.IsTruncated) || out.NextContinuationToken == nil {
+			break
+		}
+		token = out.NextContinuationToken
+	}
+
+	return nil
 }
 
 func (u *S3FileUploader) UploadFile(ctx context.Context, prefix, resourceID, purpose, fileName, contentType string, data []byte) (string, error) {
@@ -116,6 +169,29 @@ func (u *S3FileUploader) UploadFileStream(ctx context.Context, prefix, resourceI
 	}
 
 	return key, nil
+}
+
+func (u *S3FileUploader) GeneratePresignedGetURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
+	if u.bucket == "" {
+		return "", errors.New("s3 bucket is not configured")
+	}
+	if strings.TrimSpace(key) == "" {
+		return "", errors.New("key is required")
+	}
+	if expiry <= 0 {
+		expiry = 20 * time.Minute
+	}
+
+	presigner := s3.NewPresignClient(u.rawS3)
+	out, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(u.bucket),
+		Key:    aws.String(strings.TrimPrefix(key, "/")),
+	}, s3.WithPresignExpires(expiry))
+	if err != nil {
+		return "", err
+	}
+
+	return out.URL, nil
 }
 
 func sanitizeSegment(in string) string {

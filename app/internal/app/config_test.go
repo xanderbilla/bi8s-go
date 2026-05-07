@@ -9,6 +9,9 @@ func baseConfig() Config {
 	return Config{
 		Addr:                              ":8080",
 		Env:                               "dev",
+		HTTPMaxJSONBytes:                  1 << 20,
+		HTTPMaxMultipartBytes:             1 << 30,
+		RouterTimeoutSecond:               60,
 		TableName:                         "movies",
 		PersonTableName:                   "people",
 		AttributeTableName:                "attrs",
@@ -18,7 +21,17 @@ func baseConfig() Config {
 		ContentAttributeTableName:         "content-attribute",
 		ContentVisibilityCreatedAtIndex:   "visibility-createdAt-index",
 		ContentVisibilityContentTypeIndex: "visibility-contentType-index",
+		ContentVisibilityReleaseDateIndex: "visibility-releaseDate-index",
 		S3Bucket:                          "bucket",
+		RateLimitBackend:                  "memory",
+		RateLimitGlobalBurst:              100,
+		RateLimitGlobalPerMin:             100,
+		RateLimitEncoderBurst:             5,
+		RateLimitEncoderPerMin:            5,
+		RateLimitMovieBurst:               20,
+		RateLimitMoviePerMin:              20,
+		RateLimitPersonBurst:              20,
+		RateLimitPersonPerMin:             20,
 		AWS:                               AWSCredentials{Region: "us-east-1"},
 	}
 }
@@ -37,6 +50,9 @@ func TestConfigValidate_Errors(t *testing.T) {
 	}{
 		{"bad env", func(c *Config) { c.Env = "qa" }, "APP_ENV"},
 		{"missing port", func(c *Config) { c.Addr = "" }, "PORT"},
+		{"bad max json", func(c *Config) { c.HTTPMaxJSONBytes = 0 }, "HTTP_MAX_JSON_BYTES"},
+		{"bad max multipart", func(c *Config) { c.HTTPMaxMultipartBytes = 0 }, "HTTP_MAX_MULTIPART_BYTES"},
+		{"bad router timeout", func(c *Config) { c.RouterTimeoutSecond = 0 }, "ROUTER_TIMEOUT_SECONDS"},
 		{"missing bucket", func(c *Config) { c.S3Bucket = "" }, "S3_BUCKET"},
 		{"missing region", func(c *Config) { c.AWS.Region = "" }, "AWS_REGION"},
 		{"missing table", func(c *Config) { c.TableName = "" }, "DYNAMODB"},

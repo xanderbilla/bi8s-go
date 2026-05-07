@@ -1,6 +1,3 @@
-// Package redis wraps go-redis with project-wide defaults: URL parsing,
-// startup PING, sane timeouts, and a small surface that the rest of the
-// codebase can depend on without pulling go-redis types around.
 package redis
 
 import (
@@ -13,8 +10,6 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 )
 
-// Options carries the small set of connection knobs we expose. Anything
-// not listed is taken from the URL or go-redis defaults.
 type Options struct {
 	URL          string
 	DialTimeout  time.Duration
@@ -23,9 +18,6 @@ type Options struct {
 	PoolSize     int
 }
 
-// New parses url, builds a *goredis.Client, and verifies connectivity with
-// a PING using the supplied context. The caller owns the returned client
-// and is responsible for calling Close on shutdown.
 func New(ctx context.Context, opts Options) (*goredis.Client, error) {
 	if strings.TrimSpace(opts.URL) == "" {
 		return nil, errors.New("redis: URL is required")

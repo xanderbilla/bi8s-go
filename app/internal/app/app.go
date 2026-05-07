@@ -16,16 +16,15 @@ type HealthCheck func(ctx context.Context) error
 type Application struct {
 	Config           Config
 	Clients          *awsinfra.Clients
-	MovieService     *service.MovieService
+	ContentService   *service.ContentService
 	PersonService    *service.PersonService
+	SearchService    *service.SearchService
 	AttributeService *service.AttributeService
 	EncoderService   *service.EncoderService
 	HealthChecks     map[string]HealthCheck
 	HTTPMetrics      *observability.HTTPMetrics
 
-	// RateLimitFactory builds per-route rate-limit Backends. Always non-nil.
 	RateLimitFactory ratelimit.Factory
-	// RedisClient is set only when RateLimitBackend == "redis"; nil otherwise.
-	// Closed during graceful shutdown.
+
 	RedisClient *goredis.Client
 }
