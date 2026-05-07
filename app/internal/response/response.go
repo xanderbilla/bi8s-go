@@ -7,9 +7,6 @@ import (
 	"time"
 )
 
-// ErrorPayload is the structured error body embedded in the response envelope.
-// Type groups errors at a high level (VALIDATION_ERROR, CLIENT_ERROR, ...);
-// Code is the specific machine-readable code (NOT_FOUND, RATE_LIMITED, ...).
 type ErrorPayload struct {
 	Type        string `json:"type"`
 	Code        string `json:"code"`
@@ -19,17 +16,12 @@ type ErrorPayload struct {
 	Context     any    `json:"context,omitempty"`
 }
 
-// PagedData wraps a paginated list response. NextCursor is omitted when there
-// are no further pages.
 type PagedData[T any] struct {
 	Items      []T    `json:"items"`
 	NextCursor string `json:"nextCursor,omitempty"`
 	Count      int    `json:"count"`
 }
 
-// Envelope is the single response shape used by every endpoint. Data is null
-// on errors; Error is null on success. Both fields are always present so
-// clients can rely on the schema.
 type Envelope struct {
 	Success   bool          `json:"success"`
 	Status    int           `json:"status"`
@@ -80,9 +72,6 @@ func Accepted(w http.ResponseWriter, r *http.Request, location, msg string, data
 	return Success(w, r, http.StatusAccepted, msg, data)
 }
 
-// Error writes a structured error envelope. msg becomes the top-level
-// message and the error title/detail/userMessage; details (if non-nil)
-// becomes ErrorPayload.Context.
 func Error(w http.ResponseWriter, r *http.Request, status int, code, msg string, details any) error {
 	return ErrorWith(w, r, status, &ErrorPayload{
 		Type:        deriveType(status),
@@ -94,8 +83,6 @@ func Error(w http.ResponseWriter, r *http.Request, status int, code, msg string,
 	})
 }
 
-// ErrorWith writes an error envelope with a fully-specified ErrorPayload.
-// The top-level Message mirrors payload.Title for client convenience.
 func ErrorWith(w http.ResponseWriter, r *http.Request, status int, payload *ErrorPayload) error {
 	if payload == nil {
 		payload = &ErrorPayload{Type: deriveType(status), Code: "UNKNOWN", Title: "unknown error", Detail: "unknown error"}
