@@ -1,0 +1,223 @@
+{
+  "version": 1,
+  "defaults": {},
+  "routes": [
+    {
+      "id": "health.healthz",
+      "method": "GET",
+      "route": "/v1/health",
+      "handler": "health.HealthCheck"
+    },
+    {
+      "id": "health.livez",
+      "method": "GET",
+      "route": "/v1/livez",
+      "handler": "health.Liveness"
+    },
+    {
+      "id": "health.readyz",
+      "method": "GET",
+      "route": "/v1/readyz",
+      "handler": "health.Readiness"
+    },
+    {
+      "id": "docs.openapi",
+      "method": "GET",
+      "route": "/v1/openapi.yaml",
+      "handler": "docs.OpenAPISpec"
+    },
+    {
+      "id": "docs.swagger",
+      "method": "GET",
+      "route": "/v1/docs",
+      "handler": "docs.SwaggerUI"
+    },
+
+    {
+      "id": "consumer.search",
+      "method": "GET",
+      "route": "/v1/c/search",
+      "handler": "search.Search",
+      "middlewares": ["timeout"]
+    },
+    {
+      "id": "consumer.attributes.list",
+      "method": "GET",
+      "route": "/v1/c/attributes",
+      "handler": "attribute.ListConsumer",
+      "middlewares": ["timeout"]
+    },
+    {
+      "id": "consumer.content.get",
+      "method": "GET",
+      "route": "/v1/c/content/{contentId}",
+      "handler": "content.GetConsumer",
+      "middlewares": ["timeout", "validate.contentId"]
+    },
+    {
+      "id": "consumer.content.related",
+      "method": "GET",
+      "route": "/v1/c/content/{contentId}/related",
+      "handler": "search.MoreLikeThis",
+      "middlewares": ["timeout", "validate.contentId"]
+    },
+    {
+      "id": "consumer.person.get",
+      "method": "GET",
+      "route": "/v1/c/people/{peopleId}",
+      "handler": "person.GetConsumer",
+      "middlewares": ["timeout", "validate.personId"]
+    },
+    {
+      "id": "consumer.person.content",
+      "method": "GET",
+      "route": "/v1/c/people/{peopleId}/content",
+      "handler": "content.GetByPersonConsumer",
+      "middlewares": ["timeout", "validate.personId"]
+    },
+    {
+      "id": "consumer.banner",
+      "method": "GET",
+      "route": "/v1/c/banner",
+      "handler": "content.GetBanner",
+      "middlewares": ["timeout"]
+    },
+    {
+      "id": "consumer.attributes.byId",
+      "method": "GET",
+      "route": "/v1/c/attributes/{id}",
+      "handler": "content.GetByAttribute",
+      "middlewares": ["timeout", "validate.consumerAttributeId"]
+    },
+    {
+      "id": "consumer.discover",
+      "method": "GET",
+      "route": "/v1/c/discover",
+      "handler": "content.GetDiscover",
+      "middlewares": ["timeout"]
+    },
+    {
+      "id": "consumer.play",
+      "method": "GET",
+      "route": "/v1/c/play/{contentType}/{contentId}",
+      "handler": "content.GetPlayback",
+      "middlewares": ["timeout", "validate.contentTypeAndId"]
+    },
+
+    {
+      "id": "admin.content.upload",
+      "method": "POST",
+      "route": "/v1/a/content/{contentId}",
+      "handler": "content.UploadAssets",
+      "middlewares": ["validate.contentId"]
+    },
+    {
+      "id": "admin.encoder.create",
+      "method": "POST",
+      "route": "/v1/a/encoder/",
+      "handler": "encoder.Create",
+      "middlewares": ["ratelimit.encoder"]
+    },
+    {
+      "id": "admin.encoder.get",
+      "method": "GET",
+      "route": "/v1/a/encoder/{jobId}",
+      "handler": "encoder.Get",
+      "middlewares": ["timeout", "validate.jobId"]
+    },
+
+    {
+      "id": "admin.content.list",
+      "method": "GET",
+      "route": "/v1/a/content/",
+      "handler": "content.ListAdmin",
+      "middlewares": ["timeout"]
+    },
+    {
+      "id": "admin.content.get",
+      "method": "GET",
+      "route": "/v1/a/content/{contentId}",
+      "handler": "content.GetAdmin",
+      "middlewares": ["timeout", "validate.movieId"]
+    },
+    {
+      "id": "admin.content.create",
+      "method": "POST",
+      "route": "/v1/a/content/",
+      "handler": "content.Create",
+      "middlewares": ["timeout", "ratelimit.movie"]
+    },
+    {
+      "id": "admin.content.delete",
+      "method": "DELETE",
+      "route": "/v1/a/content/{contentId}",
+      "handler": "content.Delete",
+      "middlewares": ["timeout", "validate.movieId"]
+    },
+
+    {
+      "id": "admin.people.list",
+      "method": "GET",
+      "route": "/v1/a/people/",
+      "handler": "person.ListAdmin",
+      "middlewares": ["timeout"]
+    },
+    {
+      "id": "admin.people.get",
+      "method": "GET",
+      "route": "/v1/a/people/{peopleId}",
+      "handler": "person.GetAdmin",
+      "middlewares": ["timeout", "validate.personId"]
+    },
+    {
+      "id": "admin.people.create",
+      "method": "POST",
+      "route": "/v1/a/people/",
+      "handler": "person.Create",
+      "middlewares": ["timeout", "ratelimit.person"]
+    },
+    {
+      "id": "admin.people.delete",
+      "method": "DELETE",
+      "route": "/v1/a/people/{peopleId}",
+      "handler": "person.Delete",
+      "middlewares": ["timeout", "validate.personId"]
+    },
+    {
+      "id": "admin.people.content",
+      "method": "GET",
+      "route": "/v1/a/people/{peopleId}/content",
+      "handler": "content.GetByPersonAdmin",
+      "middlewares": ["timeout", "validate.personId"]
+    },
+
+    {
+      "id": "admin.attributes.list",
+      "method": "GET",
+      "route": "/v1/a/attributes/",
+      "handler": "attribute.ListAdmin",
+      "middlewares": ["timeout"]
+    },
+    {
+      "id": "admin.attributes.get",
+      "method": "GET",
+      "route": "/v1/a/attributes/{attributeId}",
+      "handler": "attribute.GetAdmin",
+      "middlewares": ["timeout", "validate.attributeId"]
+    },
+    {
+      "id": "admin.attributes.create",
+      "method": "POST",
+      "route": "/v1/a/attributes/",
+      "handler": "attribute.Create",
+      "middlewares": ["timeout"]
+    },
+    {
+      "id": "admin.attributes.delete",
+      "method": "DELETE",
+      "route": "/v1/a/attributes/{attributeId}",
+      "handler": "attribute.Delete",
+      "middlewares": ["timeout", "validate.attributeId"]
+    }
+  ]
+}

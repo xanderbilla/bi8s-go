@@ -91,41 +91,24 @@ var (
 	YearPattern = regexp.MustCompile(`^[12][0-9]{3}$`)
 )
 
-var MovieIDValidator = URLParamValidator{
-	ParamName: "contentId",
-	Required:  true,
-	MaxLength: 100,
-	MinLength: 1,
-	Pattern:   AlphanumericPattern,
-	ErrorMsg:  "Invalid content ID format",
+func alphanumericIDValidator(paramName, errMsg string) URLParamValidator {
+	return URLParamValidator{
+		ParamName: paramName,
+		Required:  true,
+		MaxLength: 100,
+		MinLength: 1,
+		Pattern:   AlphanumericPattern,
+		ErrorMsg:  errMsg,
+	}
 }
 
-var PersonIDValidator = URLParamValidator{
-	ParamName: "peopleId",
-	Required:  true,
-	MaxLength: 100,
-	MinLength: 1,
-	Pattern:   AlphanumericPattern,
-	ErrorMsg:  "Invalid person ID format",
-}
+var MovieIDValidator = alphanumericIDValidator("contentId", "Invalid content ID format")
 
-var AttributeIDValidator = URLParamValidator{
-	ParamName: "attributeId",
-	Required:  true,
-	MaxLength: 100,
-	MinLength: 1,
-	Pattern:   AlphanumericPattern,
-	ErrorMsg:  "Invalid attribute ID format",
-}
+var PersonIDValidator = alphanumericIDValidator("peopleId", "Invalid person ID format")
 
-var ConsumerAttributeIDValidator = URLParamValidator{
-	ParamName: "id",
-	Required:  true,
-	MaxLength: 100,
-	MinLength: 1,
-	Pattern:   AlphanumericPattern,
-	ErrorMsg:  "Invalid attribute ID format",
-}
+var AttributeIDValidator = alphanumericIDValidator("attributeId", "Invalid attribute ID format")
+
+var ConsumerAttributeIDValidator = alphanumericIDValidator("id", "Invalid attribute ID format")
 
 var JobIDValidator = URLParamValidator{
 	ParamName: "jobId",
@@ -143,14 +126,7 @@ var ContentTypeValidator = URLParamValidator{
 	ErrorMsg:    "Invalid content type, must be 'movie' or 'tv'",
 }
 
-var ContentIDValidator = URLParamValidator{
-	ParamName: "contentId",
-	Required:  true,
-	MaxLength: 100,
-	MinLength: 1,
-	Pattern:   AlphanumericPattern,
-	ErrorMsg:  "Invalid content ID format",
-}
+var ContentIDValidator = alphanumericIDValidator("contentId", "Invalid content ID format")
 
 func ValidateContentType(contentType string) (string, bool) {
 	switch strings.ToLower(contentType) {

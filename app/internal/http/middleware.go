@@ -4,13 +4,16 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/xanderbilla/bi8s-go/internal/ctxutil"
 	"github.com/xanderbilla/bi8s-go/internal/http/middleware/ratelimit"
+	"github.com/xanderbilla/bi8s-go/internal/http/respwriter"
 )
 
 var permissionsPolicy = strings.Join([]string{
@@ -36,7 +39,7 @@ var permissionsPolicy = strings.Join([]string{
 
 func RequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestID := r.Header.Get("X-Request-ID")
+		requestID := sanitizeRequestID(r.Header.Get("X-Request-ID"))
 		if requestID == "" {
 			requestID = middleware.GetReqID(r.Context())
 		}
@@ -81,24 +84,17 @@ func MaxBytesJSON(maxBytes int64) func(http.Handler) http.Handler {
 	}
 }
 
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-	bytes  int
-}
-
-func (s *statusRecorder) WriteHeader(code int) {
-	s.status = code
-	s.ResponseWriter.WriteHeader(code)
-}
-
-func (s *statusRecorder) Write(b []byte) (int, error) {
-	if s.status == 0 {
-		s.status = http.StatusOK
+func MaxBytesMultipart(maxBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Body != nil &&
+				r.ContentLength != 0 &&
+				strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "multipart/") {
+				r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			}
+			next.ServeHTTP(w, r)
+		})
 	}
-	n, err := s.ResponseWriter.Write(b)
-	s.bytes += n
-	return n, err
 }
 
 func RequestLogger(next http.Handler) http.Handler {
@@ -110,19 +106,19 @@ func RequestLogger(next http.Handler) http.Handler {
 			return
 		}
 		start := time.Now()
-		rec := &statusRecorder{ResponseWriter: w}
+		rec := respwriter.New(w)
 		next.ServeHTTP(rec, r)
 
-		if rec.status == 0 {
-			rec.status = http.StatusOK
+		if rec.Status == 0 {
+			rec.Status = http.StatusOK
 		}
 
 		attrs := []any{
 			"request_id", middleware.GetReqID(r.Context()),
 			"method", r.Method,
 			"path", path,
-			"status", rec.status,
-			"bytes", rec.bytes,
+			"status", rec.Status,
+			"bytes", rec.Bytes,
 			"duration_ms", time.Since(start).Milliseconds(),
 			"remote_addr", ratelimit.GetClientIP(r),
 		}
@@ -130,15 +126,57 @@ func RequestLogger(next http.Handler) http.Handler {
 			attrs = append(attrs, "user_agent", ua)
 		}
 		if q := r.URL.RawQuery; q != "" {
-			attrs = append(attrs, "query", q)
+			attrs = append(attrs, "query", redactQuery(r.URL.Query()).Encode())
 		}
 		switch {
-		case rec.status >= 500:
+		case rec.Status >= 500:
 			slog.Error("http_request", attrs...)
-		case rec.status >= 400:
+		case rec.Status >= 400:
 			slog.Warn("http_request", attrs...)
 		default:
 			slog.Info("http_request", attrs...)
 		}
 	})
+}
+
+func sanitizeRequestID(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" || len(v) > 128 {
+		return ""
+	}
+	for _, r := range v {
+		if r > unicode.MaxASCII {
+			return ""
+		}
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' && r != '_' && r != '.' && r != ':' {
+			return ""
+		}
+	}
+	return v
+}
+
+func redactQuery(values url.Values) url.Values {
+	if len(values) == 0 {
+		return values
+	}
+	out := make(url.Values, len(values))
+	for key, vals := range values {
+		if isSensitiveQueryKey(key) {
+			out[key] = []string{"[REDACTED]"}
+			continue
+		}
+		cloned := make([]string, len(vals))
+		copy(cloned, vals)
+		out[key] = cloned
+	}
+	return out
+}
+
+func isSensitiveQueryKey(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "token", "access_token", "id_token", "refresh_token", "api_key", "apikey", "key", "signature", "sig", "password", "secret", "authorization":
+		return true
+	default:
+		return false
+	}
 }
