@@ -22,16 +22,16 @@
   "description": "Distributed traces dashboard for bi8s API using Tempo + TraceQL. Covers service graph, trace explorers, DynamoDB spans, and latency metrics derived from trace data.",
   "links": [
     {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
       "keepTime": true,
-      "title": "Open Metrics Dashboard",
-      "type": "link",
-      "url": "/d/bi8s-metrics-merged/bi8s-api-metrics"
-    },
-    {
-      "keepTime": true,
-      "title": "Open Logging Dashboard",
-      "type": "link",
-      "url": "/d/bfkuquap88pogc/bi8s-api-logging"
+      "tags": ["bi8s"],
+      "targetBlank": false,
+      "title": "bi8s Dashboards",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
     }
   ],
   "panels": [

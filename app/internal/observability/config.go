@@ -8,16 +8,14 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/env"
 )
 
-// Config controls OpenTelemetry SDK initialization. All values are sourced
-// from environment variables; nothing is hardcoded.
 type Config struct {
 	Enabled        bool
 	ServiceName    string
 	ServiceVersion string
 	Environment    string
 
-	Endpoint string // host:port for the OTLP gRPC collector.
-	Insecure bool   // true → no TLS (collector on the same network).
+	Endpoint string
+	Insecure bool
 
 	TracesEnabled  bool
 	MetricsEnabled bool
@@ -28,9 +26,6 @@ type Config struct {
 	ShutdownTimeout      time.Duration
 }
 
-// LoadConfig reads OTel configuration from environment variables. Defaults are
-// safe for local development against the observability stack defined in
-// observability/docker-compose.local.yml.
 func LoadConfig(serviceName, serviceVersion, environment string) Config {
 	if v := strings.TrimSpace(env.GetString("OTEL_SERVICE_NAME", "")); v != "" {
 		serviceName = v

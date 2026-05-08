@@ -7,17 +7,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// SlogHandler wraps an slog.Handler and adds trace_id/span_id attributes drawn
-// from the active span context whenever a record is emitted. It is the only
-// integration point between the OTel trace context and structured logs, so all
-// log lines emitted via slog.*Context (or our internal/logger) are
-// automatically correlated with traces.
 type SlogHandler struct {
 	inner slog.Handler
 }
 
-// NewSlogHandler returns a handler that delegates to inner and injects
-// trace_id/span_id when the request context carries an active span.
 func NewSlogHandler(inner slog.Handler) *SlogHandler {
 	return &SlogHandler{inner: inner}
 }

@@ -20,8 +20,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// Provider holds the live OTel SDK providers and exposes a single Shutdown
-// to flush traces/metrics on graceful termination.
 type Provider struct {
 	cfg      Config
 	tp       *sdktrace.TracerProvider
@@ -31,9 +29,6 @@ type Provider struct {
 	closed   bool
 }
 
-// Init configures global tracer/meter/propagator. When cfg.Enabled is false it
-// installs no-op providers and returns a Provider whose Shutdown is a noop.
-// All exporters use OTLP/gRPC. Telemetry MUST flow only to the OTel collector.
 func Init(ctx context.Context, cfg Config) (*Provider, error) {
 	p := &Provider{cfg: cfg}
 
@@ -111,8 +106,6 @@ func buildResource(ctx context.Context, cfg Config) (*resource.Resource, error) 
 	)
 }
 
-// Shutdown flushes pending telemetry and closes exporters. Safe to call more
-// than once; subsequent calls are noops.
 func (p *Provider) Shutdown(ctx context.Context) error {
 	if p == nil {
 		return nil

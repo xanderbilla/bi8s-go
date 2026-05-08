@@ -62,7 +62,8 @@ groups:
           severity: critical
           service: bi8s-api
         annotations:
-          summary: "bi8s-api 5xx ratio above 1% (current: {{ $value | humanizePercentage
+          summary:
+            "bi8s-api 5xx ratio above 1% (current: {{ $value | humanizePercentage
             }})"
           description: |
             The 5xx error ratio over the last 5m is {{ $value | humanizePercentage }},
@@ -233,9 +234,133 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }} >85%
+          summary:
+            "Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }} >85%
             full"
           description: |
             Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }} has
             been over 85% full for 15 minutes. Free space or rotate logs
             before Prometheus / Loki ingestion stalls.
+
+  # ────────────────────────────────────────────────────────────────────────
+  # Search SLO — recording rules + alerts scoped to the /v1/c/search route.
+  #
+  # Error budget targets:
+  #   Availability  : 99.5% (≤0.5% 5xx ratio)
+  #   p95 latency   : ≤800ms
+  #   p99 latency   : ≤2000ms
+  # ────────────────────────────────────────────────────────────────────────
+  - name: bi8s-search.recording
+    interval: 30s
+    rules:
+      - record: bi8s:search_requests:rate5m
+        expr: |
+          sum(rate(bi8s_http_server_requests_total{http_route=~".*/search"}[5m]))
+
+      - record: bi8s:search_5xx_ratio:rate5m
+        expr: |
+          sum(rate(bi8s_http_server_requests_total{http_route=~".*/search",http_response_status_code=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(bi8s_http_server_requests_total{http_route=~".*/search"}[5m])), 1e-9)
+
+      - record: bi8s:search_4xx_ratio:rate5m
+        expr: |
+          sum(rate(bi8s_http_server_requests_total{http_route=~".*/search",http_response_status_code=~"4.."}[5m]))
+          /
+          clamp_min(sum(rate(bi8s_http_server_requests_total{http_route=~".*/search"}[5m])), 1e-9)
+
+      - record: bi8s:search_p95_latency_ms:rate5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(bi8s_http_server_duration_milliseconds_bucket{http_route=~".*/search"}[5m]))
+          )
+
+      - record: bi8s:search_p99_latency_ms:rate5m
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le) (rate(bi8s_http_server_duration_milliseconds_bucket{http_route=~".*/search"}[5m]))
+          )
+
+  - name: bi8s-search.slo
+    interval: 30s
+    rules:
+      - alert: Bi8sSearchHigh5xxRate
+        expr: bi8s:search_5xx_ratio:rate5m > 0.005
+        for: 5m
+        labels:
+          severity: critical
+          service: bi8s-api
+          feature: search
+        annotations:
+          summary: "Search 5xx error ratio above 0.5% (current: {{ $value | humanizePercentage }})"
+          description: |
+            The search endpoint 5xx error ratio is {{ $value | humanizePercentage }}
+            over the last 5m, breaching the 99.5% availability SLO. Investigate
+            OpenSearch reachability, index health, and mapping errors in the
+            application error logs.
+
+      - alert: Bi8sSearchHighP95Latency
+        expr: bi8s:search_p95_latency_ms:rate5m > 800
+        for: 5m
+        labels:
+          severity: warning
+          service: bi8s-api
+          feature: search
+        annotations:
+          summary: "Search p95 latency above 800ms (current: {{ $value }}ms)"
+          description: |
+            Search p95 response latency is {{ $value }}ms over the last 5m.
+            Check OpenSearch query performance, shard health, and JVM heap
+            pressure. Fuzzy-match and aggregation queries are particularly
+            sensitive to shard saturation.
+
+      - alert: Bi8sSearchHighP99Latency
+        expr: bi8s:search_p99_latency_ms:rate5m > 2000
+        for: 10m
+        labels:
+          severity: warning
+          service: bi8s-api
+          feature: search
+        annotations:
+          summary: "Search p99 latency above 2000ms (current: {{ $value }}ms)"
+          description: |
+            Search p99 latency is {{ $value }}ms sustained. Tail latency this
+            high usually indicates GC pressure in OpenSearch or very large
+            aggregation payloads — consider reducing facet bucket sizes.
+
+      - alert: Bi8sSearchNoTraffic
+        # Fire when the API is receiving traffic but the search route is silent —
+        # this distinguishes a broken search route from a whole-service outage.
+        expr: |
+          bi8s:http_requests:rate5m > 0.1
+          and
+          bi8s:search_requests:rate5m == 0
+        for: 15m
+        labels:
+          severity: warning
+          service: bi8s-api
+          feature: search
+        annotations:
+          summary: "Search route received zero requests for 15m while API has traffic"
+          description: |
+            The API is receiving requests but none are hitting the search
+            endpoint. Check that the /v1/c/search route is still registered,
+            that the load balancer is routing correctly, and that client
+            applications haven't silently disabled the feature.
+
+      - alert: Bi8sOpenSearchDown
+        # Uses the Prometheus scrape target for the opensearch node exporter
+        # (job="opensearch") or falls back to inferring from 5xx spike with
+        # "opensearch" in the label context.
+        expr: up{job="opensearch"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: bi8s-api
+          feature: search
+        annotations:
+          summary: "OpenSearch node is down"
+          description: |
+            The OpenSearch Prometheus target has been unreachable for 2 minutes.
+            All search requests will fail until the node is restored. Run
+            `docker compose ps opensearch` to check container health.
