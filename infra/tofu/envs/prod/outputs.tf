@@ -51,7 +51,17 @@ output "environment_variables" {
     DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX   = "visibility-createdAt-index"
     DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX = "visibility-contentType-index"
     S3_BUCKET                                      = module.s3.bucket_name
+    SEARCH_ENABLED                                 = "true"
+    SEARCH_PROVIDER                                = "opensearch"
+    SEARCH_ENDPOINT                                = "https://${module.opensearch.domain_endpoint}"
+    SEARCH_CONTENT_INDEX_NAME                      = "bi8s-content"
+    SEARCH_PEOPLE_INDEX_NAME                       = "bi8s-people"
   }
+}
+
+output "opensearch_endpoint" {
+  description = "OpenSearch domain endpoint"
+  value       = module.opensearch.domain_endpoint
 }
 
 output "prometheus_ebs_volume_id" {
@@ -72,4 +82,9 @@ output "api_url" {
 output "grafana_url" {
   description = "URL for Grafana (empty when no public DNS configured)"
   value       = var.enable_public_dns && var.grafana_domain_name != "" ? "https://${var.grafana_domain_name}" : ""
+}
+
+output "storage_cdn_url" {
+  description = "URL for storage CDN (empty when storage domain is not configured)"
+  value       = var.storage_domain_name != "" ? "https://${var.storage_domain_name}" : ""
 }

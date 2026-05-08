@@ -81,7 +81,10 @@ resource "aws_iam_policy" "s3" {
   })
 }
 
-# ECR Policy
+# ECR Policy. ecr:GetAuthorizationToken does not support resource-level
+# permissions and must remain on "*". The pull actions are scoped to
+# var.ecr_repository_arns when provided; otherwise they fall back to "*" for
+# backwards compatibility with environments that have not yet wired the ARN.
 resource "aws_iam_policy" "ecr" {
   name        = "${var.role_name}-ecr-policy"
   description = "Policy for ECR access"
@@ -90,17 +93,52 @@ resource "aws_iam_policy" "ecr" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid      = "EcrAuth"
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
+        Resource = "*"
+      },
+      {
+        Sid    = "EcrPull"
         Effect = "Allow"
         Action = [
-          "ecr:GetAuthorizationToken",
           "ecr:BatchCheckLayerAvailability",
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchGetImage"
         ]
-        Resource = "*"
+        Resource = length(var.ecr_repository_arns) > 0 ? var.ecr_repository_arns : ["*"]
       }
     ]
   })
+}
+
+# SSM Parameter Store policy (optional). Scoped to a single path prefix so the
+# instance role can only read its own environment's parameters.
+resource "aws_iam_policy" "ssm_parameters" {
+  count       = var.ssm_parameter_path != "" ? 1 : 0
+  name        = "${var.role_name}-ssm-parameters-policy"
+  description = "Read-only access to SSM parameters under ${var.ssm_parameter_path}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath",
+        ]
+        Resource = "arn:aws:ssm:${var.aws_region}:*:parameter${var.ssm_parameter_path}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_parameters" {
+  count      = var.ssm_parameter_path != "" ? 1 : 0
+  role       = aws_iam_role.this.name
+  policy_arn = aws_iam_policy.ssm_parameters[0].arn
 }
 
 # CloudWatch Logs Policy
@@ -123,6 +161,30 @@ resource "aws_iam_policy" "cloudwatch" {
       }
     ]
   })
+}
+
+# OpenSearch Policy (conditional)
+resource "aws_iam_policy" "opensearch" {
+  count       = length(var.opensearch_domain_arns) > 0 ? 1 : 0
+  name        = "${var.role_name}-opensearch-policy"
+  description = "Policy for OpenSearch HTTP access"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["es:ESHttpGet", "es:ESHttpPut", "es:ESHttpPost", "es:ESHttpDelete", "es:ESHttpHead"]
+        Resource = [for arn in var.opensearch_domain_arns : "${arn}/*"]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "opensearch" {
+  count      = length(var.opensearch_domain_arns) > 0 ? 1 : 0
+  role       = aws_iam_role.this.name
+  policy_arn = aws_iam_policy.opensearch[0].arn
 }
 
 # Attach Policies

@@ -1,11 +1,12 @@
 # DynamoDB Table Module
 resource "aws_dynamodb_table" "this" {
-  name           = var.table_name
-  billing_mode   = var.billing_mode
-  hash_key       = var.hash_key
-  range_key      = var.range_key
-  read_capacity  = var.billing_mode == "PROVISIONED" ? var.read_capacity : null
-  write_capacity = var.billing_mode == "PROVISIONED" ? var.write_capacity : null
+  name                        = var.table_name
+  billing_mode                = var.billing_mode
+  hash_key                    = var.hash_key
+  range_key                   = var.range_key
+  read_capacity               = var.billing_mode == "PROVISIONED" ? var.read_capacity : null
+  write_capacity              = var.billing_mode == "PROVISIONED" ? var.write_capacity : null
+  deletion_protection_enabled = var.deletion_protection_enabled
 
   dynamic "attribute" {
     for_each = var.attributes

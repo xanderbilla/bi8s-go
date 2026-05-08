@@ -153,3 +153,27 @@ variable "enable_public_dns" {
   type        = bool
   default     = true
 }
+
+variable "log_retention_days" {
+  description = "Retention (in days) for CloudWatch log groups created for app + nginx tail-shippers. Dev defaults to 7 to keep costs low."
+  type        = number
+  default     = 7
+}
+
+variable "enable_budget" {
+  description = "When true, provision an AWS monthly cost budget for this environment."
+  type        = bool
+  default     = false
+}
+
+variable "budget_monthly_limit_usd" {
+  description = "Monthly budget limit in USD when enable_budget is true."
+  type        = number
+  default     = 30
+}
+
+variable "budget_notification_emails" {
+  description = "Email addresses to notify on budget threshold breaches."
+  type        = list(string)
+  default     = []
+}

@@ -66,7 +66,7 @@ echo 'export GOPATH=/home/ubuntu/go' >> /etc/profile.d/go.sh
 
 # Create proper directory structure
 echo "Creating application directory structure..."
-mkdir -p /opt/${project_name}/{compose,nginx/{conf.d,ssl/{live,archive,renewal},certbot/www},scripts,prometheus-data}
+mkdir -p /opt/${project_name}/{compose,nginx/{conf.d,snippets,ssl/{live,archive,renewal},certbot/www},scripts,prometheus-data}
 cd /opt/${project_name}
 
 # Mount Prometheus EBS volume
@@ -211,16 +211,19 @@ server {
 
     ssl_certificate /etc/nginx/ssl/live/cert.crt;
     ssl_certificate_key /etc/nginx/ssl/live/cert.key;
+    # Mozilla "intermediate" profile (https://ssl-config.mozilla.org/)
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
     ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
 
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
 
     location /${project_name} {
         proxy_pass http://grafana_backend;
@@ -244,19 +247,21 @@ server {
     # SSL Configuration
     ssl_certificate /etc/nginx/ssl/live/cert.crt;
     ssl_certificate_key /etc/nginx/ssl/live/cert.key;
-    
-    # SSL Security
+
+    # SSL Security — Mozilla "intermediate" profile.
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
     ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
 
     # Security Headers
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
 
     # Client body size
     client_max_body_size 100M;

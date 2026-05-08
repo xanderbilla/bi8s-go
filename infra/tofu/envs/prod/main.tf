@@ -131,6 +131,7 @@ module "dynamodb_movie" {
   write_capacity                = var.dynamodb_write_capacity
   enable_point_in_time_recovery = true
   enable_encryption             = true
+  deletion_protection_enabled   = var.dynamodb_deletion_protection
   tags                          = local.common_tags
 }
 
@@ -145,6 +146,7 @@ module "dynamodb_person" {
   write_capacity                = var.dynamodb_write_capacity
   enable_point_in_time_recovery = true
   enable_encryption             = true
+  deletion_protection_enabled   = var.dynamodb_deletion_protection
   tags                          = local.common_tags
 }
 
@@ -169,6 +171,7 @@ module "dynamodb_attribute" {
   write_capacity                = var.dynamodb_write_capacity
   enable_point_in_time_recovery = true
   enable_encryption             = true
+  deletion_protection_enabled   = var.dynamodb_deletion_protection
   tags                          = local.common_tags
 }
 
@@ -193,6 +196,7 @@ module "dynamodb_encoder" {
   write_capacity                = var.dynamodb_write_capacity
   enable_point_in_time_recovery = true
   enable_encryption             = true
+  deletion_protection_enabled   = var.dynamodb_deletion_protection
   tags                          = local.common_tags
 }
 
@@ -211,6 +215,7 @@ module "dynamodb_content_cast" {
   write_capacity                = var.dynamodb_write_capacity
   enable_point_in_time_recovery = true
   enable_encryption             = true
+  deletion_protection_enabled   = var.dynamodb_deletion_protection
   tags                          = local.common_tags
 }
 
@@ -229,6 +234,7 @@ module "dynamodb_content_attribute" {
   write_capacity                = var.dynamodb_write_capacity
   enable_point_in_time_recovery = true
   enable_encryption             = true
+  deletion_protection_enabled   = var.dynamodb_deletion_protection
   tags                          = local.common_tags
 }
 
@@ -250,10 +256,12 @@ module "s3" {
         "http://localhost:3000",
         "http://localhost:8080",
         "http://localhost:8443",
+        "https://localhost",
         "https://localhost:8443",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:8080",
         "http://127.0.0.1:8443",
+        "https://127.0.0.1",
         "https://127.0.0.1:8443"
       ]
       expose_headers  = ["ETag"]
@@ -308,7 +316,36 @@ module "iam" {
 
   s3_bucket_arns = [module.s3.bucket_arn]
 
+  opensearch_domain_arns = [
+    module.opensearch.domain_arn,
+  ]
+
+  ecr_repository_arns = [aws_ecr_repository.this.arn]
+  ssm_parameter_path  = "/${var.project_name}/${var.environment}"
+
   tags = local.common_tags
+}
+
+# OpenSearch Domain
+module "opensearch" {
+  source = "../../modules/opensearch"
+
+  domain_name            = "${local.name_prefix}-search"
+  engine_version         = "OpenSearch_2.11"
+  instance_type          = "m6g.large.search"
+  instance_count         = 2
+  zone_awareness_enabled = true
+  volume_type            = "gp3"
+  volume_size            = 20
+  vpc_id                 = module.vpc.vpc_id
+  subnet_ids             = module.vpc.private_subnet_ids
+  security_group_name    = "${local.name_prefix}-opensearch-sg"
+  allowed_security_group_ids = [
+    module.security_group.security_group_id,
+  ]
+  aws_region = var.aws_region
+  account_id = data.aws_caller_identity.current.account_id
+  tags       = local.common_tags
 }
 
 # EC2 Instance
@@ -434,4 +471,17 @@ resource "aws_route53_record" "grafana" {
   type    = "A"
   ttl     = 60
   records = [module.ec2.instance_public_ip]
+}
+
+# Cost guardrail -- monthly budget with email alerts. Disabled by default;
+# enable per-environment by setting enable_budget=true and providing
+# budget_notification_emails in tfvars.
+module "budgets" {
+  count  = var.enable_budget ? 1 : 0
+  source = "../../modules/budgets"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  monthly_limit_usd   = var.budget_monthly_limit_usd
+  notification_emails = var.budget_notification_emails
 }
