@@ -148,7 +148,7 @@ When tripped, the API returns `429` with `error.code = RATE_LIMITED` and a
 
 ## Pagination & limits
 
-- Request body cap: `HTTP_MAX_JSON_BYTES` (default 1 MiB).
+- Request body cap: `HTTP_MAX_JSON_BYTES` (JSON, default 1 MiB), `HTTP_MAX_MULTIPART_BYTES` (multipart, default 1 GiB).
 - DynamoDB scan cap: `DYNAMODB_MAX_SCAN_PAGES` (default 1000).
 - Per-request timeout: `ROUTER_TIMEOUT_SECONDS` (default 60).
 

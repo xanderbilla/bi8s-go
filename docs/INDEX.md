@@ -20,6 +20,14 @@ this order: **ARCHITECTURE → LOCAL_DEVELOPMENT → CONFIGURATION → API**.
 | [SECURITY.md](SECURITY.md)                   | Threat model, secure defaults, secrets handling, hardening.         |
 | [OBSERVABILITY.md](OBSERVABILITY.md)         | Logs, metrics, traces, dashboards, alerts.                          |
 | [RUNBOOK.md](RUNBOOK.md)                     | Operational playbooks for common incidents.                         |
+| [ROUTES.md](ROUTES.md)                       | Hand-curated index of every HTTP route the binary serves.           |
+| [CACHING.md](CACHING.md)                     | Layered cache model: in-process, Redis, HTTP response headers.      |
+| [CI_CD.md](CI_CD.md)                         | GitHub Actions workflow map; blocking vs advisory jobs.             |
+| [ERROR_HANDLING.md](ERROR_HANDLING.md)       | Typed-error model, HTTP status mapping, stable error codes.         |
+| [NGINX_LOCAL_HTTPS.md](NGINX_LOCAL_HTTPS.md) | Run the local stack with TLS via mkcert + nginx.                    |
+| [PERFORMANCE.md](PERFORMANCE.md)             | Latency / throughput targets and how they're measured.              |
+| [RELEASING.md](RELEASING.md)                 | Version bump, tag, and rollback checklist.                          |
+| [STREAMING_USER.md](STREAMING_USER.md)       | End-user guide to consuming the HLS streaming endpoints.            |
 
 ## Conventions used in these docs
 

@@ -22,7 +22,7 @@ the disclosure policy.
 | TLS             | Terminated by NGINX with Let's Encrypt; HSTS 1y/preload set in app.                                                                      |
 | CORS            | Explicit allow-list, no `*`; `https://` enforced in `prod`.                                                                              |
 | Headers         | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cross-Origin-Resource-Policy: same-origin`. |
-| Body limits     | 1 MiB JSON body cap (`HTTP_MAX_JSON_BYTES`).                                                                                             |
+| Body limits     | 1 MiB JSON body cap (`HTTP_MAX_JSON_BYTES`); 1 GiB multipart upload cap (`HTTP_MAX_MULTIPART_BYTES`).                                    |
 | Timeouts        | 60 s per request, 30 s per DynamoDB call, 1800 s per encode.                                                                             |
 | Container       | Distroless-style Debian slim, runs as UID 10001 non-root, no shell capabilities relied on.                                               |
 | Trusted proxies | Honoured only when `TRUSTED_PROXIES` is set; ignored otherwise.                                                                          |

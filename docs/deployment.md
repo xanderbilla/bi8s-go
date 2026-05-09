@@ -79,11 +79,11 @@ upstream switching.
 
 ## Runtime
 
-| Component        | Image / package                     | Notes                                                                                                  |
-| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| API              | `ghcr.io/xanderbilla/bi8s-go:<tag>` | Runtime stage of `app/Dockerfile`, runs as UID 10001.                                                  |
-| NGINX            | distro package                      | Config in `infra/docker/nginx.conf`. TLS via Let's Encrypt (`infra/scripts/setup-ssl-letsencrypt.sh`). |
-| CloudWatch Agent | distro package                      | Installed by `infra/scripts/install-cloudwatch-agent.sh`.                                              |
+| Component        | Image / package                     | Notes                                                                                                                                                        |
+| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| API              | `ghcr.io/xanderbilla/bi8s-go:<tag>` | Runtime stage of `app/Dockerfile`, runs as UID 10001.                                                                                                        |
+| NGINX            | distro package                      | Config in `infra/docker/nginx/` (split: `nginx.conf`, `conf.d/*.conf`, `snippets/*.conf`). TLS via Let's Encrypt (`infra/scripts/setup-ssl-letsencrypt.sh`). |
+| CloudWatch Agent | distro package                      | Installed by `infra/scripts/install-cloudwatch-agent.sh`.                                                                                                    |
 
 ## Health & probes
 
