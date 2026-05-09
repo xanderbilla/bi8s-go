@@ -106,6 +106,7 @@ _create_content_table() {
       AttributeName=visibility,AttributeType=S \
       AttributeName=createdAt,AttributeType=S \
       AttributeName=contentType,AttributeType=S \
+      AttributeName=releaseDate,AttributeType=S \
     --key-schema AttributeName=id,KeyType=HASH \
     --global-secondary-indexes '[
       {
@@ -123,6 +124,14 @@ _create_content_table() {
           {"AttributeName": "contentType", "KeyType": "RANGE"}
         ],
         "Projection": {"ProjectionType": "ALL"}
+      },
+      {
+        "IndexName": "visibility-releaseDate-index",
+        "KeySchema": [
+          {"AttributeName": "visibility", "KeyType": "HASH"},
+          {"AttributeName": "releaseDate", "KeyType": "RANGE"}
+        ],
+        "Projection": {"ProjectionType": "ALL"}
       }
     ]' \
     --billing-mode PAY_PER_REQUEST \
@@ -134,6 +143,59 @@ _create_content_table() {
     --region "$REGION" \
     "${_ep_flag[@]}"
   ok "Created: $table"
+}
+
+# Add visibility-releaseDate-index GSI to an existing content table if not present.
+_add_releasedate_gsi_if_missing() {
+  local table="$1"
+  local gsi_count
+  gsi_count=$(aws dynamodb describe-table \
+    --table-name "$table" \
+    --region "$REGION" \
+    "${_ep_flag[@]}" \
+    --output json 2>/dev/null \
+    | jq '.Table.GlobalSecondaryIndexes // [] | map(select(.IndexName == "visibility-releaseDate-index")) | length')
+  if [ "${gsi_count:-0}" -gt 0 ]; then
+    ok "GSI already exists: visibility-releaseDate-index on $table"
+    return
+  fi
+  log "Adding GSI visibility-releaseDate-index to $table"
+  aws dynamodb update-table \
+    --table-name "$table" \
+    --attribute-definitions \
+      AttributeName=visibility,AttributeType=S \
+      AttributeName=releaseDate,AttributeType=S \
+    --global-secondary-index-updates '[
+      {
+        "Create": {
+          "IndexName": "visibility-releaseDate-index",
+          "KeySchema": [
+            {"AttributeName": "visibility", "KeyType": "HASH"},
+            {"AttributeName": "releaseDate", "KeyType": "RANGE"}
+          ],
+          "Projection": {"ProjectionType": "ALL"}
+        }
+      }
+    ]' \
+    --region "$REGION" \
+    "${_ep_flag[@]}" \
+    --output json > /dev/null
+  log "Waiting for GSI visibility-releaseDate-index to become ACTIVE on $table..."
+  while true; do
+    local gsi_status
+    gsi_status=$(aws dynamodb describe-table \
+      --table-name "$table" \
+      --region "$REGION" \
+      "${_ep_flag[@]}" \
+      --output json \
+      | jq -r '.Table.GlobalSecondaryIndexes // [] | map(select(.IndexName == "visibility-releaseDate-index")) | .[0].IndexStatus // "MISSING"')
+    if [ "$gsi_status" = "ACTIVE" ]; then
+      break
+    fi
+    log "  GSI status: $gsi_status, retrying in 2s..."
+    sleep 2
+  done
+  ok "Added GSI: visibility-releaseDate-index on $table"
 }
 
 _create_attribute_table() {
@@ -360,6 +422,7 @@ echo ""
 
 log "--- DynamoDB tables ---"
 _create_content_table      "$CONTENT_TABLE"
+_add_releasedate_gsi_if_missing "$CONTENT_TABLE"
 _create_simple_table       "$PERSON_TABLE"
 _create_attribute_table    "$ATTRIBUTE_TABLE"
 _create_encoder_table      "$ENCODER_TABLE" "$ENCODER_GSI"

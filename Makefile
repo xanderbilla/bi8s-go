@@ -1,4 +1,4 @@
-.PHONY: help setup init-backend create-infra update-infra destroy-infra build-image push-image deploy-app clean test test-unit test-integration coverage lint format fmt-check vet staticcheck govulncheck quality build run run-docker runbuild local-setup openapi-validate tofu-plan tofu-apply docker-up docker-down docker-logs
+.PHONY: help setup init-backend create-infra update-infra destroy-infra build-image push-image deploy-app clean test test-unit test-integration coverage lint format fmt-check vet staticcheck govulncheck tidy quality build run run-summary runbuild local-setup reindex openapi-validate tofu-plan tofu-apply docker-up docker-down docker-logs docker-prune
 
 # Variables
 PROJECT_NAME ?= $(shell echo $$PROJECT_NAME)
@@ -68,12 +68,13 @@ help:
 	@printf "   $(GREEN)make build-image$(RESET)                    Build Docker image\n"
 	@printf "   $(GREEN)make push-image$(RESET)                     Build and push Docker image\n\n"
 	@printf "$(BOLD)$(BLUE)Local Development:$(RESET)\n"
-	@printf "   $(GREEN)make local-setup$(RESET)                    Create DynamoDB tables + S3 bucket for local dev\n\n"
+	@printf "   $(GREEN)make local-setup$(RESET)                    Create DynamoDB tables + S3 bucket for local dev\n"
+	@printf "   $(GREEN)make reindex$(RESET)                        Backfill DynamoDB data into local OpenSearch indexes\n\n"
 	@printf "$(BOLD)$(BLUE)Development:$(RESET)\n"
 	@printf "   $(GREEN)make test$(RESET)                           Run tests\n"
 	@printf "   $(GREEN)make build$(RESET)                          clean → test(quality checks) → build\n"
-	@printf "   $(GREEN)make run$(RESET)                            test(quality checks) → run application\n"
-	@printf "   $(GREEN)make run-docker$(RESET)                     docker quality checks → run local api\n\n"
+	@printf "   $(GREEN)make run$(RESET)                            prune → quality → build → compose up (detached) → reindex\n\n"
+	@printf "   $(GREEN)make tidy$(RESET)                           Run go mod tidy in app/ and test/\n\n"
 	@printf "$(BOLD)$(BLUE)Targeted Quality:$(RESET)\n"
 	@printf "   $(GREEN)make lint$(RESET)                           Run golangci-lint\n"
 	@printf "   $(GREEN)make test-unit$(RESET)                      Run unit tests only (./internal/...)\n"
@@ -81,7 +82,7 @@ help:
 	@printf "   $(GREEN)make coverage$(RESET)                       Generate HTML coverage report\n"
 	@printf "   $(GREEN)make openapi-validate$(RESET)               Validate docs/openapi.yaml\n\n"
 	@printf "$(BOLD)$(BLUE)Compose Shortcuts:$(RESET)\n"
-	@printf "   $(GREEN)make docker-up$(RESET)                      Start local stack (docker-compose.local.yml)\n"
+	@printf "   $(GREEN)make docker-up$(RESET)                      Start local stack + auto-reindex search\n"
 	@printf "   $(GREEN)make docker-down$(RESET)                    Stop local stack and remove volumes\n"
 	@printf "   $(GREEN)make docker-logs$(RESET)                    Tail local stack logs\n\n"
 	@printf "$(BOLD)$(BLUE)OpenTofu Shortcuts:$(RESET)\n"
@@ -210,19 +211,90 @@ build: clean test
 runbuild: build
 	@cd app && air
 
-run: test
-	@printf "\n$(BOLD)$(BLUE)Running application...$(RESET)\n\n"
-	@cd app && go run ./cmd/api
+# `make run` orchestrates a clean, fully verified local stack:
+#   1. Prune the previous stack (volumes + project images).
+#   2. Run all quality gates verbosely: tidy, fmt-check, vet, lint, staticcheck,
+#      govulncheck, test-unit, test-integration, openapi-validate, build.
+#   3. Bring compose up in detached mode (api is rebuilt; ui pulls from ECR).
+#   4. Wait for /v1/livez, then reindex search.
+# Compose runs detached but every quality step is verbose so failures surface.
+run: docker-prune tidy fmt-check vet lint staticcheck govulncheck test-unit test-integration openapi-validate build
+	@printf "\n$(BOLD)$(BLUE)[run] Starting local stack (detached, https+ui profiles)...$(RESET)\n\n"
+	@./scripts/compose.sh -f docker-compose.local.yml --profile https --profile ui up -d --build
+	@printf "\n$(BLUE)[run] Waiting for API readiness...$(RESET)\n"
+	@for i in $$(seq 1 60); do \
+		if curl -fsS http://localhost:8080/v1/livez > /dev/null 2>&1; then \
+			printf "$(GREEN)✓ API is ready$(RESET)\n"; \
+			break; \
+		fi; \
+		if [ $$i -eq 60 ]; then \
+			printf "$(RED)Error: API did not become ready in time$(RESET)\n"; \
+			exit 1; \
+		fi; \
+		sleep 2; \
+	done
+	@$(MAKE) reindex
+	@printf "\n$(BOLD)$(GREEN)✓ run complete — stack healthy and reindexed$(RESET)\n"
+	@$(MAKE) --no-print-directory run-summary
 
-run-docker:
-	@printf "\n$(BOLD)$(BLUE)Running API in Docker (local compose)...$(RESET)\n\n"
-	@docker compose -f docker-compose.local.yml up --build api
+# Pretty-print the local endpoints + helpful info after `make run`.
+# Reads BUILD_VERSION/BUILD_COMMIT from the wrapper so the banner reflects
+# the actual image that was deployed.
+run-summary:
+	@VER=$$(cat VERSION 2>/dev/null || echo dev); \
+	COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown); \
+	if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then COMMIT="$$COMMIT-dirty"; fi; \
+	printf "\n$(BOLD)$(CYAN)═══════════════════════════════════════════════════════════════$(RESET)\n"; \
+	printf "$(BOLD)$(CYAN)  bi8s local stack — $(GREEN)v$$VER$(CYAN) ($(YELLOW)$$COMMIT$(CYAN))$(RESET)\n"; \
+	printf "$(BOLD)$(CYAN)═══════════════════════════════════════════════════════════════$(RESET)\n\n"; \
+	printf "$(BOLD)Application$(RESET)\n"; \
+	printf "  UI (HTTPS, via nginx)   $(GREEN)https://localhost/$(RESET)\n"; \
+	printf "  UI (direct)             $(GREEN)https://localhost:8443/$(RESET)\n"; \
+	printf "  API (HTTPS, via nginx)  $(GREEN)https://localhost/v1/$(RESET)\n"; \
+	printf "  API (direct)            $(GREEN)http://localhost:8080/v1/$(RESET)\n"; \
+	printf "  Swagger / OpenAPI       $(GREEN)https://localhost/v1/docs$(RESET)\n"; \
+	printf "  Liveness                $(GREEN)https://localhost/v1/livez$(RESET)\n"; \
+	printf "  Readiness               $(GREEN)https://localhost/v1/readyz$(RESET)\n\n"; \
+	printf "$(BOLD)Observability$(RESET)\n"; \
+	printf "  Grafana                 $(GREEN)http://localhost:$${GRAFANA_PORT:-4000}$(RESET)  (admin / admin)\n"; \
+	printf "  Prometheus              $(GREEN)http://localhost:$${PROMETHEUS_PORT:-9090}$(RESET)\n"; \
+	printf "  Tempo (traces)          $(GREEN)http://localhost:$${TEMPO_HTTP_PORT:-3200}$(RESET)\n"; \
+	printf "  Loki (logs)             $(GREEN)http://localhost:$${LOKI_PORT:-3100}$(RESET)\n"; \
+	printf "  cAdvisor                $(GREEN)http://localhost:$${CADVISOR_PORT:-8090}$(RESET)\n"; \
+	printf "  node-exporter           $(GREEN)http://localhost:$${NODE_EXPORTER_PORT:-9100}/metrics$(RESET)\n\n"; \
+	printf "$(BOLD)Data services$(RESET)\n"; \
+	printf "  Redis                   $(CYAN)localhost:$${REDIS_PORT:-6379}$(RESET)\n"; \
+	printf "  OpenSearch              $(GREEN)http://localhost:$${OPENSEARCH_PORT:-9200}$(RESET)\n\n"; \
+	printf "$(BOLD)Useful commands$(RESET)\n"; \
+	printf "  Tail API logs           $(YELLOW)make docker-logs$(RESET)\n"; \
+	printf "  Stop & wipe stack       $(YELLOW)make docker-prune$(RESET)\n"; \
+	printf "  Re-run search seed      $(YELLOW)make reindex$(RESET)\n\n"; \
+	printf "$(YELLOW)Note: the local TLS cert is self-signed. Browsers will warn until$(RESET)\n"; \
+	printf "$(YELLOW)you trust infra/docker/nginx/ssl/live/cert.crt locally.$(RESET)\n\n"
+
+# Tear down the previous local stack and remove its built images so the next
+# build is fully fresh. Safe to run repeatedly.
+docker-prune:
+	@printf "\n$(BOLD)$(BLUE)[run] Pruning previous local stack...$(RESET)\n\n"
+	@./scripts/compose.sh -f docker-compose.local.yml --profile https --profile ui down -v --remove-orphans --rmi local || true
+	@printf "$(GREEN)✓ docker-prune$(RESET)\n"
+
+tidy:
+	@printf "\n$(BOLD)$(BLUE)Tidying Go modules...$(RESET)\n\n"
+	@cd app && go mod tidy
+	@cd test && go mod tidy
+	@printf "$(GREEN)✓ tidy$(RESET)\n"
 
 # Local development bootstrap
 local-setup:
 	@printf "\n$(BOLD)$(BLUE)Setting up local dev resources...$(RESET)\n\n"
 	@./scripts/local-setup.sh
 	@printf "\n$(BOLD)$(GREEN)Local resources ready$(RESET)\n\n"
+
+reindex:
+	@printf "\n$(BOLD)$(BLUE)Reindexing DynamoDB data into OpenSearch...$(RESET)\n\n"
+	@cd app && SEARCH_ENDPOINT=http://localhost:9200 go run ./cmd/reindex
+	@printf "\n$(BOLD)$(GREEN)Reindex complete$(RESET)\n\n"
 
 # Bootstrap dev tools
 setup:
@@ -263,19 +335,34 @@ openapi-validate:
 	fi
 	@printf "$(GREEN)✓ openapi-validate$(RESET)\n"
 
-# Local docker compose shortcuts
+# Local docker compose shortcuts. All invocations go through scripts/compose.sh
+# which resolves BUILD_VERSION/BUILD_COMMIT/BUILD_DATE dynamically from the
+# working tree so the api image always carries real ldflags values.
 docker-up:
 	@printf "\n$(BOLD)$(BLUE)Starting local stack...$(RESET)\n\n"
-	@docker compose -f docker-compose.local.yml up -d --build
+	@./scripts/compose.sh -f docker-compose.local.yml up -d --build
+	@printf "$(BLUE)Waiting for API readiness...$(RESET)\n"
+	@for i in $$(seq 1 60); do \
+		if curl -fsS http://localhost:8080/v1/livez > /dev/null 2>&1; then \
+			printf "$(GREEN)✓ API is ready$(RESET)\n"; \
+			break; \
+		fi; \
+		if [ $$i -eq 60 ]; then \
+			printf "$(RED)Error: API did not become ready in time$(RESET)\n"; \
+			exit 1; \
+		fi; \
+		sleep 2; \
+	done
+	@$(MAKE) reindex
 	@printf "$(GREEN)✓ docker-up$(RESET)\n"
 
 docker-down:
 	@printf "\n$(BOLD)$(BLUE)Stopping local stack...$(RESET)\n\n"
-	@docker compose -f docker-compose.local.yml down -v
+	@./scripts/compose.sh -f docker-compose.local.yml down -v
 	@printf "$(GREEN)✓ docker-down$(RESET)\n"
 
 docker-logs:
-	@docker compose -f docker-compose.local.yml logs -f --tail=200
+	@./scripts/compose.sh -f docker-compose.local.yml logs -f --tail=200
 
 # OpenTofu shortcuts (delegates to scripts/deploy.sh for parity with CI)
 tofu-plan: check-env validate-env
