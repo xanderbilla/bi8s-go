@@ -38,6 +38,13 @@ permissions:
   contents: read
   pull-requests: write
 
+# Per-environment serialization: never run two applies/destroys against the
+# same env concurrently. Plan jobs on different branches still parallelize
+# (group includes ref).
+concurrency:
+  group: infra-deploy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   TF_VERSION: "1.6.0"
   AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -95,7 +102,8 @@ jobs:
     name: Terraform Plan
     runs-on: ubuntu-latest
     needs: detect-environment
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.action !=
+    if:
+      github.event_name != 'workflow_dispatch' || github.event.inputs.action !=
       'destroy'
     # Plan binds to the env so the role secret resolves; prod plan does NOT
     # require reviewer approval (read-only).
@@ -198,7 +206,7 @@ jobs:
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    needs: [ detect-environment, terraform-plan ]
+    needs: [detect-environment, terraform-plan]
     # Apply runs only when:
     #   - dev push (auto), OR
     #   - workflow_dispatch with action=apply (gated by GitHub Environment
@@ -278,7 +286,8 @@ jobs:
     name: Terraform Destroy
     runs-on: ubuntu-latest
     needs: detect-environment
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action ==
+    if:
+      github.event_name == 'workflow_dispatch' && github.event.inputs.action ==
       'destroy'
     # Destroy uses a separate environment so you can require additional
     # reviewers on `<env>-destroy` independently of normal applies.
