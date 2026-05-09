@@ -10,17 +10,17 @@ info:
     {
       "success": true,
       "status": 200,
-      "code": "OK",
       "message": "ok",
       "data": {},
-      "request_id": "01J...",
+      "error": null,
+      "requestId": "01J...",
       "path": "/v1/...",
       "timestamp": "2026-01-01T00:00:00Z"
     }
     ```
 
-    Error responses set `success: false` and include `error` (machine-readable
-    code) plus optional `details`.
+    Error responses set `success: false` and include an `error` object with
+    machine-readable `type` and `code` fields.
   version: "1.0.0"
 servers:
   - url: /v1
@@ -39,7 +39,7 @@ tags:
 paths:
   /health:
     get:
-      tags: [ Health ]
+      tags: [Health]
       summary: Deep health check (parallel dependency probe)
       responses:
         "200": { $ref: "#/components/responses/OK" }
@@ -47,34 +47,23 @@ paths:
 
   /livez:
     get:
-      tags: [ Health ]
+      tags: [Health]
       summary: Liveness probe (cheap, no metadata leaked)
       responses:
         "200": { $ref: "#/components/responses/OK" }
 
   /readyz:
     get:
-      tags: [ Health ]
+      tags: [Health]
       summary: Readiness probe
       description: Returns 503 with code `NOT_READY` during startup or shutdown.
       responses:
         "200": { $ref: "#/components/responses/OK" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
 
-  /c/content:
-    get:
-      tags: [ Consumer ]
-      summary: List recent content
-      parameters:
-        - in: query
-          name: type
-          schema: { type: string, enum: [ all, movie, tv ] }
-      responses:
-        "200": { $ref: "#/components/responses/OK" }
-
   /c/content/{contentId}:
     get:
-      tags: [ Consumer ]
+      tags: [Consumer]
       summary: Get a movie / show by content ID
       parameters:
         - $ref: "#/components/parameters/ContentId"
@@ -85,7 +74,7 @@ paths:
 
   /c/people/{peopleId}:
     get:
-      tags: [ Consumer ]
+      tags: [Consumer]
       summary: Get a person by ID
       parameters:
         - $ref: "#/components/parameters/PeopleId"
@@ -96,7 +85,7 @@ paths:
 
   /c/people/{peopleId}/content:
     get:
-      tags: [ Consumer ]
+      tags: [Consumer]
       summary: List content associated with a person
       parameters:
         - $ref: "#/components/parameters/PeopleId"
@@ -108,7 +97,7 @@ paths:
 
   /c/banner:
     get:
-      tags: [ Consumer ]
+      tags: [Consumer]
       summary: Featured banner content
       parameters:
         - in: query
@@ -118,9 +107,43 @@ paths:
         "200": { $ref: "#/components/responses/OK" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /c/attributes:
+    get:
+      tags: [Consumer]
+      summary: List consumer attributes
+      description: Returns active attributes only. Use `type` to filter by attribute family.
+      parameters:
+        - in: query
+          name: type
+          schema:
+            {
+              type: string,
+              enum:
+                [
+                  genre,
+                  genres,
+                  tag,
+                  tags,
+                  mood,
+                  moods,
+                  studio,
+                  studios,
+                  category,
+                  categories,
+                  speciality,
+                  specialities,
+                ],
+            }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [alpha_asc, alpha_desc] }
+      responses:
+        "200": { $ref: "#/components/responses/OK" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
   /c/attributes/{id}:
     get:
-      tags: [ Consumer ]
+      tags: [Consumer]
       summary: List content for an attribute (genre/tag/etc.)
       parameters:
         - in: path
@@ -130,64 +153,82 @@ paths:
         - in: query
           name: content
           schema: { type: string }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [alpha_asc, alpha_desc] }
       responses:
         "200": { $ref: "#/components/responses/OK" }
 
   /c/discover:
     get:
-      tags: [ Consumer ]
+      tags: [Consumer]
       summary: Discover content
       parameters:
         - in: query
           name: type
-          schema: { type: string, default: latest }
+          schema:
+            {
+              type: string,
+              enum: [latest, recent, popular, trending],
+              default: latest,
+            }
         - in: query
           name: content
-          schema: { type: string }
+          schema: { type: string, enum: [all, movie, tv], default: all }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [alpha_asc, alpha_desc] }
       responses:
         "200": { $ref: "#/components/responses/OK" }
 
+  /c/search:
+    get:
+      tags: [Consumer]
+      summary: Search content and people
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema: { type: string }
+        - in: query
+          name: in
+          schema: { type: string, enum: [all, movie, tv, people], default: all }
+        - in: query
+          name: sort
+          schema:
+            {
+              type: string,
+              enum: [recent, latest, alpha_asc, alpha_desc],
+              default: recent,
+            }
+          description: Single sort value only.
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200": { $ref: "#/components/responses/OK" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
   /c/play/{contentType}/{contentId}:
     get:
-      tags: [ Consumer ]
+      tags: [Consumer]
       summary: Get HLS playback information
       parameters:
         - in: path
           name: contentType
           required: true
-          schema: { type: string, enum: [ movie, tv ] }
+          schema: { type: string, enum: [movie, tv] }
         - $ref: "#/components/parameters/ContentId"
       responses:
         "200": { $ref: "#/components/responses/OK" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /a/content/{contentId}:
-    post:
-      tags: [ Admin ]
-      summary: Upload supplementary video assets (trailer/teaser/clip/promo/bts)
-      parameters:
-        - $ref: "#/components/parameters/ContentId"
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [ assetType, videos ]
-              properties:
-                assetType:
-                  type: string
-                  enum: [ TRAILER, TEASER, CLIP, PROMO, BTS ]
-                videos:
-                  type: array
-                  items: { type: string, format: binary }
-      responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-
   /a/encoder:
     post:
-      tags: [ Admin, Encoder ]
+      tags: [Admin, Encoder]
       summary: Submit a video for HLS encoding
       requestBody:
         required: true
@@ -195,10 +236,10 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [ contentId, contentType, video ]
+              required: [contentId, contentType, video]
               properties:
                 contentId: { type: string }
-                contentType: { type: string, enum: [ MOVIE, TV ] }
+                contentType: { type: string, enum: [MOVIE, TV] }
                 video: { type: string, format: binary }
       responses:
         "201": { $ref: "#/components/responses/OK" }
@@ -207,7 +248,7 @@ paths:
 
   /a/encoder/{jobId}:
     get:
-      tags: [ Admin, Encoder ]
+      tags: [Admin, Encoder]
       summary: Get encoder job status
       parameters:
         - in: path
@@ -220,12 +261,12 @@ paths:
 
   /a/content:
     get:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: List all content (admin view)
       responses:
         "200": { $ref: "#/components/responses/OK" }
     post:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: Create a movie
       requestBody:
         required: true
@@ -241,36 +282,52 @@ paths:
 
   /a/content/{contentId}:
     get:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: Get content (admin view)
       parameters:
-        - in: path
-          name: contentId
-          required: true
-          schema: { type: string, maxLength: 100 }
+        - $ref: "#/components/parameters/ContentId"
       responses:
         "200": { $ref: "#/components/responses/OK" }
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: Delete content
       parameters:
-        - in: path
-          name: contentId
-          required: true
-          schema: { type: string }
+        - $ref: "#/components/parameters/ContentId"
       responses:
         "200": { $ref: "#/components/responses/OK" }
         "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Admin]
+      summary: Upload supplementary video assets (trailer/teaser/clip/promo/bts)
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [assetType, videos]
+              properties:
+                assetType:
+                  type: string
+                  enum: [TRAILER, TEASER, CLIP, PROMO, BTS]
+                videos:
+                  type: array
+                  items: { type: string, format: binary }
+      responses:
+        "200": { $ref: "#/components/responses/OK" }
+        "400": { $ref: "#/components/responses/BadRequest" }
 
   /a/people:
     get:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: List all people
       responses:
         "200": { $ref: "#/components/responses/OK" }
     post:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: Create a person
       requestBody:
         required: true
@@ -285,7 +342,7 @@ paths:
 
   /a/people/{peopleId}:
     get:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: Get a person
       parameters:
         - $ref: "#/components/parameters/PeopleId"
@@ -293,7 +350,7 @@ paths:
         "200": { $ref: "#/components/responses/OK" }
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: Delete a person
       parameters:
         - $ref: "#/components/parameters/PeopleId"
@@ -303,7 +360,7 @@ paths:
 
   /a/people/{peopleId}/content:
     get:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: List content associated with a person (admin view)
       parameters:
         - $ref: "#/components/parameters/PeopleId"
@@ -315,12 +372,12 @@ paths:
 
   /a/attributes:
     get:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: List all attributes
       responses:
         "200": { $ref: "#/components/responses/OK" }
     post:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: Create an attribute
       requestBody:
         required: true
@@ -335,7 +392,7 @@ paths:
 
   /a/attributes/{attributeId}:
     get:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: Get an attribute
       parameters:
         - in: path
@@ -346,7 +403,7 @@ paths:
         "200": { $ref: "#/components/responses/OK" }
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
-      tags: [ Admin ]
+      tags: [Admin]
       summary: Delete an attribute
       parameters:
         - in: path
@@ -411,7 +468,7 @@ components:
   schemas:
     SuccessEnvelope:
       type: object
-      required: [ success, status, message, data, error, requestId, timestamp ]
+      required: [success, status, message, data, error, requestId, timestamp]
       properties:
         success: { type: boolean, example: true }
         status: { type: integer, example: 200 }
@@ -427,7 +484,7 @@ components:
 
     ErrorPayload:
       type: object
-      required: [ type, code, title, detail ]
+      required: [type, code, title, detail]
       properties:
         type:
           type: string
@@ -466,7 +523,7 @@ components:
 
     ErrorEnvelope:
       type: object
-      required: [ success, status, message, data, error, requestId, timestamp ]
+      required: [success, status, message, data, error, requestId, timestamp]
       properties:
         success: { type: boolean, example: false }
         status: { type: integer, example: 400 }
