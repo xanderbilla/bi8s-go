@@ -36,4 +36,28 @@ fi
 
 export BUILD_VERSION BUILD_COMMIT BUILD_DATE
 
+# ---------------------------------------------------------------------------
+# ECR authentication
+# Docker cannot pull private ECR images without a valid token. Credentials
+# (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION) come from .env via
+# direnv or are already exported in the shell. We derive the registry URL from
+# UI_IMAGE_NAME if set, otherwise fall back to the default image in the compose
+# file. Login is skipped gracefully if `aws` CLI is not installed.
+# ---------------------------------------------------------------------------
+if command -v aws > /dev/null 2>&1; then
+  # Resolve the ECR registry hostname from the image name or the default.
+  _ecr_image="${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:efx-image-dev-latest}"
+  _ecr_registry="$(echo "${_ecr_image}" | cut -d'/' -f1)"
+  _ecr_region="${AWS_REGION:-us-east-1}"
+
+  if [[ "${_ecr_registry}" == *.amazonaws.com ]]; then
+    echo "[compose.sh] Logging in to ECR: ${_ecr_registry} (region: ${_ecr_region})"
+    aws ecr get-login-password --region "${_ecr_region}" \
+      | docker login --username AWS --password-stdin "${_ecr_registry}" \
+      || echo "[compose.sh] WARN: ECR login failed — UI image pull may fail"
+  fi
+else
+  echo "[compose.sh] WARN: 'aws' CLI not found — skipping ECR login (UI image pull may fail)"
+fi
+
 exec docker compose "$@"

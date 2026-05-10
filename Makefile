@@ -6,6 +6,14 @@ AWS_REGION ?= $(shell echo $$AWS_REGION)
 DOCKER_IMAGE ?= $(shell echo $$DOCKER_IMAGE)
 ENV ?= dev
 
+# OS detection (Darwin = macOS, Linux = Linux)
+OS := $(shell uname -s)
+ifeq ($(OS),Darwin)
+  OPEN_CMD := open
+else
+  OPEN_CMD := xdg-open
+endif
+
 # Colors
 CYAN := \033[0;36m
 BLUE := \033[0;34m
@@ -172,12 +180,8 @@ lint:
 		cd app && golangci-lint run; \
 		printf "$(GREEN)✓ lint$(RESET)\n"; \
 	else \
-		printf "$(YELLOW)→ Installing golangci-lint...$(RESET)\n"; \
-		go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
-		cd app && golangci-lint run; \
-		printf "$(GREEN)✓ lint$(RESET)\n"; \
-	fi
-
+		printf "$(YELLOW)→ Installing golangci-lint v2...$(RESET)\n"; \
+		go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest; \
 staticcheck:
 	@if command -v staticcheck > /dev/null; then \
 		cd app && staticcheck ./...; \
@@ -213,12 +217,14 @@ runbuild: build
 
 # `make run` orchestrates a clean, fully verified local stack:
 #   1. Prune the previous stack (volumes + project images).
-#   2. Run all quality gates verbosely: tidy, fmt-check, vet, lint, staticcheck,
-#      govulncheck, test-unit, test-integration, openapi-validate, build.
+#   2. Run static quality gates: tidy, fmt-check, vet, lint, staticcheck,
+#      govulncheck, test-unit, openapi-validate, build.
+#      (test-integration runs AFTER the stack is up since it needs live services.)
 #   3. Bring compose up in detached mode (api is rebuilt; ui pulls from ECR).
 #   4. Wait for /v1/livez, then reindex search.
+#   5. Run integration tests against the live stack.
 # Compose runs detached but every quality step is verbose so failures surface.
-run: docker-prune tidy fmt-check vet lint staticcheck govulncheck test-unit test-integration openapi-validate build
+run: docker-prune tidy fmt-check vet lint staticcheck govulncheck test-unit openapi-validate build
 	@printf "\n$(BOLD)$(BLUE)[run] Starting local stack (detached, https+ui profiles)...$(RESET)\n\n"
 	@./scripts/compose.sh -f docker-compose.local.yml --profile https --profile ui up -d --build
 	@printf "\n$(BLUE)[run] Waiting for API readiness...$(RESET)\n"
@@ -234,6 +240,7 @@ run: docker-prune tidy fmt-check vet lint staticcheck govulncheck test-unit test
 		sleep 2; \
 	done
 	@$(MAKE) reindex
+	@$(MAKE) test-integration
 	@printf "\n$(BOLD)$(GREEN)✓ run complete — stack healthy and reindexed$(RESET)\n"
 	@$(MAKE) --no-print-directory run-summary
 
@@ -250,11 +257,11 @@ run-summary:
 	printf "$(BOLD)Application$(RESET)\n"; \
 	printf "  UI (HTTPS, via nginx)   $(GREEN)https://localhost/$(RESET)\n"; \
 	printf "  UI (direct)             $(GREEN)https://localhost:8443/$(RESET)\n"; \
-	printf "  API (HTTPS, via nginx)  $(GREEN)https://localhost/v1/$(RESET)\n"; \
+	printf "  API (HTTPS, via nginx)  $(GREEN)https://localhost/api/v1/$(RESET)\n"; \
 	printf "  API (direct)            $(GREEN)http://localhost:8080/v1/$(RESET)\n"; \
-	printf "  Swagger / OpenAPI       $(GREEN)https://localhost/v1/docs$(RESET)\n"; \
-	printf "  Liveness                $(GREEN)https://localhost/v1/livez$(RESET)\n"; \
-	printf "  Readiness               $(GREEN)https://localhost/v1/readyz$(RESET)\n\n"; \
+	printf "  Swagger / OpenAPI       $(GREEN)https://localhost/api/v1/docs$(RESET)\n"; \
+	printf "  Liveness                $(GREEN)https://localhost/api/v1/livez$(RESET)\n"; \
+	printf "  Readiness               $(GREEN)https://localhost/api/v1/readyz$(RESET)\n\n"; \
 	printf "$(BOLD)Observability$(RESET)\n"; \
 	printf "  Grafana                 $(GREEN)http://localhost:$${GRAFANA_PORT:-4000}$(RESET)  (admin / admin)\n"; \
 	printf "  Prometheus              $(GREEN)http://localhost:$${PROMETHEUS_PORT:-9090}$(RESET)\n"; \
@@ -298,8 +305,8 @@ reindex:
 
 # Bootstrap dev tools
 setup:
-	@printf "\n$(BOLD)$(BLUE)Installing Go dev tools...$(RESET)\n\n"
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@printf "\n$(BOLD)$(BLUE)Installing Go dev tools ($(OS))...$(RESET)\n\n"
+	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 	@go install honnef.co/go/tools/cmd/staticcheck@latest
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
 	@go install github.com/air-verse/air@latest
