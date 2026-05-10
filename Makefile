@@ -176,13 +176,13 @@ vet:
 	@cd app && go vet ./...
 	@printf "$(GREEN)✓ go vet$(RESET)\n"
 lint:
-	@if command -v golangci-lint > /dev/null; then \
+	@if command -v golangci-lint > /dev/null && golangci-lint version 2>/dev/null | grep -qF 'v2.'; then \
 		cd app && golangci-lint run; \
 		printf "$(GREEN)✓ lint$(RESET)\n"; \
 	else \
 		printf "$(YELLOW)→ Installing golangci-lint v2...$(RESET)\n"; \
 		go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest; \
-		cd app && golangci-lint run; \
+		cd app && $$(go env GOPATH)/bin/golangci-lint run; \
 		printf "$(GREEN)✓ lint$(RESET)\n"; \
 	fi
 
