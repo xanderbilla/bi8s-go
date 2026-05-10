@@ -85,6 +85,15 @@
               "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"bi8s[_-].*\",image!=\"\"}[5m])) * 100",
               "legendFormat": "{{name}}",
               "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"bi8s[_-].*\",image!=\"\"}[5m])) * 100",
+              "legendFormat": "Overall (all containers)",
+              "refId": "B"
             }
           ],
           "title": "Container CPU Usage %",
@@ -138,6 +147,15 @@
               "expr": "container_memory_usage_bytes{name=~\"bi8s[_-].*\",image!=\"\"}",
               "legendFormat": "{{name}}",
               "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(container_memory_usage_bytes{name=~\"bi8s[_-].*\",image!=\"\"})",
+              "legendFormat": "Overall (all containers)",
+              "refId": "B"
             }
           ],
           "title": "Container Memory Usage",
@@ -200,6 +218,24 @@
               "expr": "sum by (name) (rate(container_network_transmit_bytes_total{name=~\"bi8s[_-].*\"}[5m]))",
               "legendFormat": "Transmit: {{name}}",
               "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(rate(container_network_receive_bytes_total{name=~\"bi8s[_-].*\"}[5m]))",
+              "legendFormat": "Overall Receive",
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(rate(container_network_transmit_bytes_total{name=~\"bi8s[_-].*\"}[5m]))",
+              "legendFormat": "Overall Transmit",
+              "refId": "D"
             }
           ],
           "title": "Container Network I/O",
@@ -250,8 +286,8 @@
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (name) (rate(container_fs_reads_bytes_total{name=~\"bi8s[_-].*\"}[5m]))",
-              "legendFormat": "Disk Read: {{name}}",
+              "expr": "rate(node_disk_read_bytes_total{device=~\"sd.*|nvme.*|vd.*|hd.*\"}[5m])",
+              "legendFormat": "Read: {{device}}",
               "refId": "A"
             },
             {
@@ -259,12 +295,30 @@
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (name) (rate(container_fs_writes_bytes_total{name=~\"bi8s[_-].*\"}[5m]))",
-              "legendFormat": "Disk Write: {{name}}",
+              "expr": "rate(node_disk_written_bytes_total{device=~\"sd.*|nvme.*|vd.*|hd.*\"}[5m])",
+              "legendFormat": "Write: {{device}}",
               "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(rate(node_disk_read_bytes_total{device=~\"sd.*|nvme.*|vd.*|hd.*\"}[5m]))",
+              "legendFormat": "Overall Read",
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(rate(node_disk_written_bytes_total{device=~\"sd.*|nvme.*|vd.*|hd.*\"}[5m]))",
+              "legendFormat": "Overall Write",
+              "refId": "D"
             }
           ],
-          "title": "Container Disk I/O",
+          "title": "Host Disk I/O (by device)",
           "type": "timeseries"
         }
       ]
