@@ -182,6 +182,10 @@ lint:
 	else \
 		printf "$(YELLOW)→ Installing golangci-lint v2...$(RESET)\n"; \
 		go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest; \
+		cd app && golangci-lint run; \
+		printf "$(GREEN)✓ lint$(RESET)\n"; \
+	fi
+
 staticcheck:
 	@if command -v staticcheck > /dev/null; then \
 		cd app && staticcheck ./...; \
