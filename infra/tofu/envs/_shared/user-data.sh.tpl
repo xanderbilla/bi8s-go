@@ -305,7 +305,7 @@ export DYNAMODB_CONTENT_ATTRIBUTE_TABLE="${dynamodb_content_attribute_table}"
 export DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX="visibility-createdAt-index"
 export DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX="visibility-contentType-index"
 export S3_BUCKET="${s3_bucket}"
-export CORS_ALLOWED_ORIGINS="%{ if domain_name != "" }https://${domain_name},http://${domain_name},%{ endif }%{ if grafana_domain_name != "" }https://${grafana_domain_name},%{ endif }http://localhost:3000,http://localhost:8080,http://$PUBLIC_IP"
+export CORS_ALLOWED_ORIGINS="%{ if domain_name != "" }https://${domain_name},http://${domain_name},%{ endif }%{ if grafana_domain_name != "" }https://${grafana_domain_name},%{ endif }%{ if amplify_url != "" }${amplify_url},%{ endif }http://localhost:3000,http://localhost:8080,http://$PUBLIC_IP"
 export CORS_ALLOW_PRIVATE_NETWORK="true"
 export PUBLIC_IP="$PUBLIC_IP"
 EOF
@@ -332,7 +332,7 @@ DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX=visibility-contentType-index
 DYNAMODB_MAX_SCAN_PAGES=1000
 CTX_DB_TIMEOUT_MS=30000
 S3_BUCKET=${s3_bucket}
-CORS_ALLOWED_ORIGINS=%{ if domain_name != "" }https://${domain_name},http://${domain_name},%{ endif }%{ if grafana_domain_name != "" }https://${grafana_domain_name},%{ endif }http://localhost:3000,http://localhost:8080,http://$${PUBLIC_IP}
+CORS_ALLOWED_ORIGINS=%{ if domain_name != "" }https://${domain_name},http://${domain_name},%{ endif }%{ if grafana_domain_name != "" }https://${grafana_domain_name},%{ endif }%{ if amplify_url != "" }${amplify_url},%{ endif }http://localhost:3000,http://localhost:8080,http://$${PUBLIC_IP}
 CORS_ALLOW_PRIVATE_NETWORK=true
 TRUSTED_PROXIES=
 ENCODER_MAX_CONCURRENT=2
