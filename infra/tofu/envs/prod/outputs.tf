@@ -26,22 +26,65 @@ output "s3_bucket_name" {
 output "dynamodb_tables" {
   description = "DynamoDB table names"
   value = {
-    movie     = module.dynamodb_movie.table_name
-    person    = module.dynamodb_person.table_name
-    attribute = module.dynamodb_attribute.table_name
-    encoder   = module.dynamodb_encoder.table_name
+    movie             = module.dynamodb_movie.table_name
+    person            = module.dynamodb_person.table_name
+    attribute         = module.dynamodb_attribute.table_name
+    encoder           = module.dynamodb_encoder.table_name
+    content_cast      = module.dynamodb_content_cast.table_name
+    content_attribute = module.dynamodb_content_attribute.table_name
   }
 }
 
 output "environment_variables" {
   description = "Environment variables for application"
   value = {
-    APP_ENV                   = var.environment
-    AWS_REGION                = var.aws_region
-    DYNAMODB_MOVIE_TABLE      = module.dynamodb_movie.table_name
-    DYNAMODB_PERSON_TABLE     = module.dynamodb_person.table_name
-    DYNAMODB_ATTRIBUTE_TABLE  = module.dynamodb_attribute.table_name
-    DYNAMODB_ENCODER_TABLE    = module.dynamodb_encoder.table_name
-    S3_BUCKET                 = module.s3.bucket_name
+    APP_ENV                                        = var.environment
+    AWS_REGION                                     = var.aws_region
+    DYNAMODB_CONTENT_TABLE                         = module.dynamodb_movie.table_name
+    DYNAMODB_PERSON_TABLE                          = module.dynamodb_person.table_name
+    DYNAMODB_ATTRIBUTE_TABLE                       = module.dynamodb_attribute.table_name
+    DYNAMODB_ATTRIBUTE_NAME_INDEX                  = "name-index"
+    DYNAMODB_ENCODER_TABLE                         = module.dynamodb_encoder.table_name
+    DYNAMODB_ENCODER_CONTENT_ID_INDEX              = "contentId-index"
+    DYNAMODB_CONTENT_CAST_TABLE                    = module.dynamodb_content_cast.table_name
+    DYNAMODB_CONTENT_ATTRIBUTE_TABLE               = module.dynamodb_content_attribute.table_name
+    DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX   = "visibility-createdAt-index"
+    DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX = "visibility-contentType-index"
+    S3_BUCKET                                      = module.s3.bucket_name
+    SEARCH_ENABLED                                 = "true"
+    SEARCH_PROVIDER                                = "opensearch"
+    SEARCH_ENDPOINT                                = "https://${module.opensearch.domain_endpoint}"
+    SEARCH_CONTENT_INDEX_NAME                      = "bi8s-content"
+    SEARCH_PEOPLE_INDEX_NAME                       = "bi8s-people"
   }
+}
+
+output "opensearch_endpoint" {
+  description = "OpenSearch domain endpoint"
+  value       = module.opensearch.domain_endpoint
+}
+
+output "prometheus_ebs_volume_id" {
+  description = "EBS volume ID for Prometheus persistent data"
+  value       = aws_ebs_volume.prometheus.id
+}
+
+output "ecr_repository_url" {
+  description = "ECR repository URL for the application image"
+  value       = aws_ecr_repository.this.repository_url
+}
+
+output "api_url" {
+  description = "URL for the API"
+  value       = var.enable_public_dns ? "https://${aws_route53_record.api[0].fqdn}" : "http://${module.ec2.instance_public_ip}"
+}
+
+output "grafana_url" {
+  description = "URL for Grafana (empty when no public DNS configured)"
+  value       = var.enable_public_dns && var.grafana_domain_name != "" ? "https://${var.grafana_domain_name}" : ""
+}
+
+output "storage_cdn_url" {
+  description = "URL for storage CDN (empty when storage domain is not configured)"
+  value       = var.storage_domain_name != "" ? "https://${var.storage_domain_name}" : ""
 }

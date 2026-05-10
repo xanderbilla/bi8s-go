@@ -108,11 +108,57 @@ output "lock_table_name" {
 
 output "backend_config" {
   description = "Backend configuration for Terraform"
-  value = <<-EOT
+  value       = <<-EOT
     bucket         = "${aws_s3_bucket.terraform_state.id}"
     key            = "${var.project_name}/${var.environment}/terraform.tfstate"
     region         = "${var.aws_region}"
     dynamodb_table = "${aws_dynamodb_table.terraform_locks.name}"
     encrypt        = true
   EOT
+}
+
+# ---------------------------------------------------------------------------
+# GitHub Actions OIDC deploy role for this environment
+# ---------------------------------------------------------------------------
+#
+# Branch trust: workflows on the matching branch (dev branch -> dev role,
+# prod branch -> prod role) may assume this role.
+# Environment trust: workflows running under the matching GitHub Environment
+# (configure required reviewers on the prod environment) may assume it.
+# This eliminates the need for static AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+# secrets in the repo (B4) and gates prod applies behind GitHub's environment
+# approval mechanism (B5).
+
+module "github_oidc" {
+  source = "../modules/github-oidc"
+
+  github_owner         = var.github_owner
+  github_repo          = var.github_repo
+  role_name            = "${var.project_name}-gha-deploy-${var.environment}"
+  allowed_branches     = [var.environment]
+  allowed_environments = [var.environment]
+  allow_pull_requests  = var.allow_pr_plan
+  create_oidc_provider = var.create_oidc_provider
+
+  tags = {
+    Name        = "${var.project_name}-gha-deploy-${var.environment}"
+    Environment = var.environment
+    Project     = var.project_name
+    ManagedBy   = "OpenTofu"
+  }
+}
+
+output "github_oidc_role_arn" {
+  description = "ARN of the GitHub Actions deploy role for this environment. Set as the AWS_OIDC_ROLE_ARN secret in the matching GitHub Environment."
+  value       = module.github_oidc.role_arn
+}
+
+output "github_oidc_role_name" {
+  description = "Name of the GitHub Actions deploy role"
+  value       = module.github_oidc.role_name
+}
+
+output "github_oidc_provider_arn" {
+  description = "ARN of the OIDC provider"
+  value       = module.github_oidc.oidc_provider_arn
 }

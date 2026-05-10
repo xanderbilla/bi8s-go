@@ -27,6 +27,29 @@ if [[ ! "$ACTION" =~ ^(plan|apply|destroy)$ ]]; then
     exit 1
 fi
 
+# Production guardrail — require explicit confirmation for any mutating action
+# against prod, and warn loudly if the current git branch is not 'prod'.
+if [ "$ENVIRONMENT" = "prod" ] && [[ "$ACTION" =~ ^(apply|destroy)$ ]]; then
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+    if [ "$CURRENT_BRANCH" != "prod" ]; then
+        echo "WARNING: You are about to ${ACTION} PROD from branch '${CURRENT_BRANCH}'."
+        echo "         Production is normally deployed from the 'prod' branch via CI."
+    fi
+    echo ""
+    echo "PROD ${ACTION^^} REQUESTED"
+    echo "  Project:     bi8s"
+    echo "  Environment: prod"
+    echo "  Action:      ${ACTION}"
+    echo "  Branch:      ${CURRENT_BRANCH}"
+    echo ""
+    echo "Type the project name 'bi8s' to confirm, anything else to abort:"
+    read -r PROD_CONFIRM
+    if [ "$PROD_CONFIRM" != "bi8s" ]; then
+        echo "Aborted: confirmation did not match."
+        exit 1
+    fi
+fi
+
 # Change to environment directory
 cd "$(dirname "$0")/../infra/tofu/envs/${ENVIRONMENT}" || exit 1
 
@@ -83,13 +106,6 @@ case $ACTION in
             rm -f "${ENVIRONMENT}.tfplan"
         else
             ${TF_CMD} apply -auto-approve
-        fi
-        # Remove any stale /etc/hosts overrides for project domains so DNS resolves correctly
-        if grep -q "xanderbilla" /etc/hosts 2>/dev/null; then
-            echo ""
-            echo "Removing stale /etc/hosts entries for xanderbilla.com domains..."
-            sudo sed -i '' '/xanderbilla/d' /etc/hosts
-            echo "Done."
         fi
         ;;
     destroy)

@@ -29,11 +29,13 @@ locals {
   ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 
   # Resource names
-  dynamodb_movie_table     = "${var.project_name}-content-table-${var.environment}"
-  dynamodb_person_table    = "${var.project_name}-person-table-${var.environment}"
-  dynamodb_attribute_table = "${var.project_name}-attributes-table-${var.environment}"
-  dynamodb_encoder_table   = "${var.project_name}-video-table-${var.environment}"
-  s3_bucket                = "${var.project_name}-storage-${var.environment}"
+  dynamodb_movie_table             = "${var.project_name}-content-table-${var.environment}"
+  dynamodb_person_table            = "${var.project_name}-person-table-${var.environment}"
+  dynamodb_attribute_table         = "${var.project_name}-attributes-table-${var.environment}"
+  dynamodb_encoder_table           = "${var.project_name}-video-table-${var.environment}"
+  dynamodb_content_cast_table      = "${var.project_name}-content-cast-table-${var.environment}"
+  dynamodb_content_attribute_table = "${var.project_name}-content-attribute-table-${var.environment}"
+  s3_bucket                        = "${var.project_name}-storage-${var.environment}"
 
   common_tags = merge(
     var.tags,
@@ -65,32 +67,23 @@ module "security_group" {
   description = "Security group for ${var.project_name} application"
   vpc_id      = module.vpc.vpc_id
 
+  # NOTE: SSH (22) is intentionally NOT exposed. Use AWS SSM Session Manager:
+  #   aws ssm start-session --target <instance-id>
+  # The EC2 IAM role already has AmazonSSMManagedInstanceCore attached.
+  # The application port (8080) is NOT exposed publicly: nginx terminates TLS
+  # and proxies to the api container over the internal docker network.
   ingress_rules = [
     {
-      description = "HTTP"
+      description = "HTTP (redirected to HTTPS by nginx)"
       from_port   = 80
       to_port     = 80
       protocol    = "tcp"
       cidr_ipv4   = "0.0.0.0/0"
     },
     {
-      description = "HTTPS"
+      description = "HTTPS (nginx)"
       from_port   = 443
       to_port     = 443
-      protocol    = "tcp"
-      cidr_ipv4   = "0.0.0.0/0"
-    },
-    {
-      description = "Application Port"
-      from_port   = 8080
-      to_port     = 8080
-      protocol    = "tcp"
-      cidr_ipv4   = "0.0.0.0/0"
-    },
-    {
-      description = "SSH"
-      from_port   = 22
-      to_port     = 22
       protocol    = "tcp"
       cidr_ipv4   = "0.0.0.0/0"
     }
@@ -111,10 +104,29 @@ module "security_group" {
 module "dynamodb_movie" {
   source = "../../modules/dynamodb"
 
-  table_name                    = local.dynamodb_movie_table
-  billing_mode                  = var.dynamodb_billing_mode
-  hash_key                      = "id"
-  attributes                    = [{ name = "id", type = "S" }]
+  table_name   = local.dynamodb_movie_table
+  billing_mode = var.dynamodb_billing_mode
+  hash_key     = "id"
+  attributes = [
+    { name = "id", type = "S" },
+    { name = "visibility", type = "S" },
+    { name = "createdAt", type = "S" },
+    { name = "contentType", type = "S" },
+  ]
+  global_secondary_indexes = [
+    {
+      name            = "visibility-createdAt-index"
+      hash_key        = "visibility"
+      range_key       = "createdAt"
+      projection_type = "ALL"
+    },
+    {
+      name            = "visibility-contentType-index"
+      hash_key        = "visibility"
+      range_key       = "contentType"
+      projection_type = "ALL"
+    },
+  ]
   read_capacity                 = var.dynamodb_read_capacity
   write_capacity                = var.dynamodb_write_capacity
   enable_point_in_time_recovery = true
@@ -139,10 +151,20 @@ module "dynamodb_person" {
 module "dynamodb_attribute" {
   source = "../../modules/dynamodb"
 
-  table_name                    = local.dynamodb_attribute_table
-  billing_mode                  = var.dynamodb_billing_mode
-  hash_key                      = "id"
-  attributes                    = [{ name = "id", type = "S" }]
+  table_name   = local.dynamodb_attribute_table
+  billing_mode = var.dynamodb_billing_mode
+  hash_key     = "id"
+  attributes = [
+    { name = "id", type = "S" },
+    { name = "name", type = "S" },
+  ]
+  global_secondary_indexes = [
+    {
+      name            = "name-index"
+      hash_key        = "name"
+      projection_type = "ALL"
+    },
+  ]
   read_capacity                 = var.dynamodb_read_capacity
   write_capacity                = var.dynamodb_write_capacity
   enable_point_in_time_recovery = true
@@ -174,6 +196,42 @@ module "dynamodb_encoder" {
   tags                          = local.common_tags
 }
 
+module "dynamodb_content_cast" {
+  source = "../../modules/dynamodb"
+
+  table_name   = local.dynamodb_content_cast_table
+  billing_mode = var.dynamodb_billing_mode
+  hash_key     = "personId"
+  range_key    = "contentId"
+  attributes = [
+    { name = "personId", type = "S" },
+    { name = "contentId", type = "S" },
+  ]
+  read_capacity                 = var.dynamodb_read_capacity
+  write_capacity                = var.dynamodb_write_capacity
+  enable_point_in_time_recovery = true
+  enable_encryption             = true
+  tags                          = local.common_tags
+}
+
+module "dynamodb_content_attribute" {
+  source = "../../modules/dynamodb"
+
+  table_name   = local.dynamodb_content_attribute_table
+  billing_mode = var.dynamodb_billing_mode
+  hash_key     = "attributeId"
+  range_key    = "contentId"
+  attributes = [
+    { name = "attributeId", type = "S" },
+    { name = "contentId", type = "S" },
+  ]
+  read_capacity                 = var.dynamodb_read_capacity
+  write_capacity                = var.dynamodb_write_capacity
+  enable_point_in_time_recovery = true
+  enable_encryption             = true
+  tags                          = local.common_tags
+}
+
 # S3 Bucket
 module "s3" {
   source = "../../modules/s3"
@@ -192,10 +250,12 @@ module "s3" {
         "http://localhost:3000",
         "http://localhost:8080",
         "http://localhost:8443",
+        "https://localhost",
         "https://localhost:8443",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:8080",
         "http://127.0.0.1:8443",
+        "https://127.0.0.1",
         "https://127.0.0.1:8443",
         "https://api.xanderbilla.com",
         "https://grafana.xanderbilla.com",
@@ -303,7 +363,35 @@ module "iam" {
     module.s3.bucket_arn,
   ]
 
+  opensearch_domain_arns = [
+    module.opensearch.domain_arn,
+  ]
+
+  ecr_repository_arns = [aws_ecr_repository.this.arn]
+  ssm_parameter_path  = "/${var.project_name}/${var.environment}"
+
   tags = local.common_tags
+}
+
+# OpenSearch Domain
+module "opensearch" {
+  source = "../../modules/opensearch"
+
+  domain_name         = "${local.name_prefix}-search"
+  engine_version      = "OpenSearch_2.11"
+  instance_type       = "t3.small.search"
+  instance_count      = 1
+  volume_type         = "gp3"
+  volume_size         = 10
+  vpc_id              = module.vpc.vpc_id
+  subnet_ids          = [module.vpc.private_subnet_ids[0]]
+  security_group_name = "${local.name_prefix}-opensearch-sg"
+  allowed_security_group_ids = [
+    module.security_group.security_group_id,
+  ]
+  aws_region = var.aws_region
+  account_id = data.aws_caller_identity.current.account_id
+  tags       = local.common_tags
 }
 
 # EC2 Instance
@@ -319,26 +407,30 @@ module "ec2" {
   key_name             = var.key_name
   create_eip           = true
 
-  user_data = base64gzip(templatefile("${path.module}/user-data.sh", {
-    project_name             = var.project_name
-    environment              = var.environment
-    aws_region               = var.aws_region
-    dynamodb_movie_table     = local.dynamodb_movie_table
-    dynamodb_person_table    = local.dynamodb_person_table
-    dynamodb_attribute_table = local.dynamodb_attribute_table
-    dynamodb_encoder_table   = local.dynamodb_encoder_table
-    s3_bucket                = local.s3_bucket
-    prometheus_device        = "/dev/xvdb"
-    repo_url                 = var.repo_url
-    repo_branch              = var.repo_branch
-    image_name               = "${local.ecr_registry}/${local.name_prefix}:latest"
-    ecr_registry             = local.ecr_registry
-    grafana_admin_user       = var.grafana_admin_user
-    grafana_admin_password   = var.grafana_admin_password
-    grafana_domain_name      = var.grafana_domain_name
-    storage_domain_name      = var.storage_domain_name
-    domain_name              = var.domain_name
-    admin_email              = var.admin_email
+  user_data = base64gzip(templatefile("${path.module}/../_shared/user-data.sh.tpl", {
+    project_name                     = var.project_name
+    environment                      = var.environment
+    aws_region                       = var.aws_region
+    dynamodb_movie_table             = local.dynamodb_movie_table
+    dynamodb_person_table            = local.dynamodb_person_table
+    dynamodb_attribute_table         = local.dynamodb_attribute_table
+    dynamodb_attribute_name_index    = "name-index"
+    dynamodb_encoder_table           = local.dynamodb_encoder_table
+    dynamodb_content_cast_table      = local.dynamodb_content_cast_table
+    dynamodb_content_attribute_table = local.dynamodb_content_attribute_table
+    s3_bucket                        = local.s3_bucket
+    prometheus_device                = "/dev/xvdb"
+    repo_url                         = var.repo_url
+    repo_branch                      = var.repo_branch
+    image_name                       = "${local.ecr_registry}/${local.name_prefix}:latest"
+    ecr_registry                     = local.ecr_registry
+    grafana_admin_user               = var.grafana_admin_user
+    grafana_admin_password           = var.grafana_admin_password
+    grafana_domain_name              = var.grafana_domain_name
+    storage_domain_name              = var.storage_domain_name
+    domain_name                      = var.domain_name
+    admin_email                      = var.admin_email
+    enable_public_dns                = var.enable_public_dns
   }))
 
   tags = local.common_tags
@@ -375,6 +467,7 @@ resource "aws_volume_attachment" "prometheus" {
 
 # Route53 A record — auto-updated to the EC2 EIP on every deploy
 resource "aws_route53_record" "api" {
+  count   = var.enable_public_dns ? 1 : 0
   zone_id = var.route53_zone_id
   name    = var.domain_name
   type    = "A"
@@ -383,9 +476,23 @@ resource "aws_route53_record" "api" {
 }
 
 resource "aws_route53_record" "grafana" {
+  count   = var.enable_public_dns ? 1 : 0
   zone_id = var.route53_zone_id
   name    = var.grafana_domain_name
   type    = "A"
   ttl     = 60
   records = [module.ec2.instance_public_ip]
+}
+
+# Cost guardrail -- monthly budget with email alerts. Disabled by default;
+# enable per-environment by setting enable_budget=true and providing
+# budget_notification_emails in tfvars.
+module "budgets" {
+  count  = var.enable_budget ? 1 : 0
+  source = "../../modules/budgets"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  monthly_limit_usd   = var.budget_monthly_limit_usd
+  notification_emails = var.budget_notification_emails
 }

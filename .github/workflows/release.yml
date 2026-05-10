@@ -1,0 +1,117 @@
+name: Release (Semantic Tag)
+
+# Computes next semver tag from Conventional Commits since the last tag and
+# pushes a `vX.Y.Z` tag. Bumping rules:
+#   - feat!: / "BREAKING CHANGE" footer  -> MAJOR (X)
+#   - feat:                              -> MINOR (Y)
+#   - fix:                               -> PATCH (Z)
+#   - anything else                      -> no release
+#
+# Pushing a tag triggers `docker-publish.yml` (which already resolves the
+# tag via `git describe`).
+
+on:
+    push:
+        branches:
+            - dev
+            - prod
+    workflow_dispatch:
+        inputs:
+            bump:
+                description: "Force bump (major|minor|patch). Leave empty for auto."
+                required: false
+                type: choice
+                default: ""
+                options:
+                    - ""
+                    - major
+                    - minor
+                    - patch
+
+permissions:
+    contents: write
+
+concurrency:
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    tag:
+        name: Compute and push semver tag
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Compute next version
+              id: bump
+              env:
+                  FORCE_BUMP: ${{ inputs.bump }}
+              run: |
+                  set -eu
+
+                  LAST_TAG="$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1 || true)"
+                  if [ -z "$LAST_TAG" ]; then
+                    BASE="0.0.0"
+                    RANGE_FROM=""
+                  else
+                    BASE="${LAST_TAG#v}"
+                    RANGE_FROM="$LAST_TAG..HEAD"
+                  fi
+
+                  IFS=. read -r MAJOR MINOR PATCH <<<"${BASE}"
+
+                  if [ -n "${FORCE_BUMP:-}" ]; then
+                    BUMP="$FORCE_BUMP"
+                  else
+                    BUMP="none"
+                    COMMITS="$(git log --pretty=format:'%s%n%b%n--END--' ${RANGE_FROM})"
+                    if echo "$COMMITS" | grep -Eiq '(^|\n)BREAKING[ -]CHANGE:|^[a-zA-Z]+(\([^)]+\))?!:'; then
+                      BUMP="major"
+                    elif echo "$COMMITS" | grep -Eiq '^feat(\([^)]+\))?:'; then
+                      BUMP="minor"
+                    elif echo "$COMMITS" | grep -Eiq '^fix(\([^)]+\))?:'; then
+                      BUMP="patch"
+                    fi
+                  fi
+
+                  case "$BUMP" in
+                    major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+                    minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+                    patch) PATCH=$((PATCH + 1)) ;;
+                    none)
+                      echo "No release-worthy commits since ${LAST_TAG:-<root>}; skipping."
+                      echo "skip=true" >> "$GITHUB_OUTPUT"
+                      exit 0 ;;
+                  esac
+
+                  NEXT="v${MAJOR}.${MINOR}.${PATCH}"
+                  echo "Last tag: ${LAST_TAG:-<none>}"
+                  echo "Bump: ${BUMP}"
+                  echo "Next tag: ${NEXT}"
+                  echo "version=${NEXT}" >> "$GITHUB_OUTPUT"
+                  echo "skip=false" >> "$GITHUB_OUTPUT"
+
+            - name: Update VERSION file
+              if: steps.bump.outputs.skip != 'true'
+              run: |
+                  echo "${{ steps.bump.outputs.version }}" | sed 's/^v//' > VERSION
+
+            - name: Configure git
+              if: steps.bump.outputs.skip != 'true'
+              run: |
+                  git config user.name  "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            - name: Commit, tag and push
+              if: steps.bump.outputs.skip != 'true'
+              run: |
+                  set -e
+                  git add VERSION
+                  git commit -m "chore(release): ${{ steps.bump.outputs.version }} [skip ci]" || echo "VERSION unchanged"
+                  git tag -a "${{ steps.bump.outputs.version }}" -m "Release ${{ steps.bump.outputs.version }}"
+                  git push origin HEAD:${{ github.ref_name }}
+                  git push origin "${{ steps.bump.outputs.version }}"

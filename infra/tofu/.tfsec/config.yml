@@ -1,0 +1,21 @@
+---
+# tfsec baseline exclusions for bi8s-go IaC.
+# Each excluded rule must include a written justification. Re-evaluate
+# whenever module structure changes or a finding becomes actionable.
+
+exclude:
+  # IAM policies that legitimately require wildcards:
+  # - ecr:GetAuthorizationToken must target Resource "*" per AWS spec
+  # - CloudWatch Logs CreateLogGroup/PutLogEvents on log-group/* prefix
+  # - SSM ssm:DescribeParameters scoped to account but requires "*"
+  # Resource-scoped statements (EcrPull, SSM Parameter ARNs) are explicit.
+  - aws-iam-no-policy-wildcards
+
+  # Bootstrap (tofu state) resources only — pre-RBAC, single-account use:
+  # - state bucket logging would itself need a logging bucket (chicken/egg)
+  # - state bucket and lock table use AWS-managed KMS (sufficient for
+  #   tofu state which contains no PII; CMK adds rotation overhead)
+  - aws-s3-enable-bucket-logging
+  - aws-s3-encryption-customer-key
+  - aws-dynamodb-enable-at-rest-encryption
+  - aws-dynamodb-table-customer-key

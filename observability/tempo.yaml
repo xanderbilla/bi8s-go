@@ -33,16 +33,11 @@ query_frontend:
 
 storage:
   trace:
-    backend: s3
+    backend: local
     wal:
       path: /var/tempo/wal
-    s3:
-      bucket: ${S3_BUCKET}
-      endpoint: s3.${AWS_REGION}.amazonaws.com
-      prefix: traces
-      region: ${AWS_REGION}
-      forcepathstyle: false
-      # access_key / secret_key omitted -> uses AWS SDK default chain (instance profile / IRSA)
+    local:
+      path: /var/tempo/blocks
     pool:
       max_workers: 100
       queue_depth: 10000

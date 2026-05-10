@@ -23,25 +23,51 @@ x-logging: &default-logging
       max-file: "5"
 
 services:
+  quality:
+    build:
+      context: ../../app
+      dockerfile: Dockerfile
+      target: quality
+    container_name: ${PROJECT_NAME:-bi8s}-quality
+    command: ["/bin/sh", "-c", "echo quality checks passed"]
+    profiles: ["quality"]
+    networks: [app-network]
+
   api:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: ${IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/bi8s-dev:latest}
     container_name: ${PROJECT_NAME:-bi8s}-api
     pull_policy: always
     expose:
       - "8080"
+    # Container hardening — drop all kernel capabilities, prevent privilege
+    # escalation. The Go binary does not need any caps; ffmpeg is invoked as
+    # a child process and also needs none.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    read_only: false # encoder writes intermediate files to BI8S_TMP_DIR
+    mem_limit: ${API_MEM_LIMIT:-1g}
+    cpus: ${API_CPUS:-1.5}
     environment:
       APP_ENV: ${APP_ENV}
       PORT: ":8080"
       LOG_LEVEL: ${LOG_LEVEL:-info}
       AWS_REGION: ${AWS_REGION}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      DYNAMODB_MOVIE_TABLE: ${DYNAMODB_MOVIE_TABLE}
+      # AWS credentials are intentionally NOT injected — production EC2 hosts
+      # use the instance profile (see infra/tofu/modules/iam). Setting these
+      # would shadow the role and break least-privilege auditing.
+      DYNAMODB_CONTENT_TABLE: ${DYNAMODB_CONTENT_TABLE}
       DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE}
       DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE}
+      DYNAMODB_ATTRIBUTE_NAME_INDEX: ${DYNAMODB_ATTRIBUTE_NAME_INDEX:-name-index}
       DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE}
       DYNAMODB_ENCODER_CONTENT_ID_INDEX: ${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}
+      DYNAMODB_CONTENT_CAST_TABLE: ${DYNAMODB_CONTENT_CAST_TABLE}
+      DYNAMODB_CONTENT_ATTRIBUTE_TABLE: ${DYNAMODB_CONTENT_ATTRIBUTE_TABLE}
+      DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX:-visibility-createdAt-index}
+      DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX:-visibility-contentType-index}
+      DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX:-visibility-releaseDate-index}
       DYNAMODB_MAX_SCAN_PAGES: ${DYNAMODB_MAX_SCAN_PAGES:-1000}
       CTX_DB_TIMEOUT_MS: ${CTX_DB_TIMEOUT_MS:-30000}
       S3_BUCKET: ${S3_BUCKET}
@@ -62,32 +88,52 @@ services:
       OTEL_METRIC_EXPORT_INTERVAL_SECONDS: ${OTEL_METRIC_EXPORT_INTERVAL_SECONDS:-15}
       OTEL_SHUTDOWN_TIMEOUT_SECONDS: ${OTEL_SHUTDOWN_TIMEOUT_SECONDS:-5}
       BUILD_VERSION: ${BUILD_VERSION:-dev}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-redis}
+      RATE_LIMIT_REDIS_FAIL_MODE: ${RATE_LIMIT_REDIS_FAIL_MODE:-fail-open}
+      RATE_LIMIT_REDIS_TIMEOUT_MS: ${RATE_LIMIT_REDIS_TIMEOUT_MS:-50}
+      SEARCH_ENABLED: ${SEARCH_ENABLED:-false}
+      SEARCH_PROVIDER: ${SEARCH_PROVIDER:-opensearch}
+      SEARCH_ENDPOINT: ${SEARCH_ENDPOINT:-}
+      SEARCH_USERNAME: ${SEARCH_USERNAME:-}
+      SEARCH_PASSWORD: ${SEARCH_PASSWORD:-}
+      SEARCH_CONTENT_INDEX_NAME: ${SEARCH_CONTENT_INDEX_NAME:-bi8s-content}
+      SEARCH_PEOPLE_INDEX_NAME: ${SEARCH_PEOPLE_INDEX_NAME:-bi8s-people}
+      SEARCH_REQUEST_TIMEOUT_MS: ${SEARCH_REQUEST_TIMEOUT_MS:-3000}
     depends_on:
       otel-collector:
         condition: service_started
-    networks: [ app-network ]
+      redis:
+        condition: service_healthy
+    networks: [app-network]
     healthcheck:
-      test: [ "CMD", "wget", "-qO-", "http://localhost:8080/v1/livez" ]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/v1/livez"]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 40s
 
   nginx:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: nginx:alpine
     container_name: ${PROJECT_NAME:-bi8s}-nginx
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN", "DAC_OVERRIDE", "SETGID", "SETUID", "NET_BIND_SERVICE"]
+    mem_limit: ${NGINX_MEM_LIMIT:-256m}
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ../nginx/conf.d:/etc/nginx/conf.d:ro
+      - ../nginx/snippets:/etc/nginx/snippets:ro
       - ../nginx/ssl:/etc/nginx/ssl:ro
       - ../nginx/certbot/www:/var/www/certbot:ro
     depends_on:
       api:
         condition: service_started
-    networks: [ app-network ]
+    networks: [app-network]
     healthcheck:
       test:
         [
@@ -102,12 +148,62 @@ services:
       timeout: 10s
       retries: 3
 
+  # ─────────────────────────────── UI ──────────────────────────────────────
+  # Optional UI service pulled from ECR. Activated by `--profile ui` so the
+  # backend-only deploy path (current default) is unaffected. Image and tag
+  # are env-driven; pin to an immutable vX.Y.Z in production.
+  ui:
+    <<: [*restart-policy, *default-logging]
+    image: ${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:efx-image-prod-latest}
+    container_name: ${PROJECT_NAME:-bi8s}-ui
+    pull_policy: always
+    profiles: ["ui"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    mem_limit: ${UI_MEM_LIMIT:-512m}
+    cpus: ${UI_CPUS:-1.0}
+    expose:
+      - "8443"
+    environment:
+      NODE_ENV: ${UI_NODE_ENV:-production}
+    networks: [app-network]
+
+  # ────────────────────────────── Redis ────────────────────────────────────
+  # Co-located Redis for shared rate-limit state. For true multi-replica
+  # deployments behind an ALB, replace with a managed Redis (ElastiCache)
+  # and set REDIS_URL via SSM/Secrets Manager.
+  redis:
+    <<: [*restart-policy, *default-logging]
+    image: redis:7-alpine
+    container_name: ${PROJECT_NAME:-bi8s}-redis
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "256mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [app-network]
+
   # ────────────────────────── Observability stack ──────────────────────────
   otel-collector:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: otel/opentelemetry-collector-contrib:0.111.0
     container_name: ${PROJECT_NAME:-bi8s}-otel-collector
-    command: [ "--config=/etc/otelcol/config.yaml" ]
+    command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
     expose:
@@ -119,10 +215,10 @@ services:
         condition: service_started
       loki:
         condition: service_started
-    networks: [ app-network ]
+    networks: [app-network]
 
   prometheus:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: prom/prometheus:v2.55.1
     container_name: ${PROJECT_NAME:-bi8s}-prometheus
     user: root
@@ -134,19 +230,20 @@ services:
       - "--enable-feature=exemplar-storage"
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus-rules.yml:/etc/prometheus/rules/prometheus-rules.yml:ro
       - ../prometheus-data:/prometheus
     expose:
       - "9090"
-    networks: [ app-network ]
+    networks: [app-network]
 
   tempo:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: grafana/tempo:2.6.1
     container_name: ${PROJECT_NAME:-bi8s}-tempo
-    command: [ "-config.file=/etc/tempo/tempo.yaml", "-config.expand-env=true" ]
+    command: ["-config.file=/etc/tempo/tempo.yaml", "-config.expand-env=true"]
     environment:
       AWS_REGION: ${AWS_REGION}
-      S3_BUCKET: ${S3_BUCKET}
+      S3_BUCKET: ${S3_BUCKET:?S3_BUCKET is required}
     volumes:
       - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - tempo-data:/var/tempo
@@ -154,28 +251,29 @@ services:
       - "3200"
       - "4317"
       - "4318"
-    networks: [ app-network ]
+    networks: [app-network]
 
   loki:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: grafana/loki:3.2.1
     container_name: ${PROJECT_NAME:-bi8s}-loki
-    command: [ "-config.file=/etc/loki/loki-config.yaml", "-config.expand-env=true" ]
+    command:
+      ["-config.file=/etc/loki/loki-config.yaml", "-config.expand-env=true"]
     environment:
       AWS_REGION: ${AWS_REGION}
-      S3_BUCKET: ${S3_BUCKET}
+      S3_BUCKET: ${S3_BUCKET:?S3_BUCKET is required}
     volumes:
       - ./observability/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki-data:/loki
     expose:
       - "3100"
-    networks: [ app-network ]
+    networks: [app-network]
 
   promtail:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: grafana/promtail:3.2.1
     container_name: ${PROJECT_NAME:-bi8s}-promtail
-    command: [ "-config.file=/etc/promtail/config.yaml" ]
+    command: ["-config.file=/etc/promtail/config.yaml"]
     volumes:
       - ./observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -183,15 +281,15 @@ services:
     depends_on:
       loki:
         condition: service_started
-    networks: [ app-network ]
+    networks: [app-network]
 
   grafana:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: grafana/grafana:11.3.0
     container_name: ${PROJECT_NAME:-bi8s}-grafana
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor traceToMetrics"
       GF_SERVER_ROOT_URL: "${GRAFANA_ROOT_URL:-https://grafana.xanderbilla.com/bi8s}"
@@ -209,10 +307,10 @@ services:
         condition: service_started
       loki:
         condition: service_started
-    networks: [ app-network ]
+    networks: [app-network]
 
   cadvisor:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: gcr.io/cadvisor/cadvisor:v0.50.0
     container_name: ${PROJECT_NAME:-bi8s}-cadvisor
     privileged: true
@@ -227,10 +325,10 @@ services:
       - --store_container_labels=true
     expose:
       - "8080"
-    networks: [ app-network ]
+    networks: [app-network]
 
   node-exporter:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: prom/node-exporter:v1.8.2
     container_name: ${PROJECT_NAME:-bi8s}-node-exporter
     pid: host
@@ -246,7 +344,7 @@ services:
         $$|/)"
     expose:
       - "9100"
-    networks: [ app-network ]
+    networks: [app-network]
 
 networks:
   app-network:

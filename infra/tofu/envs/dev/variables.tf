@@ -125,10 +125,9 @@ variable "grafana_admin_user" {
 }
 
 variable "grafana_admin_password" {
-  description = "Admin password for the Grafana UI on the EC2 instance"
+  description = "Admin password for the Grafana UI on the EC2 instance. Must be supplied via TF_VAR_grafana_admin_password or a *.tfvars file; no insecure default is provided."
   type        = string
   sensitive   = true
-  default     = "admin"
 }
 
 variable "grafana_domain_name" {
@@ -147,4 +146,34 @@ variable "admin_email" {
   description = "Admin email for Let's Encrypt certificate registration"
   type        = string
   default     = "admin@xanderbilla.com"
+}
+
+variable "enable_public_dns" {
+  description = "When true, request Let's Encrypt certs and create Route53 records for the configured domains. Set false for ephemeral / no-DNS environments."
+  type        = bool
+  default     = true
+}
+
+variable "log_retention_days" {
+  description = "Retention (in days) for CloudWatch log groups created for app + nginx tail-shippers. Dev defaults to 7 to keep costs low."
+  type        = number
+  default     = 7
+}
+
+variable "enable_budget" {
+  description = "When true, provision an AWS monthly cost budget for this environment."
+  type        = bool
+  default     = false
+}
+
+variable "budget_monthly_limit_usd" {
+  description = "Monthly budget limit in USD when enable_budget is true."
+  type        = number
+  default     = 30
+}
+
+variable "budget_notification_emails" {
+  description = "Email addresses to notify on budget threshold breaches."
+  type        = list(string)
+  default     = []
 }

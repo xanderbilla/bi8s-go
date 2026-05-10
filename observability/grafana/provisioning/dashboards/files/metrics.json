@@ -22,10 +22,16 @@
   "description": "Unified bi8s API metrics dashboard with RED-style traffic/error/latency plus payload and endpoint-level drilldowns.",
   "links": [
     {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
       "keepTime": true,
-      "title": "Open Logging Dashboard",
-      "type": "link",
-      "url": "/d/bfkuquap88pogc/bi8s-api-logging"
+      "tags": ["bi8s"],
+      "targetBlank": false,
+      "title": "bi8s Dashboards",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
     }
   ],
   "panels": [

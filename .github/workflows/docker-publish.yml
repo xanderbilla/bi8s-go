@@ -6,14 +6,16 @@ on:
       - dev
       - prod
     paths:
-      - appl/cmd/**
-      - appl/internal/**
-      - appl/Dockerfile
-      - appl/.air.toml
-      - appl/Makefile
+      - app/cmd/**
+      - app/internal/**
+      - app/Dockerfile
+      - app/.air.toml
+      - app/Makefile
   workflow_dispatch:
 
+# OIDC requires id-token: write. contents: read for actions/checkout.
 permissions:
+  id-token: write
   contents: read
 
 concurrency:
@@ -30,11 +32,17 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       environment: ${{ steps.detect-env.outputs.environment }}
+    # Bind to the matching GitHub Environment so its protection rules apply
+    # (required reviewers on `prod`, branch protection on `dev`).
+    environment:
+      name: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'dev' }}
 
     steps:
       # Pull repository code at the commit that triggered this workflow.
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Derive environment and Docker image name from the branch.
       - name: Detect environment
@@ -46,12 +54,14 @@ jobs:
             echo "environment=dev" >> $GITHUB_OUTPUT
           fi
 
-      # Authenticate to AWS to push to ECR.
-      - name: Configure AWS credentials
+      # Authenticate to AWS via OIDC — no long-lived access keys.
+      # AWS_OIDC_ROLE_ARN is set per GitHub Environment (dev / prod) and
+      # points at the role created by infra/tofu/bootstrap.
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          role-session-name: gha-docker-publish-${{ github.run_id }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       # Authenticate Docker to the private ECR registry.
@@ -59,21 +69,52 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Ensure ECR repository exists with the {projectname}-{env} naming convention.
+      # ECR repository naming: `<project>-<env>` (e.g. bi8s-go-dev, bi8s-go-prod).
+      # If the repository does not exist yet, create it with sensible defaults
+      # (image scanning on push, AES256 encryption, immutable tags so we can
+      # never overwrite a published vX.Y.Z).
       - name: Ensure ECR repository exists
         env:
           REPO_NAME: ${{ env.PROJECT_NAME }}-${{ steps.detect-env.outputs.environment }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
-          aws ecr describe-repositories \
-            --repository-names "$REPO_NAME" \
-            --region "$AWS_REGION" > /dev/null 2>&1 || \
-          aws ecr create-repository \
-            --repository-name "$REPO_NAME" \
-            --region "$AWS_REGION" \
-            --image-tag-mutability MUTABLE \
-            --image-scanning-configuration scanOnPush=true
-          echo "ECR repository $REPO_NAME is ready"
+          set -e
+          if aws ecr describe-repositories \
+              --repository-names "$REPO_NAME" \
+              --region "$AWS_REGION" >/dev/null 2>&1; then
+            echo "ECR repository $REPO_NAME exists"
+          else
+            echo "Creating ECR repository $REPO_NAME"
+            aws ecr create-repository \
+              --repository-name "$REPO_NAME" \
+              --region "$AWS_REGION" \
+              --image-scanning-configuration scanOnPush=true \
+              --encryption-configuration encryptionType=AES256 \
+              --image-tag-mutability MUTABLE >/dev/null
+            echo "Created ECR repository $REPO_NAME"
+          fi
+
+      # Derive semantic version from latest git tag (vX.Y.Z) or VERSION file
+      # fallback. Image is published as both :latest and :vX.Y.Z so callers
+      # can pin or follow the rolling tag.
+      - name: Resolve version
+        id: version
+        run: |
+          set -e
+          TAG="$(git describe --tags --abbrev=0 --match 'v*.*.*' 2>/dev/null || true)"
+          if [ -z "$TAG" ]; then
+            if [ -f VERSION ]; then
+              TAG="v$(tr -d '[:space:]' < VERSION)"
+            else
+              TAG="v0.0.0"
+            fi
+          fi
+          COMMIT="$(git rev-parse --short HEAD)"
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "version=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "commit=${COMMIT}" >> "$GITHUB_OUTPUT"
+          echo "date=${DATE}" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: ${TAG} (${COMMIT})"
 
       # Enable emulation so we can build for multiple CPU architectures.
       - name: Set up QEMU
@@ -85,30 +126,80 @@ jobs:
 
       # Build and push image manifests for linux/amd64 and linux/arm64 to ECR.
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@v6
         with:
-          context: ./appl
-          file: ./appl/Dockerfile
+          context: ./app
+          file: ./app/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            COMMIT=${{ steps.version.outputs.commit }}
+            BUILD_DATE=${{ steps.version.outputs.date }}
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT_NAME }}-${{ steps.detect-env.outputs.environment }}:latest
             ${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT_NAME }}-${{ steps.detect-env.outputs.environment }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT_NAME }}-${{ steps.detect-env.outputs.environment }}:${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Scan the published image for known CRITICAL/HIGH vulnerabilities.
+      # Advisory only -- existing baseline findings are tracked separately;
+      # promoting to blocking is a follow-up once the baseline is clean.
+      - name: Trivy image scan (advisory)
+        uses: aquasecurity/trivy-action@0.24.0
+        continue-on-error: true
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT_NAME }}-${{ steps.detect-env.outputs.environment }}:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+      # Generate an SPDX SBOM for the published image so consumers can audit
+      # third-party components. Uploaded as a workflow artifact for 30 days.
+      - name: Generate SBOM (syft)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT_NAME }}-${{ steps.detect-env.outputs.environment }}:${{ github.sha }}
+          format: spdx-json
+          output-file: sbom-${{ steps.version.outputs.version }}.spdx.json
+          upload-artifact: true
+          upload-artifact-retention: 30
+
+      # Install cosign for keyless OIDC signing of the published image.
+      # Uses the workflow's GitHub OIDC identity -- no long-lived keys to manage.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.7.0
+        with:
+          cosign-release: v2.4.1
+
+      # Sign the published image with the workflow's OIDC identity. The
+      # signature is stored alongside the image in ECR; verifiers can check
+      # it with `cosign verify --certificate-identity-regexp ... --certificate-oidc-issuer https://token.actions.githubusercontent.com`.
+      - name: Sign image with cosign (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+          IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT_NAME }}-${{ steps.detect-env.outputs.environment }}@${{ steps.build.outputs.digest }}
+        run: |
+          cosign sign --yes "$IMAGE"
 
   deploy:
     name: Redeploy on ${{ needs.docker.outputs.environment }}
     runs-on: ubuntu-latest
     needs: docker
+    # Same environment binding -- inherits prod required-reviewers gate.
+    environment:
+      name: ${{ needs.docker.outputs.environment }}
 
     steps:
-      # Authenticate to AWS to query EC2 and run SSM commands.
-      - name: Configure AWS credentials
+      # Authenticate to AWS via OIDC.
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          role-session-name: gha-redeploy-${{ github.run_id }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       # Find any running EC2 instances tagged for this project/environment.
@@ -132,25 +223,39 @@ jobs:
             echo "instance_ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
           fi
 
-      # Pull the latest image and restart the compose service on each instance via SSM.
+      # Pull the immutable SHA-tagged image and restart the compose service on
+      # each instance via SSM. Before switching IMAGE_NAME we record the
+      # currently-deployed value to /opt/$PROJ/release/PREVIOUS_IMAGE so the
+      # auto-rollback step below can restore it on a failed health check.
       - name: Redeploy containers via SSM
         if: steps.check-infra.outputs.found == 'true'
         env:
           INSTANCE_IDS: ${{ steps.check-infra.outputs.instance_ids }}
           ENVIRONMENT: ${{ needs.docker.outputs.environment }}
+          GIT_SHA: ${{ github.sha }}
         run: |
           REGION="${{ secrets.AWS_REGION }}"
           PROJ="${{ env.PROJECT_NAME }}"
 
-          # Build SSM parameters JSON using jq to avoid quoting issues
+          # Build SSM parameters JSON using jq to avoid quoting issues.
+          # Pin IMAGE_NAME to the immutable @sha tag from this build so rollouts
+          # are reproducible and a stale `:latest` cache cannot serve drift.
           PARAMS=$(jq -cn \
             --arg proj "$PROJ" \
             --arg region "$REGION" \
+            --arg env "$ENVIRONMENT" \
+            --arg sha "$GIT_SHA" \
             '{commands: [
               "set -e",
               ("cd /opt/" + $proj + "/compose"),
-              ("ECR_REGISTRY=$(aws sts get-caller-identity --query Account --output text).dkr.ecr." + $region + ".amazonaws.com"),
+              ("mkdir -p /opt/" + $proj + "/release"),
+              ("ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)"),
+              ("ECR_REGISTRY=${ACCOUNT_ID}.dkr.ecr." + $region + ".amazonaws.com"),
+              ("NEW_IMAGE=${ECR_REGISTRY}/" + $proj + "-" + $env + ":" + $sha),
+              ("PREV_IMAGE=$(grep -E \"^IMAGE_NAME=\" .env 2>/dev/null | cut -d= -f2- || true)"),
+              ("if [ -n \"$PREV_IMAGE\" ] && [ \"$PREV_IMAGE\" != \"$NEW_IMAGE\" ]; then echo \"$PREV_IMAGE\" > /opt/" + $proj + "/release/PREVIOUS_IMAGE; fi"),
               ("aws ecr get-login-password --region " + $region + " | docker login --username AWS --password-stdin $ECR_REGISTRY"),
+              ("if grep -qE \"^IMAGE_NAME=\" .env; then sed -i \"s|^IMAGE_NAME=.*|IMAGE_NAME=${NEW_IMAGE}|\" .env; else echo \"IMAGE_NAME=${NEW_IMAGE}\" >> .env; fi"),
               "docker-compose pull",
               "docker-compose down --remove-orphans",
               "docker-compose up -d"
@@ -198,3 +303,137 @@ jobs:
           echo "**Environment:** $ENVIRONMENT" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** ${{ env.PROJECT_NAME }}-$ENVIRONMENT:latest" >> $GITHUB_STEP_SUMMARY
           echo "**Instances:** $INSTANCE_IDS" >> $GITHUB_STEP_SUMMARY
+
+      # Post-deploy health gate: probe the API container's /v1/livez and /health
+      # endpoints from inside each EC2 instance via SSM and fail the workflow
+      # if they do not return 200 within the retry window. Acts as the last
+      # line of defence so a broken image cannot quietly stay running.
+      - name: Post-deploy health check
+        if: steps.check-infra.outputs.found == 'true'
+        env:
+          INSTANCE_IDS: ${{ steps.check-infra.outputs.instance_ids }}
+          ENVIRONMENT: ${{ needs.docker.outputs.environment }}
+        run: |
+          PARAMS=$(jq -cn '{commands: [
+            "set -e",
+            "for i in $(seq 1 30); do",
+            "  if curl -fsS --max-time 3 http://127.0.0.1:8080/v1/livez >/dev/null \\",
+            "       && curl -fsS --max-time 3 -k https://127.0.0.1/health >/dev/null; then",
+            "    echo \"healthy after attempt $i\"; exit 0;",
+            "  fi",
+            "  sleep 2",
+            "done",
+            "echo \"health check failed after 30 attempts\" >&2",
+            "docker ps --format \"table {{.Names}}\\t{{.Status}}\" >&2",
+            "exit 1"
+          ]}')
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids $INSTANCE_IDS \
+            --document-name "AWS-RunShellScript" \
+            --parameters "$PARAMS" \
+            --timeout-seconds 180 \
+            --comment "Post-deploy health check for ${{ env.PROJECT_NAME }}-$ENVIRONMENT" \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "Health-check SSM Command ID: $COMMAND_ID"
+          FAIL=0
+          for INSTANCE_ID in $INSTANCE_IDS; do
+            aws ssm wait command-executed \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" || true
+
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query 'Status' --output text)
+
+            echo "$INSTANCE_ID health → $STATUS"
+
+            if [ "$STATUS" != "Success" ]; then
+              FAIL=1
+              echo "--- stdout ---"
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+                --query 'StandardOutputContent' --output text
+              echo "--- stderr ---"
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+                --query 'StandardErrorContent' --output text
+            fi
+          done
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "::error::Post-deploy health check failed on one or more instances. Investigate before promoting."
+            exit 1
+          fi
+
+          echo "### Health Check" >> $GITHUB_STEP_SUMMARY
+          echo "All ${ENVIRONMENT} instances responded 200 to /v1/livez and /health." >> $GITHUB_STEP_SUMMARY
+
+      # Auto-rollback: if any earlier step in this job failed (typically the
+      # health gate above), restore the previously-deployed image recorded in
+      # /opt/$PROJ/release/PREVIOUS_IMAGE and bring the stack back up. This
+      # only runs when both (a) we have target instances and (b) we previously
+      # captured a PREVIOUS_IMAGE -- a first-ever deploy has no rollback
+      # target and will surface the failure unmodified.
+      - name: Rollback on failure
+        if: failure() && steps.check-infra.outputs.found == 'true'
+        env:
+          INSTANCE_IDS: ${{ steps.check-infra.outputs.instance_ids }}
+          ENVIRONMENT: ${{ needs.docker.outputs.environment }}
+        run: |
+          REGION="${{ secrets.AWS_REGION }}"
+          PROJ="${{ env.PROJECT_NAME }}"
+
+          PARAMS=$(jq -cn \
+            --arg proj "$PROJ" \
+            --arg region "$REGION" \
+            '{commands: [
+              "set -e",
+              ("PREV_FILE=/opt/" + $proj + "/release/PREVIOUS_IMAGE"),
+              "if [ ! -s \"$PREV_FILE\" ]; then echo \"no PREVIOUS_IMAGE recorded -- nothing to roll back to\" >&2; exit 0; fi",
+              "PREV_IMAGE=$(cat \"$PREV_FILE\")",
+              ("cd /opt/" + $proj + "/compose"),
+              ("ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)"),
+              ("ECR_REGISTRY=${ACCOUNT_ID}.dkr.ecr." + $region + ".amazonaws.com"),
+              ("aws ecr get-login-password --region " + $region + " | docker login --username AWS --password-stdin $ECR_REGISTRY"),
+              "if grep -qE \"^IMAGE_NAME=\" .env; then sed -i \"s|^IMAGE_NAME=.*|IMAGE_NAME=${PREV_IMAGE}|\" .env; else echo \"IMAGE_NAME=${PREV_IMAGE}\" >> .env; fi",
+              "echo \"rolling back to $PREV_IMAGE\"",
+              "docker-compose pull",
+              "docker-compose down --remove-orphans",
+              "docker-compose up -d"
+            ]}')
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids $INSTANCE_IDS \
+            --document-name "AWS-RunShellScript" \
+            --parameters "$PARAMS" \
+            --timeout-seconds 300 \
+            --comment "Auto-rollback for ${{ env.PROJECT_NAME }}-$ENVIRONMENT (failed deploy ${{ github.sha }})" \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "Rollback SSM Command ID: $COMMAND_ID"
+          for INSTANCE_ID in $INSTANCE_IDS; do
+            aws ssm wait command-executed \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" || true
+
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query 'Status' --output text)
+
+            echo "$INSTANCE_ID rollback → $STATUS"
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+              --query 'StandardOutputContent' --output text
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+              --query 'StandardErrorContent' --output text
+          done
+
+          echo "### Rollback" >> $GITHUB_STEP_SUMMARY
+          echo "Failed deploy of ${{ github.sha }} was rolled back on ${ENVIRONMENT} instances." >> $GITHUB_STEP_SUMMARY

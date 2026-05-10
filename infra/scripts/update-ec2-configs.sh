@@ -39,7 +39,10 @@ ssh -o StrictHostKeyChecking=no ec2-user@${EC2_IP} << 'EOF'
     sudo cp infra/docker/docker-compose.yml /opt/bi8s/compose/
     
     echo "Updating nginx config..."
-    sudo cp infra/docker/nginx.conf /opt/bi8s/nginx/conf.d/api.conf
+    sudo cp infra/docker/nginx/conf.d/api.conf /opt/bi8s/nginx/conf.d/api.conf
+    sudo cp infra/docker/nginx/conf.d/ui.conf /opt/bi8s/nginx/conf.d/ui.conf
+    sudo mkdir -p /opt/bi8s/nginx/snippets
+    sudo cp infra/docker/nginx/snippets/*.conf /opt/bi8s/nginx/snippets/
     
     echo "Setting permissions..."
     sudo chown -R ec2-user:ec2-user /opt/bi8s

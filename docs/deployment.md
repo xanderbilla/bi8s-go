@@ -1,240 +1,101 @@
 # Deployment
 
-This project uses Infrastructure as Code (OpenTofu/Terraform) for AWS deployment with automated CI/CD via GitHub Actions.
+`bi8s-go` is deployed as a single Linux container to **EC2** (Amazon
+Linux 2023) behind **NGINX**. Infrastructure is provisioned with
+**OpenTofu**, and CI publishes images to **GHCR** on every push to `dev`.
 
-## Quick Links
-
-- [Complete Deployment Guide](deployment-guide.md) - Full deployment instructions
-- [GitHub Workflows](../.github/workflows/README.md) - CI/CD documentation
-
-## Architecture
+## Pipeline overview
 
 ```
-┌─────────────────────────────────────────┐
-│ GitHub Actions                          │
-│ ├─ infra-deploy.yml (Infrastructure)    │
-│ └─ docker-publish.yml (Application)     │
-└─────────────────────────────────────────┘
-                    │
-        ┌───────────┴───────────┐
-        ▼                       ▼
-┌──────────────┐        ┌──────────────┐
-│ AWS          │        │ Docker Hub   │
-│ - VPC        │        │ - Images     │
-│ - EC2        │        └──────────────┘
-│ - DynamoDB   │                │
-│ - S3         │                │
-│ - IAM        │                │
-└──────────────┘                │
-        │                       │
-        └───────────┬───────────┘
-                    ▼
-            ┌──────────────┐
-            │ EC2 Instance │
-            │              │
-            │ Docker       │
-            │ + Nginx      │
-            │ + SSL        │
-            └──────────────┘
+┌────────────────┐    push    ┌────────────────┐    OIDC    ┌────────────────┐
+│ developer push │──────────► │ GitHub Actions │──────────► │   AWS (Tofu)   │
+└────────────────┘            └───────┬────────┘            └───────┬────────┘
+                                      │                             │
+                                      ▼                             ▼
+                              ┌────────────────┐            ┌────────────────┐
+                              │   GHCR image   │   docker   │ EC2 (NGINX +   │
+                              │ ghcr.io/.../api│◄───pull────│  bi8s-go)      │
+                              └────────────────┘            └────────────────┘
 ```
 
-## Infrastructure Components
+## CI workflows
 
-### AWS Resources (Managed by Terraform)
+All under `.github/workflows/`:
 
-- **VPC** - Isolated network with public/private subnets
-- **EC2** - Application server with Docker
-- **DynamoDB** - 4 tables (movies, persons, attributes, encoder)
-- **S3** - File storage bucket
-- **IAM** - Roles and policies (no keys needed)
-- **Security Groups** - Firewall rules (ports 80, 443, 22)
+| Workflow             | Trigger                     | What it does                                                                                                                 |
+| -------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `ci.yml`             | `push`, `pull_request`      | `go vet`, `go test -race -cover`, `golangci-lint`, `govulncheck`, OpenAPI lint (advisory).                                   |
+| `docker-publish.yml` | `push` to `dev`, tags       | Multi-arch (`linux/amd64`, `linux/arm64`) build → push to `ghcr.io/xanderbilla/bi8s-go` with `:dev` and `:sha-<short>` tags. |
+| `infra-deploy.yml`   | manual / `infra/**` changes | `tofu fmt -check`, `tofu validate`, `tofu plan`, optional `apply` (gated by environment approval).                           |
 
-### Application Stack (On EC2)
+CI authenticates to AWS via **GitHub OIDC** (no long-lived keys). The
+trust policy lives in `infra/tofu/modules/github-oidc/`.
 
-- **Docker** - Container runtime
-- **Docker Compose** - Multi-container orchestration
-- **Nginx** - Reverse proxy with SSL
-- **Go API** - Application container
+## Tofu layout
 
-## Deployment Workflow
+```
+infra/tofu/
+  bootstrap/        # one-time S3 backend + DynamoDB lock table bootstrap
+  global/           # provider/version pins shared across envs
+  modules/
+    vpc/            # VPC + public/private subnets + NAT
+    ec2/            # API EC2 instance, ALB, AMI selection
+    dynamodb/       # 4 tables + GSIs (provisioned in dev, on-demand in prod)
+    s3/             # bi8s-storage bucket (versioned, encrypted)
+    iam/            # roles for EC2 instance profile + GHA OIDC
+    security-group/ # SG rules per tier
+    github-oidc/    # OIDC provider + role for CI
+  envs/
+    _shared/        # locals/variables shared by dev and prod
+    dev/            # dev-specific composition (calls modules)
+    prod/           # prod-specific composition
+```
 
-### 1. Infrastructure Changes
+## Bootstrapping a new account
 
 ```bash
-# Edit infrastructure
-vim infra/tofu/envs/dev/variables.tf
+# 1. Create the remote state bucket + lock table once per account.
+make tofu-bootstrap
 
-# Push changes
-git push origin dev
-
-# GitHub Actions automatically:
-# - Plans changes (on PR)
-# - Applies changes (on merge)
-# - Outputs EC2 IP
+# 2. Plan + apply the dev environment.
+make tofu-plan ENV=dev
+make tofu-apply ENV=dev
 ```
 
-### 2. Application Changes
+`scripts/init-backend.sh` wires the local backend config to the bucket
+created by step 1.
 
-```bash
-# Edit code
-vim internal/http/movie_handler.go
+## Promoting to production
 
-# Push changes
-git push origin dev
+1. Merge to `dev` → CI publishes `:dev` and `:sha-<short>` images.
+2. Tag a release: `git tag v0.2.0 && git push --tags`.
+3. CI publishes `:v0.2.0` and `:latest`.
+4. Update `prod` Tofu variable `app_image_tag` to `v0.2.0`.
+5. `make tofu-plan ENV=prod` → review → `make tofu-apply ENV=prod`.
 
-# GitHub Actions automatically:
-# - Builds Docker image
-# - Pushes to Docker Hub
+The EC2 user-data script (`infra/scripts/update-ec2-configs.sh`) pulls
+the new image and rolls the container with zero downtime via NGINX
+upstream switching.
 
-# Then deploy to EC2:
-ssh ec2-user@<EC2_IP>
-cd /opt/bi8s/compose
-../scripts/deploy.sh
-```
+## Runtime
 
-## Environment Variables
+| Component        | Image / package                     | Notes                                                                                                                                                        |
+| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| API              | `ghcr.io/xanderbilla/bi8s-go:<tag>` | Runtime stage of `app/Dockerfile`, runs as UID 10001.                                                                                                        |
+| NGINX            | distro package                      | Config in `infra/docker/nginx/` (split: `nginx.conf`, `conf.d/*.conf`, `snippets/*.conf`). TLS via Let's Encrypt (`infra/scripts/setup-ssl-letsencrypt.sh`). |
+| CloudWatch Agent | distro package                      | Installed by `infra/scripts/install-cloudwatch-agent.sh`.                                                                                                    |
 
-### GitHub Secrets (CI/CD)
+## Health & probes
 
-Required in repository settings:
+- ALB target group health check: `GET /v1/livez` (200 = healthy).
+- NGINX upstream probe: `GET /v1/readyz` (used by zero-downtime swap).
+- Application readiness includes DynamoDB + S3 + Redis (when configured).
 
-- `AWS_ACCESS_KEY_ID` - AWS credentials
-- `AWS_SECRET_ACCESS_KEY` - AWS credentials
-- `AWS_REGION` - AWS region
-- `DOCKER_REGISTRY` - Docker Hub URL
-- `DOCKER_USERNAME` - Docker Hub username
-- `DOCKER_PASSWORD` - Docker Hub token
+See [RUNBOOK.md](RUNBOOK.md) for incident response and rollback steps.
 
-### EC2 Environment (Application)
+## Releases
 
-Configured in `/opt/bi8s/compose/.env`:
-
-- Auto-set by Terraform: AWS resources, region, table names
-- Manual: Application secrets (JWT, API keys, etc.)
-
-## Directory Structure on EC2
-
-```
-/opt/bi8s/
-├── compose/
-│   ├── docker-compose.yml
-│   ├── .env (your secrets)
-│   └── .env.example
-├── nginx/
-│   ├── conf.d/api.conf
-│   └── ssl/live/
-│       ├── cert.crt
-│       └── cert.key
-└── scripts/
-    ├── deploy.sh
-    ├── update-ip.sh
-    ├── renew-ssl.sh
-    └── backup-config.sh
-```
-
-## Common Tasks
-
-### Deploy Application
-
-```bash
-ssh ec2-user@<EC2_IP>
-cd /opt/bi8s/compose
-../scripts/deploy.sh
-```
-
-### View Logs
-
-```bash
-docker-compose logs -f
-```
-
-### Update Configuration
-
-```bash
-vim /opt/bi8s/compose/.env
-../scripts/deploy.sh
-```
-
-### Setup SSL Certificate
-
-```bash
-# From local machine
-./infra/scripts/setup-ssl-letsencrypt.sh <EC2_IP> api.yourdomain.com
-```
-
-### Backup Configuration
-
-```bash
-/opt/bi8s/scripts/backup-config.sh
-```
-
-## Troubleshooting
-
-### Check Service Status
-
-```bash
-cd /opt/bi8s/compose
-docker-compose ps
-```
-
-### View Application Logs
-
-```bash
-docker-compose logs -f api
-```
-
-### View Nginx Logs
-
-```bash
-docker-compose logs -f nginx
-```
-
-### Restart Services
-
-```bash
-docker-compose restart
-```
-
-### Update IP After Restart
-
-```bash
-/opt/bi8s/scripts/update-ip.sh
-docker-compose restart
-```
-
-## Security Notes
-
-- IAM roles used (no AWS keys on EC2)
-- SSL/TLS encryption (HTTPS)
-- Security groups restrict access
-- Secrets in `.env` (not in git)
-- Docker containers isolated
-- Nginx reverse proxy
-
-## Monitoring
-
-### Health Check
-
-```bash
-curl https://<EC2_IP>/v1/health
-```
-
-### Check Resources
-
-```bash
-# CPU/Memory
-docker stats
-
-# Disk space
-df -h
-
-# Network
-netstat -tlnp
-```
-
-## Further Reading
-
-- [Complete Deployment Guide](deployment-guide.md)
-- [GitHub Actions Workflows](../.github/workflows/README.md)
-- [Architecture Documentation](architecture.md)
-- [DynamoDB Design](dynamodb.md)
+Releases are tracked in [`../CHANGELOG.md`](../CHANGELOG.md) using the
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format and
+SemVer. The version stored in `VERSION` is read by the build pipeline
+and surfaced as `BUILD_VERSION` to the running binary.

@@ -10,184 +10,353 @@ info:
     {
       "success": true,
       "status": 200,
-      "code": "OK",
       "message": "ok",
       "data": {},
-      "request_id": "01J...",
+      "error": null,
+      "requestId": "01J...",
       "path": "/v1/...",
       "timestamp": "2026-01-01T00:00:00Z"
     }
     ```
 
-    Error responses set `success: false` and include `error` (machine-readable
-    code) plus optional `details`.
-  version: "1.0.0"
+    Error responses set `success: false` and include an `error` object with
+    machine-readable `type` and `code` fields.
+  version: 1.0.0
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  contact:
+    name: bi8s-go maintainers
+    url: https://github.com/xanderbilla/bi8s-go
 servers:
-  - url: /v1
-    description: API root (relative to the service host)
-
+- url: /v1
+  description: API root (relative to the service host)
 tags:
-  - name: Health
-    description: Liveness, readiness, and deep health checks.
-  - name: Consumer
-    description: Public, read-only endpoints under `/v1/c`.
-  - name: Admin
-    description: Write endpoints under `/v1/a`. Network-level access control only.
-  - name: Encoder
-    description: HLS encoder job submission and status under `/v1/a/encoder`.
-
+- name: Health
+  description: Liveness, readiness, and deep health checks.
+- name: Consumer
+  description: Public, read-only endpoints under `/v1/c`.
+- name: Admin
+  description: Write endpoints under `/v1/a`. Network-level access control only.
+- name: Encoder
+  description: HLS encoder job submission and status under `/v1/a/encoder`.
+security: []
 paths:
   /health:
     get:
-      tags: [ Health ]
+      tags:
+      - Health
       summary: Deep health check (parallel dependency probe)
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: deepHealthCheck
   /livez:
     get:
-      tags: [ Health ]
+      tags:
+      - Health
       summary: Liveness probe (cheap, no metadata leaked)
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: livenessProbe
   /readyz:
     get:
-      tags: [ Health ]
+      tags:
+      - Health
       summary: Readiness probe
       description: Returns 503 with code `NOT_READY` during startup or shutdown.
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-
-  /c/content:
-    get:
-      tags: [ Consumer ]
-      summary: List recent content
-      parameters:
-        - in: query
-          name: type
-          schema: { type: string, enum: [ all, movie, tv ] }
-      responses:
-        "200": { $ref: "#/components/responses/OK" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: readinessProbe
   /c/content/{contentId}:
     get:
-      tags: [ Consumer ]
+      tags:
+      - Consumer
       summary: Get a movie / show by content ID
       parameters:
-        - $ref: "#/components/parameters/ContentId"
+      - $ref: '#/components/parameters/ContentId'
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: getConsumerContent
   /c/people/{peopleId}:
     get:
-      tags: [ Consumer ]
+      tags:
+      - Consumer
       summary: Get a person by ID
       parameters:
-        - $ref: "#/components/parameters/PeopleId"
+      - $ref: '#/components/parameters/PeopleId'
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: getConsumerPerson
   /c/people/{peopleId}/content:
     get:
-      tags: [ Consumer ]
+      tags:
+      - Consumer
       summary: List content associated with a person
       parameters:
-        - $ref: "#/components/parameters/PeopleId"
-        - in: query
-          name: type
-          schema: { type: string }
+      - $ref: '#/components/parameters/PeopleId'
+      - in: query
+        name: type
+        schema:
+          type: string
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: getConsumerContentByPerson
   /c/banner:
     get:
-      tags: [ Consumer ]
+      tags:
+      - Consumer
       summary: Featured banner content
       parameters:
-        - in: query
-          name: type
-          schema: { type: string }
+      - in: query
+        name: type
+        schema:
+          type: string
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: getConsumerBanner
+  /c/attributes:
+    get:
+      tags:
+      - Consumer
+      summary: List consumer attributes
+      description: Returns active attributes only. Use `type` to filter by attribute family.
+      parameters:
+      - in: query
+        name: type
+        schema:
+          type: string
+          enum:
+          - genre
+          - genres
+          - tag
+          - tags
+          - mood
+          - moods
+          - studio
+          - studios
+          - category
+          - categories
+          - speciality
+          - specialities
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: listConsumerAttributes
   /c/attributes/{id}:
     get:
-      tags: [ Consumer ]
+      tags:
+      - Consumer
       summary: List content for an attribute (genre/tag/etc.)
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, maxLength: 100 }
-        - in: query
-          name: content
-          schema: { type: string }
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          maxLength: 100
+      - in: query
+        name: content
+        schema:
+          type: string
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: getConsumerContentByAttribute
   /c/discover:
     get:
-      tags: [ Consumer ]
+      tags:
+      - Consumer
       summary: Discover content
       parameters:
-        - in: query
-          name: type
-          schema: { type: string, default: latest }
-        - in: query
-          name: content
-          schema: { type: string }
+      - in: query
+        name: type
+        schema:
+          type: string
+          enum:
+          - latest
+          - recent
+          - popular
+          - trending
+          default: latest
+      - in: query
+        name: content
+        schema:
+          type: string
+          enum:
+          - all
+          - movie
+          - tv
+          default: all
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: discoverConsumerContent
+  /c/search:
+    get:
+      tags:
+      - Consumer
+      summary: Search content and people
+      description: |
+        Search across content and people indices. Results may be partial if a backend is unavailable;
+        check the `warnings` array for details on which backends failed (scope: content or people).
+      parameters:
+      - in: query
+        name: query
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: in
+        schema:
+          type: string
+          enum:
+          - all
+          - movie
+          - tv
+          - people
+          default: all
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: pageSize
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Search results. May include warnings if partial (one backend unavailable).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          type: object
+                          description: Content search result item
+                      page:
+                        type: integer
+                        description: Requested page number
+                      pageSize:
+                        type: integer
+                        description: Results per page
+                      count:
+                        type: integer
+                        description: Total results available for this query
+                  people:
+                    type: object
+                    properties:
+                      results:
+                        type: array
+                        description: Search person results
+                        items:
+                          type: object
+                          description: Person search result item
+                      page:
+                        type: integer
+                        description: Requested page number
+                      pageSize:
+                        type: integer
+                        description: Results per page
+                      count:
+                        type: integer
+                        description: Total results available for this query
+                  warnings:
+                    type: array
+                    description: |
+                      Array of warnings. Present when a search backend partially failed (e.g., one index timeout).
+                      Clients should check this array and may choose to display a notification to users about degraded search.
+                    items:
+                      type: object
+                      properties:
+                        scope:
+                          type: string
+                          enum:
+                          - content
+                          - people
+                          description: Which search backend reported the issue (content or people)
+                        code:
+                          type: string
+                          enum:
+                          - PARTIAL_SEARCH
+                          description: Warning code (PARTIAL_SEARCH indicates incomplete results from this scope)
+                        message:
+                          type: string
+                          description: Human-readable error message from the backend
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: searchConsumer
   /c/play/{contentType}/{contentId}:
     get:
-      tags: [ Consumer ]
+      tags:
+      - Consumer
       summary: Get HLS playback information
       parameters:
-        - in: path
-          name: contentType
-          required: true
-          schema: { type: string, enum: [ movie, tv ] }
-        - $ref: "#/components/parameters/ContentId"
-      responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /a/content/{contentId}:
-    post:
-      tags: [ Admin ]
-      summary: Upload supplementary video assets (trailer/teaser/clip/promo/bts)
-      parameters:
-        - $ref: "#/components/parameters/ContentId"
-      requestBody:
+      - in: path
+        name: contentType
         required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [ assetType, videos ]
-              properties:
-                assetType:
-                  type: string
-                  enum: [ TRAILER, TEASER, CLIP, PROMO, BTS ]
-                videos:
-                  type: array
-                  items: { type: string, format: binary }
+        schema:
+          type: string
+          enum:
+          - movie
+          - tv
+      - $ref: '#/components/parameters/ContentId'
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: getConsumerPlayback
   /a/encoder:
     post:
-      tags: [ Admin, Encoder ]
+      tags:
+      - Admin
+      - Encoder
       summary: Submit a video for HLS encoding
       requestBody:
         required: true
@@ -195,38 +364,63 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [ contentId, contentType, video ]
+              required:
+              - contentId
+              - contentType
+              - video
               properties:
-                contentId: { type: string }
-                contentType: { type: string, enum: [ MOVIE, TV ] }
-                video: { type: string, format: binary }
+                contentId:
+                  type: string
+                contentType:
+                  type: string
+                  enum:
+                  - MOVIE
+                  - TV
+                video:
+                  type: string
+                  format: binary
       responses:
-        "201": { $ref: "#/components/responses/OK" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "429": { $ref: "#/components/responses/RateLimited" }
-
+        '201':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+      operationId: createEncoderJob
   /a/encoder/{jobId}:
     get:
-      tags: [ Admin, Encoder ]
+      tags:
+      - Admin
+      - Encoder
       summary: Get encoder job status
       parameters:
-        - in: path
-          name: jobId
-          required: true
-          schema: { type: string, pattern: "^job_[A-Za-z0-9-]+$" }
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          pattern: ^job_[A-Za-z0-9-]+$
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /a/movies:
+        '200':
+          $ref: '#/components/responses/OK'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: getEncoderJob
+  /a/content:
     get:
-      tags: [ Admin ]
-      summary: List all movies (admin view)
+      tags:
+      - Admin
+      summary: List all content (admin view)
       responses:
-        "200": { $ref: "#/components/responses/OK" }
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: listAdminContent
     post:
-      tags: [ Admin ]
-      summary: Create a movie
+      tags:
+      - Admin
+      summary: Create content
       requestBody:
         required: true
         content:
@@ -234,43 +428,89 @@ paths:
             schema:
               type: object
       responses:
-        "201": { $ref: "#/components/responses/OK" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "409": { $ref: "#/components/responses/Conflict" }
-        "429": { $ref: "#/components/responses/RateLimited" }
-
-  /a/movies/{movieId}:
+        '201':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+      operationId: createAdminContent
+  /a/content/{contentId}:
     get:
-      tags: [ Admin ]
-      summary: Get a movie (admin view)
+      tags:
+      - Admin
+      summary: Get content (admin view)
       parameters:
-        - in: path
-          name: movieId
-          required: true
-          schema: { type: string, maxLength: 100 }
+      - $ref: '#/components/parameters/ContentId'
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "404": { $ref: "#/components/responses/NotFound" }
+        '200':
+          $ref: '#/components/responses/OK'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: getAdminContent
     delete:
-      tags: [ Admin ]
-      summary: Delete a movie
+      tags:
+      - Admin
+      summary: Delete content
       parameters:
-        - in: path
-          name: movieId
-          required: true
-          schema: { type: string }
+      - $ref: '#/components/parameters/ContentId'
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: deleteAdminContent
+    post:
+      tags:
+      - Admin
+      summary: Upload supplementary video assets (trailer/teaser/clip/promo/bts)
+      parameters:
+      - $ref: '#/components/parameters/ContentId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - assetType
+              - videos
+              properties:
+                assetType:
+                  type: string
+                  enum:
+                  - TRAILER
+                  - TEASER
+                  - CLIP
+                  - PROMO
+                  - BTS
+                videos:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: uploadAdminContentAssets
   /a/people:
     get:
-      tags: [ Admin ]
+      tags:
+      - Admin
       summary: List all people
       responses:
-        "200": { $ref: "#/components/responses/OK" }
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: listAdminPeople
     post:
-      tags: [ Admin ]
+      tags:
+      - Admin
       summary: Create a person
       requestBody:
         required: true
@@ -279,48 +519,69 @@ paths:
             schema:
               type: object
       responses:
-        "201": { $ref: "#/components/responses/OK" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "429": { $ref: "#/components/responses/RateLimited" }
-
+        '201':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+      operationId: createAdminPerson
   /a/people/{peopleId}:
     get:
-      tags: [ Admin ]
+      tags:
+      - Admin
       summary: Get a person
       parameters:
-        - $ref: "#/components/parameters/PeopleId"
+      - $ref: '#/components/parameters/PeopleId'
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "404": { $ref: "#/components/responses/NotFound" }
+        '200':
+          $ref: '#/components/responses/OK'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: getAdminPerson
     delete:
-      tags: [ Admin ]
+      tags:
+      - Admin
       summary: Delete a person
       parameters:
-        - $ref: "#/components/parameters/PeopleId"
+      - $ref: '#/components/parameters/PeopleId'
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: deleteAdminPerson
   /a/people/{peopleId}/content:
     get:
-      tags: [ Admin ]
+      tags:
+      - Admin
       summary: List content associated with a person (admin view)
       parameters:
-        - $ref: "#/components/parameters/PeopleId"
-        - in: query
-          name: type
-          schema: { type: string }
+      - $ref: '#/components/parameters/PeopleId'
+      - in: query
+        name: type
+        schema:
+          type: string
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: getAdminContentByPerson
   /a/attributes:
     get:
-      tags: [ Admin ]
+      tags:
+      - Admin
       summary: List all attributes
       responses:
-        "200": { $ref: "#/components/responses/OK" }
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      operationId: listAdminAttributes
     post:
-      tags: [ Admin ]
+      tags:
+      - Admin
       summary: Create an attribute
       requestBody:
         required: true
@@ -329,34 +590,46 @@ paths:
             schema:
               type: object
       responses:
-        "201": { $ref: "#/components/responses/OK" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "409": { $ref: "#/components/responses/Conflict" }
-
+        '201':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      operationId: createAdminAttribute
   /a/attributes/{attributeId}:
     get:
-      tags: [ Admin ]
+      tags:
+      - Admin
       summary: Get an attribute
       parameters:
-        - in: path
-          name: attributeId
-          required: true
-          schema: { type: string }
+      - in: path
+        name: attributeId
+        required: true
+        schema:
+          type: string
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "404": { $ref: "#/components/responses/NotFound" }
+        '200':
+          $ref: '#/components/responses/OK'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: getAdminAttribute
     delete:
-      tags: [ Admin ]
+      tags:
+      - Admin
       summary: Delete an attribute
       parameters:
-        - in: path
-          name: attributeId
-          required: true
-          schema: { type: string }
+      - in: path
+        name: attributeId
+        required: true
+        schema:
+          type: string
       responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
+        '200':
+          $ref: '#/components/responses/OK'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: deleteAdminAttribute
 components:
   parameters:
     ContentId:
@@ -366,7 +639,7 @@ components:
       schema:
         type: string
         maxLength: 100
-        pattern: "^[A-Za-z0-9_-]+$"
+        pattern: ^[A-Za-z0-9_-]+$
     PeopleId:
       in: path
       name: peopleId
@@ -374,76 +647,119 @@ components:
       schema:
         type: string
         maxLength: 100
-        pattern: "^[A-Za-z0-9_-]+$"
-
+        pattern: ^[A-Za-z0-9_-]+$
   responses:
     OK:
       description: Success envelope
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/SuccessEnvelope" }
+          schema:
+            $ref: '#/components/schemas/SuccessEnvelope'
     BadRequest:
       description: Validation or malformed-input error
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
     NotFound:
       description: Resource not found
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
     Conflict:
       description: Conflicting state (e.g. unique constraint, optimistic lock)
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
     RateLimited:
       description: Rate limit exceeded
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
     ServiceUnavailable:
       description: Service unavailable / not ready
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
-
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
   schemas:
     SuccessEnvelope:
       type: object
-      required: [ success, status, message, request_id, timestamp ]
+      required:
+      - success
+      - status
+      - message
+      - request_id
+      - timestamp
       properties:
-        success: { type: boolean, example: true }
-        status: { type: integer, example: 200 }
-        code: { type: string, example: "OK" }
-        message: { type: string, example: "ok" }
-        data: { description: "Endpoint-specific payload" }
-        request_id: { type: string }
-        path: { type: string }
-        timestamp: { type: string, format: date-time }
-
+        success:
+          type: boolean
+          example: true
+        status:
+          type: integer
+          example: 200
+        code:
+          type: string
+          example: OK
+        message:
+          type: string
+          example: ok
+        data:
+          description: Endpoint-specific payload
+        request_id:
+          type: string
+        path:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
     ErrorEnvelope:
       type: object
-      required: [ success, status, message, error, request_id, timestamp ]
+      required:
+      - success
+      - status
+      - message
+      - request_id
+      - timestamp
       properties:
-        success: { type: boolean, example: false }
-        status: { type: integer, example: 400 }
+        success:
+          type: boolean
+          example: false
+        status:
+          type: integer
+          example: 400
         code:
           type: string
           enum:
-            - VALIDATION_FAILED
-            - BAD_REQUEST
-            - UNAUTHORIZED
-            - FORBIDDEN
-            - NOT_FOUND
-            - CONFLICT
-            - RATE_LIMITED
-            - INTERNAL_ERROR
-            - METHOD_NOT_ALLOWED
-            - NOT_READY
-            - SERVICE_UNAVAILABLE
-        message: { type: string, example: "Request validation failed" }
-        details: { description: "Machine-readable failure context" }
-        request_id: { type: string }
-        path: { type: string }
-        timestamp: { type: string, format: date-time }
+          - VALIDATION_FAILED
+          - BAD_REQUEST
+          - UNAUTHORIZED
+          - FORBIDDEN
+          - NOT_FOUND
+          - CONFLICT
+          - RATE_LIMITED
+          - INTERNAL_ERROR
+          - METHOD_NOT_ALLOWED
+          - NOT_READY
+          - SERVICE_UNAVAILABLE
+        message:
+          type: string
+          example: Request validation failed
+        details:
+          description: Machine-readable failure context
+        request_id:
+          type: string
+        path:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+  securitySchemes:
+    noAuth:
+      type: apiKey
+      in: header
+      name: X-No-Auth
+      description: Stub scheme. Routes are protected by network-level controls; explicit auth is not implemented in this version.

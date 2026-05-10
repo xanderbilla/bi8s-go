@@ -93,3 +93,97 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# ---------------------------------------------------------------------------
+# Application / deployment variables (mirroring dev for parity)
+# ---------------------------------------------------------------------------
+
+variable "repo_url" {
+  description = "Git repository to clone on the EC2 instance for compose/observability assets"
+  type        = string
+  default     = "https://github.com/xanderbilla/bi8s-go.git"
+}
+
+variable "repo_branch" {
+  description = "Git branch to deploy"
+  type        = string
+  default     = "prod"
+}
+
+variable "route53_zone_id" {
+  description = "Route53 hosted zone ID. Only used when enable_public_dns=true."
+  type        = string
+  default     = ""
+}
+
+variable "domain_name" {
+  description = "Public domain for the API. Empty + enable_public_dns=false means access via raw IP only."
+  type        = string
+  default     = ""
+}
+
+variable "grafana_admin_user" {
+  description = "Grafana admin username"
+  type        = string
+  default     = "admin"
+}
+
+variable "grafana_admin_password" {
+  description = "Grafana admin password (must be supplied via terraform.tfvars or TF_VAR_grafana_admin_password)"
+  type        = string
+  sensitive   = true
+}
+
+variable "grafana_domain_name" {
+  description = "Grafana subdomain (empty disables the dedicated Grafana nginx vhost)"
+  type        = string
+  default     = ""
+}
+
+variable "storage_domain_name" {
+  description = "CDN/storage domain (empty falls back to public IP for STORAGE_BASE_URL)"
+  type        = string
+  default     = ""
+}
+
+variable "admin_email" {
+  description = "Admin email used for Let's Encrypt registration"
+  type        = string
+  default     = ""
+}
+
+variable "enable_public_dns" {
+  description = "When true, request Let's Encrypt certs and create Route53 records. Default false for personal-project prod (raw-IP access acceptable)."
+  type        = bool
+  default     = false
+}
+
+variable "log_retention_days" {
+  description = "Retention (in days) for CloudWatch log groups created for app + nginx tail-shippers. Prod defaults to 30 for incident forensics."
+  type        = number
+  default     = 30
+}
+
+variable "dynamodb_deletion_protection" {
+  description = "When true, DynamoDB tables in this env are protected against accidental deletion. Strongly recommended in prod."
+  type        = bool
+  default     = true
+}
+
+variable "enable_budget" {
+  description = "When true, provision an AWS monthly cost budget for this environment."
+  type        = bool
+  default     = false
+}
+
+variable "budget_monthly_limit_usd" {
+  description = "Monthly budget limit in USD when enable_budget is true."
+  type        = number
+  default     = 150
+}
+
+variable "budget_notification_emails" {
+  description = "Email addresses to notify on budget threshold breaches."
+  type        = list(string)
+  default     = []
+}

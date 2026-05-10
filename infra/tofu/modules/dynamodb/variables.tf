@@ -65,6 +65,12 @@ variable "enable_encryption" {
   default     = true
 }
 
+variable "deletion_protection_enabled" {
+  description = "When true, the table cannot be deleted via the AWS API/console without first disabling protection. Recommended for prod tables."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Tags to apply to resources"
   type        = map(string)

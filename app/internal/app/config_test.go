@@ -1,0 +1,81 @@
+package app
+
+import (
+	"strings"
+	"testing"
+)
+
+func baseConfig() Config {
+	return Config{
+		Addr:                              ":8080",
+		Env:                               "dev",
+		HTTPMaxJSONBytes:                  1 << 20,
+		HTTPMaxMultipartBytes:             1 << 30,
+		RouterTimeoutSecond:               60,
+		TableName:                         "movies",
+		PersonTableName:                   "people",
+		AttributeTableName:                "attrs",
+		EncoderTableName:                  "encoder",
+		EncoderContentIDIndex:             "encoder-content-id-index",
+		ContentCastTableName:              "content-cast",
+		ContentAttributeTableName:         "content-attribute",
+		ContentVisibilityCreatedAtIndex:   "visibility-createdAt-index",
+		ContentVisibilityContentTypeIndex: "visibility-contentType-index",
+		ContentVisibilityReleaseDateIndex: "visibility-releaseDate-index",
+		S3Bucket:                          "bucket",
+		RateLimitBackend:                  "memory",
+		RateLimitGlobalBurst:              100,
+		RateLimitGlobalPerMin:             100,
+		RateLimitEncoderBurst:             5,
+		RateLimitEncoderPerMin:            5,
+		RateLimitMovieBurst:               20,
+		RateLimitMoviePerMin:              20,
+		RateLimitPersonBurst:              20,
+		RateLimitPersonPerMin:             20,
+		AWS:                               AWSCredentials{Region: "us-east-1"},
+	}
+}
+
+func TestConfigValidate_OK(t *testing.T) {
+	if err := baseConfig().Validate(); err != nil {
+		t.Fatalf("expected ok, got %v", err)
+	}
+}
+
+func TestConfigValidate_Errors(t *testing.T) {
+	cases := []struct {
+		name string
+		mut  func(*Config)
+		want string
+	}{
+		{"bad env", func(c *Config) { c.Env = "qa" }, "APP_ENV"},
+		{"missing port", func(c *Config) { c.Addr = "" }, "PORT"},
+		{"bad max json", func(c *Config) { c.HTTPMaxJSONBytes = 0 }, "HTTP_MAX_JSON_BYTES"},
+		{"bad max multipart", func(c *Config) { c.HTTPMaxMultipartBytes = 0 }, "HTTP_MAX_MULTIPART_BYTES"},
+		{"bad router timeout", func(c *Config) { c.RouterTimeoutSecond = 0 }, "ROUTER_TIMEOUT_SECONDS"},
+		{"missing bucket", func(c *Config) { c.S3Bucket = "" }, "S3_BUCKET"},
+		{"missing region", func(c *Config) { c.AWS.Region = "" }, "AWS_REGION"},
+		{"missing table", func(c *Config) { c.TableName = "" }, "DYNAMODB"},
+		{"missing encoder index", func(c *Config) { c.EncoderContentIDIndex = "" }, "DYNAMODB_ENCODER_CONTENT_ID_INDEX"},
+		{"cors star", func(c *Config) { c.CORSAllowedOrigins = []string{"*"} }, "must not contain '*'"},
+		{"cors missing scheme", func(c *Config) { c.CORSAllowedOrigins = []string{"example.com"} }, "CORS_ALLOWED_ORIGINS"},
+		{"cors invalid scheme", func(c *Config) { c.CORSAllowedOrigins = []string{"ftp://example.com"} }, "CORS_ALLOWED_ORIGINS"},
+		{"prod requires https", func(c *Config) {
+			c.Env = "prod"
+			c.CORSAllowedOrigins = []string{"http://example.com"}
+		}, "https://"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := baseConfig()
+			tc.mut(&cfg)
+			err := cfg.Validate()
+			if err == nil {
+				t.Fatalf("expected error containing %q", tc.want)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("err %q missing %q", err.Error(), tc.want)
+			}
+		})
+	}
+}

@@ -120,9 +120,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/c/content/{{movieId}}",
+              "raw": "{{baseUrl}}/v1/c/content/{{contentId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "c", "content", "{{movieId}}"]
+              "path": ["v1", "c", "content", "{{contentId}}"]
             },
             "description": "Returns public detail for a single content by UUID. Response: ContentPublicDetail (excludes stats, audit, visibility)."
           }
@@ -231,9 +231,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/c/play/{{contentType}}/{{movieId}}",
+              "raw": "{{baseUrl}}/v1/c/play/{{contentType}}/{{contentId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "c", "play", "{{contentType}}", "{{movieId}}"]
+              "path": ["v1", "c", "play", "{{contentType}}", "{{contentId}}"]
             },
             "description": "Returns HLS playback info. Path params: contentType=MOVIE|TV (validated), contentId=UUID (validated). Response: PlaybackInfo { contentId, contentType, info { title, overview, casts }, playback { durationSec, streaming, video, audio, subtitles, preview, thumbnails, sprite } }"
           }
@@ -241,37 +241,37 @@
       ]
     },
     {
-      "name": "Admin - Movies",
-      "description": "Admin CRUD for movies under /v1/a/movies. Returns all fields without filtering.",
+      "name": "Admin - Content",
+      "description": "Admin CRUD for content under /v1/a/content. Returns all fields without filtering.",
       "item": [
         {
-          "name": "GET /v1/a/movies",
+          "name": "GET /v1/a/content",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/a/movies",
+              "raw": "{{baseUrl}}/v1/a/content",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "a", "movies"]
+              "path": ["v1", "a", "content"]
             },
-            "description": "Returns ALL movies including stats, audit, and visibility fields."
+            "description": "Returns ALL content including stats, audit, and visibility fields."
           }
         },
         {
-          "name": "GET /v1/a/movies/{movieId}",
+          "name": "GET /v1/a/content/{contentId}",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/a/movies/{{movieId}}",
+              "raw": "{{baseUrl}}/v1/a/content/{{contentId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "a", "movies", "{{movieId}}"]
+              "path": ["v1", "a", "content", "{{contentId}}"]
             },
-            "description": "Returns a single movie by UUID with ALL fields."
+            "description": "Returns a single content item by UUID with ALL fields."
           }
         },
         {
-          "name": "POST /v1/a/movies",
+          "name": "POST /v1/a/content",
           "request": {
             "method": "POST",
             "header": [],
@@ -401,24 +401,24 @@
               ]
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/a/movies",
+              "raw": "{{baseUrl}}/v1/a/content",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "a", "movies"]
+              "path": ["v1", "a", "content"]
             },
-            "description": "Creates a movie. Rate-limited: 20 req/min, burst 20."
+            "description": "Creates content. Rate-limited: 20 req/min, burst 20."
           }
         },
         {
-          "name": "DELETE /v1/a/movies/{movieId}",
+          "name": "DELETE /v1/a/content/{contentId}",
           "request": {
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/v1/a/movies/{{movieId}}",
+              "raw": "{{baseUrl}}/v1/a/content/{{contentId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "a", "movies", "{{movieId}}"]
+              "path": ["v1", "a", "content", "{{contentId}}"]
             },
-            "description": "Deletes a movie by UUID."
+            "description": "Deletes content by UUID."
           }
         }
       ]
@@ -752,9 +752,9 @@
               ]
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/a/content/{{movieId}}",
+              "raw": "{{baseUrl}}/v1/a/content/{{contentId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "a", "content", "{{movieId}}"]
+              "path": ["v1", "a", "content", "{{contentId}}"]
             },
             "description": "Uploads one or more video assets to a content item. Returns { contentId, assetType, uploadedCount, paths[] }."
           }
@@ -775,7 +775,7 @@
               "formdata": [
                 {
                   "key": "contentId",
-                  "value": "{{movieId}}",
+                  "value": "{{contentId}}",
                   "type": "text",
                   "description": "Required. UUID of the existing movie/TV content"
                 },
@@ -823,7 +823,7 @@
       "value": "http://localhost:8080"
     },
     {
-      "key": "movieId",
+      "key": "contentId",
       "value": ""
     },
     {

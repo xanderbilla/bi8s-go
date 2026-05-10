@@ -21,31 +21,48 @@ x-logging: &default-logging
       max-file: "3"
 
 services:
-  # ────────────────────────────── Application ─────────────────────────────
-  api:
-    <<: [ *restart-policy, *default-logging ]
+  quality:
     build:
-      context: ./appl
+      context: ./app
+      dockerfile: Dockerfile
+      target: quality
+    container_name: bi8s_quality_local
+    command: ["/bin/sh", "-c", "echo quality checks passed"]
+    profiles: ["quality"]
+    networks:
+      - bi8s-net
+
+  # Application
+  api:
+    <<: [*restart-policy, *default-logging]
+    build:
+      context: ./app
       dockerfile: Dockerfile
       target: runtime
+      args:
+        VERSION: ${BUILD_VERSION:-dev}
+        COMMIT: ${BUILD_COMMIT:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
     container_name: bi8s_api_local
     env_file:
-      - path: .env
-        required: false
+      - .env
     environment:
       APP_ENV: ${APP_ENV:-dev}
       PORT: ${PORT:-:8080}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      DYNAMODB_MOVIE_TABLE: ${DYNAMODB_MOVIE_TABLE:-bi8s-content-table-dev}
+      STARTUP_HEALTH_CHECK: ${STARTUP_HEALTH_CHECK:-false}
+      DYNAMODB_CONTENT_TABLE: ${DYNAMODB_CONTENT_TABLE:-bi8s-content-table-dev}
       DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE:-bi8s-person-table-dev}
       DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE:-bi8s-attributes-table-dev}
+      DYNAMODB_ATTRIBUTE_NAME_INDEX: ${DYNAMODB_ATTRIBUTE_NAME_INDEX:-name-index}
       DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE:-bi8s-video-table-dev}
       DYNAMODB_ENCODER_CONTENT_ID_INDEX: ${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      DYNAMODB_CONTENT_CAST_TABLE: ${DYNAMODB_CONTENT_CAST_TABLE:-bi8s-content-cast-table-dev}
+      DYNAMODB_CONTENT_ATTRIBUTE_TABLE: ${DYNAMODB_CONTENT_ATTRIBUTE_TABLE:-bi8s-content-attribute-table-dev}
+      DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX:-visibility-createdAt-index}
+      DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX:-visibility-releaseDate-index}
       S3_BUCKET: ${S3_BUCKET:-bi8s-storage-dev}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8443,http://127.0.0.1:8443}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8443,http://127.0.0.1:8443,https://localhost,https://127.0.0.1}
       CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api}
       OTEL_ENABLED: ${OTEL_ENABLED:-true}
@@ -57,13 +74,29 @@ services:
       OTEL_METRIC_EXPORT_INTERVAL_SECONDS: ${OTEL_METRIC_EXPORT_INTERVAL_SECONDS:-15}
       OTEL_SHUTDOWN_TIMEOUT_SECONDS: ${OTEL_SHUTDOWN_TIMEOUT_SECONDS:-5}
       BUILD_VERSION: ${BUILD_VERSION:-dev}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-memory}
+      RATE_LIMIT_REDIS_FAIL_MODE: ${RATE_LIMIT_REDIS_FAIL_MODE:-fail-open}
+      RATE_LIMIT_REDIS_TIMEOUT_MS: ${RATE_LIMIT_REDIS_TIMEOUT_MS:-50}
+      SEARCH_ENABLED: ${SEARCH_ENABLED:-true}
+      SEARCH_PROVIDER: ${SEARCH_PROVIDER:-opensearch}
+      SEARCH_ENDPOINT: ${SEARCH_ENDPOINT:-http://opensearch:9200}
+      SEARCH_USERNAME: ${SEARCH_USERNAME:-}
+      SEARCH_PASSWORD: ${SEARCH_PASSWORD:-}
+      SEARCH_CONTENT_INDEX: ${SEARCH_CONTENT_INDEX:-bi8s-content-search}
+      SEARCH_PEOPLE_INDEX: ${SEARCH_PEOPLE_INDEX:-bi8s-people-search}
+      SEARCH_REQUEST_TIMEOUT_MS: ${SEARCH_REQUEST_TIMEOUT_MS:-3000}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:
       otel-collector:
         condition: service_started
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
     healthcheck:
-      test: [ "CMD", "wget", "-qO-", "http://localhost:8080/v1/livez" ]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/v1/livez"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -71,31 +104,104 @@ services:
     networks:
       - bi8s-net
 
+  # UI is pulled from ECR (no local build). Activated by `--profile ui`.
+  # The image runs `next start` and listens on plain HTTP port 3000. We expose
+  # it on host port ${UI_PORT:-8443} for direct browser access; nginx (under
+  # the `https` profile) reverse-proxies the same upstream over TLS on :443.
   ui:
-    <<: [ *restart-policy, *default-logging ]
-    build:
-      context: ${UI_BUILD_CONTEXT:-./ui}
-      dockerfile: Dockerfile
-      args:
-        ENV_FILE: ${UI_ENV_FILE:-.env.local}
+    <<: [*restart-policy, *default-logging]
+    image: ${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:efx-image-dev-latest}
     container_name: bi8s_ui_local
+    pull_policy: ${UI_PULL_POLICY:-always}
     environment:
-      NODE_ENV: ${UI_NODE_ENV:-development}
+      NODE_ENV: ${UI_NODE_ENV:-production}
+      # Where the browser should call the Go API. Both UI and API are served
+      # behind nginx on https://localhost, so use the same origin /v1 prefix.
+      NEXT_PUBLIC_CUSTOM_API_URL: ${NEXT_PUBLIC_CUSTOM_API_URL:-https://localhost/v1}
+      # Public base URL for poster/backdrop images served from S3.
+      NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL: ${NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL:-https://${S3_BUCKET:-bi8s-storage-dev}.s3.amazonaws.com}
     ports:
-      - "${UI_PORT:-8443}:8443"
+      - "${UI_PORT:-8443}:3000"
+    # Override baked-in healthcheck: image uses `wget http://localhost:3000`
+    # which resolves to ::1 first inside this container and fails because the
+    # Next.js server only binds 0.0.0.0. Force IPv4.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider http://127.0.0.1:3000/ || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     depends_on:
       api:
         condition: service_started
     networks:
       - bi8s-net
-    profiles: [ "ui" ]
+    profiles: ["ui"]
 
-  # ────────────────────────── Observability stack ─────────────────────────
+  # Redis - Shared rate-limit backend. Single replica for local; in prod use
+  # a managed Redis (ElastiCache / Upstash) and set REDIS_URL accordingly.
+  redis:
+    <<: [*restart-policy, *default-logging]
+    image: redis:7-alpine
+    container_name: bi8s_redis_local
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "128mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - bi8s-net
+
+  opensearch:
+    <<: [*restart-policy, *default-logging]
+    image: opensearchproject/opensearch:2.16.0
+    container_name: bi8s_opensearch_local
+    environment:
+      discovery.type: single-node
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "${OPENSEARCH_PORT:-9200}:9200"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9200/_cluster/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    networks:
+      - bi8s-net
+
+  # Observability stack
   otel-collector:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: otel/opentelemetry-collector-contrib:0.111.0
     container_name: bi8s_otel_collector
-    command: [ "--config=/etc/otelcol/config.yaml" ]
+    command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
     ports:
@@ -112,7 +218,7 @@ services:
       - bi8s-net
 
   prometheus:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: prom/prometheus:v2.55.1
     container_name: bi8s_prometheus
     command:
@@ -123,6 +229,7 @@ services:
       - "--enable-feature=exemplar-storage"
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus-rules.yml:/etc/prometheus/rules/prometheus-rules.yml:ro
       - prometheus-data:/prometheus
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
@@ -130,15 +237,15 @@ services:
       - bi8s-net
 
   tempo:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: grafana/tempo:2.6.1
     container_name: bi8s_tempo
-    command: [ "-config.file=/etc/tempo/tempo.yaml", "-config.expand-env=true" ]
+    command: ["-config.file=/etc/tempo/tempo.yaml", "-config.expand-env=true"]
     environment:
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      TEMPO_BUCKET: ${TEMPO_BUCKET:-bi8s-tempo-traces-dev}
+      S3_BUCKET: ${S3_BUCKET:-bi8s-storage-dev}
     volumes:
       - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - tempo-data:/var/tempo
@@ -148,17 +255,12 @@ services:
       - bi8s-net
 
   loki:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: grafana/loki:3.2.1
     container_name: bi8s_loki
-    command: [ "-config.file=/etc/loki/loki-config.yaml", "-config.expand-env=true" ]
-    environment:
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      LOKI_BUCKET: ${LOKI_BUCKET:-bi8s-loki-chunks-dev}
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
     volumes:
-      - ./observability/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - ./observability/loki-config-local.yaml:/etc/loki/loki-config.yaml:ro
       - loki-data:/loki
     ports:
       - "${LOKI_PORT:-3100}:3100"
@@ -166,10 +268,10 @@ services:
       - bi8s-net
 
   promtail:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: grafana/promtail:3.2.1
     container_name: bi8s_promtail
-    command: [ "-config.file=/etc/promtail/config.yaml" ]
+    command: ["-config.file=/etc/promtail/config.yaml"]
     volumes:
       - ./observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -181,7 +283,7 @@ services:
       - bi8s-net
 
   grafana:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: grafana/grafana:11.3.0
     container_name: bi8s_grafana
     environment:
@@ -209,9 +311,9 @@ services:
     networks:
       - bi8s-net
 
-  # ─────────────────────── Infrastructure exporters ───────────────────────
+  # Infrastructure exporters
   cadvisor:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: gcr.io/cadvisor/cadvisor:v0.50.0
     container_name: bi8s_cadvisor
     privileged: true
@@ -224,13 +326,14 @@ services:
     command:
       - --docker_only=true
       - --store_container_labels=true
+      - --disable_metrics=disk,diskIO
     ports:
       - "${CADVISOR_PORT:-8090}:8080"
     networks:
       - bi8s-net
 
   node-exporter:
-    <<: [ *restart-policy, *default-logging ]
+    <<: [*restart-policy, *default-logging]
     image: prom/node-exporter:v1.8.2
     container_name: bi8s_node_exporter
     volumes:
@@ -241,12 +344,71 @@ services:
       - "--path.procfs=/host/proc"
       - "--path.sysfs=/host/sys"
       - "--path.rootfs=/rootfs"
-      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)(\
-        $$|/)"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|r\
+        un/host_.*|host_mnt)($$|/)"
+      - "--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgrou\
+        p2?|configfs|debugfs|devpts|devtmpfs|efivarfs|fusectl|hugetlbfs|iso9660\
+        |mqueue|nsfs|overlay|proc|procfs|pstore|ramfs|rpc_pipefs|securityfs|sel\
+        inuxfs|squashfs|sysfs|tmpfs|tracefs|fakeowner|selfowner|fuse\\..*|virti\
+        ofs.*)$"
     ports:
       - "${NODE_EXPORTER_PORT:-9100}:9100"
     networks:
       - bi8s-net
+
+  # Self-signed cert generator for the local nginx HTTPS terminator.
+  # Runs once on `--profile https`; skips regeneration if cert already exists.
+  cert-init:
+    image: alpine/openssl:latest
+    container_name: bi8s_cert_init
+    user: "0:0"
+    volumes:
+      - ./infra/docker/nginx/ssl/live:/ssl
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ ! -f /ssl/cert.crt ] || [ ! -f /ssl/cert.key ]; then
+          echo "generating self-signed cert for localhost (365d)"
+          openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+            -keyout /ssl/cert.key -out /ssl/cert.crt \
+            -subj "/CN=localhost/O=bi8s-local/C=US" \
+            -addext "subjectAltName=DNS:localhost,DNS:*.localhost,IP:127.0.0.1,IP:::1"
+          chmod 644 /ssl/cert.crt /ssl/cert.key
+        else
+          echo "cert already present; skipping"
+        fi
+    restart: "no"
+    profiles: ["https"]
+
+  # Local nginx HTTPS terminator. Reuses the prod-style configs in
+  # infra/docker/nginx so behavior stays consistent. Activate with:
+  #   docker compose -f docker-compose.local.yml --profile https up -d
+  nginx:
+    <<: [*restart-policy, *default-logging]
+    image: nginx:alpine
+    container_name: bi8s_nginx_local
+    depends_on:
+      cert-init:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./infra/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./infra/docker/nginx/snippets:/etc/nginx/snippets:ro
+      - ./infra/docker/nginx/ssl/live:/etc/nginx/ssl/live:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - bi8s-net
+    profiles: ["https"]
 
 networks:
   bi8s-net:
@@ -257,3 +419,4 @@ volumes:
   tempo-data:
   loki-data:
   grafana-data:
+  opensearch-data:
