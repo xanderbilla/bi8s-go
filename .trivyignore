@@ -1,0 +1,72 @@
+# trivy baseline ignore file for bi8s-go.
+
+#
+
+# Format: one CVE/Misconfig ID per line, optional `# justification`.
+
+# Scope is repository-wide (filesystem scan via .github/workflows/ci.yml).
+
+#
+
+# Add entries only when:
+
+# - upstream has no fix yet AND mitigation is in place, or
+
+# - finding is not exploitable in our deployment topology.
+
+#
+
+# Re-evaluate on every dependency bump. Empty by default — populate as
+
+# real findings surface in CI.
+
+# --- IaC misconfig accepted by design (mirrors infra/tofu/.tfsec/config.yml) -
+
+# Bucket SSE uses AES256 (SSE-S3) instead of customer-managed KMS keys.
+
+# Cost/complexity tradeoff for a non-regulated workload; same decision as
+
+# aws-s3-encryption-customer-key in tfsec.
+
+AVD-AWS-0132
+
+# CloudFront distribution has no WAF attached. Dev/staging only — prod
+
+# fronts traffic via ALB+WAF; revisit when CDN takes prod traffic.
+
+AVD-AWS-0011
+
+# ECR repository tag mutability is MUTABLE for dev convenience. Prod
+
+# pipelines pin by digest, so mutable tags do not break supply chain.
+
+AVD-AWS-0031
+
+# GitHub OIDC deploy role uses service-level wildcards (s3:_, ec2:_, …).
+
+# Required so a single CI role can manage the full IaC stack; same as
+
+# aws-iam-no-policy-wildcards in tfsec.
+
+AVD-AWS-0345
+
+# Egress 0.0.0.0/0 on app/opensearch SGs. Required for AWS API calls and
+
+# package fetches; ingress is locked down. Standard for private subnets.
+
+AVD-AWS-0104
+
+# S3 public-access-block toggles are wired through `var.block_public_access`.
+
+# All callers pass `true`; trivy cannot follow the variable. False positive.
+
+AVD-AWS-0086
+AVD-AWS-0087
+AVD-AWS-0091
+AVD-AWS-0093
+
+# Public subnets map public IPs on launch. Required for the ALB / NAT
+
+# gateway tier; private subnets host the actual workloads.
+
+AVD-AWS-0164
