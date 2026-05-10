@@ -62,7 +62,7 @@ services:
       DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX:-visibility-createdAt-index}
       DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX:-visibility-releaseDate-index}
       S3_BUCKET: ${S3_BUCKET:-bi8s-storage-dev}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8443,http://127.0.0.1:8443,https://localhost,https://127.0.0.1}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8443,http://127.0.0.1:8443,https://localhost,https://127.0.0.1,https://100.98.33.20}
       CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api}
       OTEL_ENABLED: ${OTEL_ENABLED:-true}
