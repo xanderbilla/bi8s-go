@@ -692,7 +692,7 @@ components:
       - success
       - status
       - message
-      - request_id
+      - requestId
       - timestamp
       properties:
         success:
@@ -709,7 +709,7 @@ components:
           example: ok
         data:
           description: Endpoint-specific payload
-        request_id:
+        requestId:
           type: string
         path:
           type: string
@@ -722,7 +722,7 @@ components:
       - success
       - status
       - message
-      - request_id
+      - requestId
       - timestamp
       properties:
         success:
@@ -750,7 +750,7 @@ components:
           example: Request validation failed
         details:
           description: Machine-readable failure context
-        request_id:
+        requestId:
           type: string
         path:
           type: string

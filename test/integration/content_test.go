@@ -92,5 +92,5 @@ func assertErrorEnvelope(t *testing.T, resp *http.Response) {
 }
 
 func nowSuffix() string {
-	return time.Now().UTC().Format("20060102150405.000")
+	return time.Now().UTC().Format("20060102150405000")
 }
