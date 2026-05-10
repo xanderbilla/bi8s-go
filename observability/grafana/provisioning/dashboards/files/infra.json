@@ -575,7 +575,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"})",
+          "expr": "sum(node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} or (node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} unless on(instance, job) node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\"}))",
           "legendFormat": "Total Disk",
           "refId": "A",
           "instant": true
@@ -641,7 +641,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 * sum(node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"}) / sum(node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"})",
+          "expr": "100 * sum((node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} - node_filesystem_avail_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"}) or ((node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"}) unless on(instance, job) node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\"})) / sum(node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} or (node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} unless on(instance, job) node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\"}))",
           "legendFormat": "Disk Used %",
           "refId": "A",
           "instant": true
@@ -1273,7 +1273,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"})",
+          "expr": "sum((node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} - node_filesystem_avail_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"}) or ((node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"}) unless on(instance, job) node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\"}))",
           "legendFormat": "Used Disk Space",
           "refId": "A",
           "instant": true
@@ -1329,7 +1329,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"})",
+          "expr": "sum(node_filesystem_avail_bytes{mountpoint=\"/var/lib/docker\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} or (node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|fakeowner|selfowner|virtiofs.*|fuse\\\\..*\"} unless on(instance, job) node_filesystem_size_bytes{mountpoint=\"/var/lib/docker\"}))",
           "legendFormat": "Free Disk Space",
           "refId": "A",
           "instant": true
