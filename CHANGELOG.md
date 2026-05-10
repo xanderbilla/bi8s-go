@@ -19,6 +19,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docker-down`.
 - Starter scaffolding (READMEs and placeholder fixtures) under
   `test/integration`, `test/e2e`, `test/fixtures`, `test/testdata`.
+- `internal/buildinfo` package exposing `Version`, `Commit`, `Date` set via
+  `-ldflags -X` at Docker build time. `/health` and `/healthz` now include
+  `version` (and `/health` also `commit`) so deployments are introspectable.
+- `.github/workflows/release.yml`: Conventional Commits → semver bump
+  (`feat!:` MAJOR, `feat:` MINOR, `fix:` PATCH) creates `vX.Y.Z` tags
+  automatically on push to `dev`/`prod`.
+- `docker-publish.yml` now resolves the latest semver tag, injects it as
+  build args, and publishes images tagged `:latest`, `:<sha>`, and
+  `:vX.Y.Z` to ECR (`bi8s-go-{env}:vX.Y.Z`).
+- All four Grafana dashboards (`infra`, `metrics`, `logging`, `traces`)
+  now share the same `bi8s Dashboards` dropdown menu (tag-driven).
+- `scripts/stripcomments`: small AST tool that strips comments inside
+  Go function bodies while preserving godoc and `//go:` directives.
+
+### Changed
+
+- Internal DRY refactors with no behavior, route, response, log message,
+  metric, or env var changes:
+  - `repository`: generic `GetByID[T]`, `CreateWithIDCondition[T]`,
+    `DeleteByID` helpers in `base.go`.
+  - `http`: declarative router split (`Mount`/`buildRouter`), shared
+    `respwriter.Recorder`, `alphanumericIDValidator`, `writeOK` response
+    helper.
+  - `service`: shared `cacheGetJSON[T]`/`cacheSetJSON`/`cacheDel` Redis
+    helpers; `removeTempFile` helper for encoder temp-file cleanup.
+  - `app`: `LoadConfigFromEnv` first-error closures (`getInt`/`getBool`);
+    `Validate` rate-limit bucket loop.
+  - `observability`: `NewHTTPMetrics` first-error closure.
 
 ### Removed
 
