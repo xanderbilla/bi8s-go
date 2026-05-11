@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -35,6 +37,7 @@ func Mount(application *app.Application) (http.Handler, func()) {
 
 func buildRouter(application *app.Application) (*chi.Mux, func()) {
 	r := chi.NewRouter()
+	allowOrigin := newCORSOriginMatcher(application.Config.CORSAllowedOrigins)
 
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		errs.Write(w, r, errs.NewNotFound(""))
@@ -48,7 +51,7 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 	})
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   application.Config.CORSAllowedOrigins,
+		AllowOriginFunc:  allowOrigin,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "Access-Control-Request-Private-Network"},
 		ExposedHeaders:   []string{"Link", "X-Request-ID"},
@@ -186,4 +189,61 @@ func allowPrivateNetworkPreflight(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func newCORSOriginMatcher(allowedOrigins []string) func(*http.Request, string) bool {
+	allowed := make(map[string]struct{}, len(allowedOrigins))
+	for _, origin := range allowedOrigins {
+		if normalized, ok := normalizeOrigin(origin); ok {
+			allowed[normalized] = struct{}{}
+		}
+	}
+
+	return func(_ *http.Request, origin string) bool {
+		normalized, ok := normalizeOrigin(origin)
+		if !ok {
+			return false
+		}
+		_, exists := allowed[normalized]
+		return exists
+	}
+}
+
+func normalizeOrigin(origin string) (string, bool) {
+	origin = strings.TrimSpace(origin)
+	if origin == "" {
+		return "", false
+	}
+
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" {
+		return "", false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", false
+	}
+	if u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return "", false
+	}
+	if path := strings.Trim(u.EscapedPath(), "/"); path != "" {
+		return "", false
+	}
+
+	host := strings.ToLower(u.Hostname())
+	if host == "" {
+		return "", false
+	}
+
+	port := u.Port()
+	switch {
+	case u.Scheme == "https" && port == "443":
+		port = ""
+	case u.Scheme == "http" && port == "80":
+		port = ""
+	}
+
+	if port != "" {
+		return u.Scheme + "://" + host + ":" + port, true
+	}
+	return u.Scheme + "://" + host, true
 }
