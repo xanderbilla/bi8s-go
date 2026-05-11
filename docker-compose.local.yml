@@ -104,54 +104,6 @@ services:
     networks:
       - bi8s-net
 
-  # UI is pulled from ECR (no local build). Activated by `--profile ui`.
-  # The image runs `next start` and listens on plain HTTP port 3000. We expose
-  # it on host port ${UI_PORT:-8443} for direct browser access; nginx (under
-  # the `https` profile) reverse-proxies the same upstream over TLS on :443.
-  ui:
-    <<: [*restart-policy, *default-logging]
-    image: ${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:efx-image-dev-latest}
-    container_name: bi8s_ui_local
-    pull_policy: ${UI_PULL_POLICY:-always}
-    environment:
-      NODE_ENV: ${UI_NODE_ENV:-production}
-      # Where the browser should call the Go API. Both UI and API are served
-      # behind nginx on https://localhost, so use the same origin /v1 prefix.
-      NEXT_PUBLIC_CUSTOM_API_URL: ${NEXT_PUBLIC_CUSTOM_API_URL:-https://localhost/api}
-      # Public base URL for poster/backdrop images served from S3.
-      NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL: ${NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL:-https://${S3_BUCKET:-bi8s-storage-dev}.s3.amazonaws.com}
-    ports:
-      - "${UI_PORT:-8443}:3000"
-    # Override baked-in healthcheck: image uses `wget http://localhost:3000`
-    # which resolves to ::1 first inside this container and fails because the
-    # Next.js server only binds 0.0.0.0. Force IPv4.
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget --quiet --tries=1 --spider http://127.0.0.1:3000/ || exit 1",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    # Runtime URL injection: NEXT_PUBLIC_CUSTOM_API_URL is baked into the
-    # Next.js bundle at image build time. This startup script patches every
-    # occurrence of the build-time URL with the container env var value,
-    # making the API endpoint configurable without a rebuild.
-    entrypoint: ["sh", "-c"]
-    command:
-      - |
-        grep -rl 'http://localhost:8080' /app/.next 2>/dev/null \
-          | xargs -r sed -i "s|http://localhost:8080|$$NEXT_PUBLIC_CUSTOM_API_URL|g"
-        exec node server.js
-    depends_on:
-      api:
-        condition: service_started
-    networks:
-      - bi8s-net
-    profiles: ["ui"]
-
   # Redis - Shared rate-limit backend. Single replica for local; in prod use
   # a managed Redis (ElastiCache / Upstash) and set REDIS_URL accordingly.
   redis:
