@@ -33,8 +33,8 @@ Everything else is optional with the default shown.
 | ---------------------------- | -------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | `CORS_ALLOWED_ORIGINS`       | no       | see `DefaultCORSOrigins` | Comma-separated. **Cannot contain `*`** when credentials are enabled. In `prod`, every origin must use `https://`. |
 | `CORS_ALLOW_PRIVATE_NETWORK` | no       | `false`                  | Enable [Private Network Access](https://wicg.github.io/private-network-access/) preflight.                         |
-| `HTTP_MAX_JSON_BYTES`        | no       | `1048576`                | Per-request JSON body cap (bytes).                                                                                 |
-| `HTTP_MAX_MULTIPART_BYTES`   | no       | `1073741824`             | Per-request multipart/form-data body cap (bytes); applies to encoder and content/people uploads.                   |
+| `HTTP_MAX_JSON_BYTES`        | no       | `1048576`                | Per-request JSON body cap (bytes).                                                                                      |
+| `HTTP_MAX_MULTIPART_BYTES`   | no       | `1073741824`             | Per-request multipart/form-data body cap (bytes); applies to encoder and content/people uploads.                                                                                      |
 | `ROUTER_TIMEOUT_SECONDS`     | no       | `60`                     | Per-request deadline.                                                                                              |
 | `TRUSTED_PROXIES`            | no       | (empty)                  | Comma-separated CIDRs. Required when behind NGINX so `X-Forwarded-For` is honoured.                                |
 
@@ -52,7 +52,7 @@ Everything else is optional with the default shown.
 
 | Variable                            | Required | Default      | Notes                                        |
 | ----------------------------------- | -------- | ------------ | -------------------------------------------- |
-| `DYNAMODB_CONTENT_TABLE`            | yes      | —            | Movie / content table name.                  |
+| `DYNAMODB_CONTENT_TABLE`              | yes      | —            | Movie / content table name.                  |
 | `DYNAMODB_PERSON_TABLE`             | yes      | —            | Person table name.                           |
 | `DYNAMODB_ATTRIBUTE_TABLE`          | yes      | —            | Attribute table name.                        |
 | `DYNAMODB_ENCODER_TABLE`            | yes      | —            | Encoder job table name.                      |

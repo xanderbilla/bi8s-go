@@ -230,7 +230,7 @@ runbuild: build
 # Compose runs detached but every quality step is verbose so failures surface.
 run: docker-prune tidy fmt-check vet lint staticcheck govulncheck test-unit openapi-validate build
 	@printf "\n$(BOLD)$(BLUE)[run] Starting local stack (detached, https+ui profiles)...$(RESET)\n\n"
-	@./scripts/compose.sh -f docker-compose.local.yml --profile https up -d --build
+	@./scripts/compose.sh -f docker-compose.local.yml --profile https --profile ui up -d --build
 	@printf "\n$(BLUE)[run] Waiting for API readiness...$(RESET)\n"
 	@for i in $$(seq 1 60); do \
 		if curl -fsS http://localhost:8080/v1/livez > /dev/null 2>&1; then \
@@ -259,6 +259,7 @@ run-summary:
 	printf "$(BOLD)$(CYAN)  bi8s local stack — $(GREEN)v$$VER$(CYAN) ($(YELLOW)$$COMMIT$(CYAN))$(RESET)\n"; \
 	printf "$(BOLD)$(CYAN)═══════════════════════════════════════════════════════════════$(RESET)\n\n"; \
 	printf "$(BOLD)Application$(RESET)\n"; \
+	printf "  UI                      $(GREEN)http://localhost:$${UI_PORT:-3000}$(RESET)\n"; \
 	printf "  API (HTTPS, via nginx)  $(GREEN)https://localhost/api/v1/$(RESET)\n"; \
 	printf "  API (direct)            $(GREEN)http://localhost:8080/v1/$(RESET)\n"; \
 	printf "  Swagger / OpenAPI       $(GREEN)https://localhost/api/v1/docs$(RESET)\n"; \
@@ -285,7 +286,7 @@ run-summary:
 # build is fully fresh. Safe to run repeatedly.
 docker-prune:
 	@printf "\n$(BOLD)$(BLUE)[run] Pruning previous local stack...$(RESET)\n\n"
-	@./scripts/compose.sh -f docker-compose.local.yml --profile https down -v --remove-orphans --rmi local || true
+	@./scripts/compose.sh -f docker-compose.local.yml --profile https --profile ui down -v --remove-orphans --rmi local || true
 	@printf "$(GREEN)✓ docker-prune$(RESET)\n"
 
 tidy:
