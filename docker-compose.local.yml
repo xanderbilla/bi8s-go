@@ -104,6 +104,45 @@ services:
     networks:
       - bi8s-net
 
+  # UI — Next.js frontend. Pulled from ECR, no local build needed.
+  # Plain HTTP; nginx on :443 and the tunnel on :8081 proxy in front of it.
+  # Access directly at http://localhost:${UI_PORT:-3000}
+  ui:
+    <<: [*restart-policy, *default-logging]
+    image: ${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:efx-image-dev-latest}
+    container_name: bi8s_ui_local
+    pull_policy: ${UI_PULL_POLICY:-always}
+    environment:
+      NODE_ENV: ${UI_NODE_ENV:-development}
+      PORT: ${UI_CONTAINER_PORT:-3000}
+      HOSTNAME: "0.0.0.0"
+      NEXT_PUBLIC_ENABLE_LOGGING: ${NEXT_PUBLIC_ENABLE_LOGGING:-true}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+      NEXT_PUBLIC_HTTP_TIMEOUT_MS: ${NEXT_PUBLIC_HTTP_TIMEOUT_MS:-10000}
+      NEXT_PUBLIC_CUSTOM_API_URL: ${NEXT_PUBLIC_CUSTOM_API_URL:-http://localhost:8080/v1}
+      NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL: ${NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL:-https://bi8s-storage-dev.s3.amazonaws.com}
+      NEXT_PUBLIC_IMAGE_HOSTS: ${NEXT_PUBLIC_IMAGE_HOSTS:-}
+      NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-}
+      NEXT_PUBLIC_APP_ENV: ${NEXT_PUBLIC_APP_ENV:-dev}
+    ports:
+      - "${UI_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider http://127.0.0.1:3000/ || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - bi8s-net
+    profiles: ["ui"]
+
   # Redis - Shared rate-limit backend. Single replica for local; in prod use
   # a managed Redis (ElastiCache / Upstash) and set REDIS_URL accordingly.
   redis:
