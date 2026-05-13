@@ -37,7 +37,6 @@ This project follows the practices documented in [docs/SECURITY.md](docs/SECURIT
 - Strict request validation at the HTTP boundary
 - Rate limiting (memory or Redis backend) on public routes
 - Admin routes (`/v1/a/*`) network-protected at the reverse proxy layer
-- TLS termination at the edge (Nginx + Let's Encrypt) in production
 - IMDSv2-only EC2 metadata, least-privilege IAM via OpenTofu modules
 - Multi-stage Docker build, distroless-style runtime, non-root UID 10001
 - Dependency scanning via `govulncheck` and `go mod` policies in CI

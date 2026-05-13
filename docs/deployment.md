@@ -74,21 +74,18 @@ created by step 1.
 5. `make tofu-plan ENV=prod` → review → `make tofu-apply ENV=prod`.
 
 The EC2 user-data script (`infra/scripts/update-ec2-configs.sh`) pulls
-the new image and rolls the container with zero downtime via NGINX
-upstream switching.
+the new image and rolls the container with zero downtime.
 
 ## Runtime
 
-| Component        | Image / package                     | Notes                                                                                                                                                        |
-| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| API              | `ghcr.io/xanderbilla/bi8s-go:<tag>` | Runtime stage of `app/Dockerfile`, runs as UID 10001.                                                                                                        |
-| NGINX            | distro package                      | Config in `infra/docker/nginx/` (split: `nginx.conf`, `conf.d/*.conf`, `snippets/*.conf`). TLS via Let's Encrypt (`infra/scripts/setup-ssl-letsencrypt.sh`). |
-| CloudWatch Agent | distro package                      | Installed by `infra/scripts/install-cloudwatch-agent.sh`.                                                                                                    |
+| Component        | Image / package                     | Notes                                                    |
+| ---------------- | ----------------------------------- | -------------------------------------------------------- |
+| API              | `ghcr.io/xanderbilla/bi8s-go:<tag>` | Runtime stage of `app/Dockerfile`, runs as UID 10001     |
+| CloudWatch Agent | distro package                      | Installed by `infra/scripts/install-cloudwatch-agent.sh` |
 
 ## Health & probes
 
 - ALB target group health check: `GET /v1/livez` (200 = healthy).
-- NGINX upstream probe: `GET /v1/readyz` (used by zero-downtime swap).
 - Application readiness includes DynamoDB + S3 + Redis (when configured).
 
 See [RUNBOOK.md](RUNBOOK.md) for incident response and rollback steps.

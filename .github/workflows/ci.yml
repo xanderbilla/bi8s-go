@@ -129,40 +129,13 @@ jobs:
             - name: Install gosec
               run: go install github.com/securego/gosec/v2/cmd/gosec@${{ env.GOSEC_VERSION }}
               # Excluded rules (justification):
-              #   G101: Lua script literal in redis ratelimit backend (false positive)
+              #   G101: Lua script literal in redis backend (false positive)
               #   G115: int conversion overflow — covered by validation layer
               #   G120: ParseMultipartForm — bounded via http.MaxBytesReader upstream
               #   G204: ffmpeg subprocess — args are filepath.Clean'd allowlist
-              #   G301/G306: media file/dir perms — required for nginx static serve
               #   G304: file open via variable — paths sourced from trusted config/env
               #   G703: tempfile cleanup — name created by os.CreateTemp
-            - run: gosec -quiet -exclude=G101,G115,G120,G204,G301,G304,G306,G703 -fmt text ./...
-
-    nginx-validate:
-        name: nginx config syntax
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-            - name: Validate split nginx layout (syntax only)
-              # Stage the canonical nginx tree, swap docker-network upstreams
-              # for loopback so DNS resolution does not fail at parse time,
-              # generate a throwaway cert/key for the SSL directives, then
-              # let `nginx -t` parse the full include tree.
-              run: |
-                  set -euo pipefail
-                  STAGE=$(mktemp -d)
-                  cp -a infra/docker/nginx/. "$STAGE/"
-                  mkdir -p "$STAGE/ssl/live"
-                  sed -i 's|server api:8080|server 127.0.0.1:8080|; s|server ui:8443|server 127.0.0.1:8443|' "$STAGE/nginx.conf"
-                  docker run --rm -v "$STAGE":/tmp/cfg:ro nginx:alpine sh -c '
-                      apk add --no-cache openssl >/dev/null 2>&1
-                      cp -a /tmp/cfg/. /etc/nginx/
-                      openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
-                          -subj "/CN=ci" \
-                          -keyout /etc/nginx/ssl/live/cert.key \
-                          -out    /etc/nginx/ssl/live/cert.crt >/dev/null 2>&1
-                      nginx -t
-                  '
+            - run: gosec -quiet -exclude=G101,G115,G120,G204,G304,G703 -fmt text ./...
 
     openapi-lint:
         name: openapi lint (redocly)

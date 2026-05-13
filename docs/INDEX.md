@@ -8,8 +8,8 @@ this order: **ARCHITECTURE → LOCAL_DEVELOPMENT → CONFIGURATION → API**.
 | -------------------------------------------- | ------------------------------------------------------------------- |
 | [ARCHITECTURE.md](ARCHITECTURE.md)           | High-level component diagram, request lifecycle, package layout.    |
 | [API.md](API.md)                             | Public REST surface, response envelope, error model, route table.   |
-| [openapi.yaml](openapi.yaml)                 | Machine-readable OpenAPI 3.0 spec served at `GET /v1/openapi.yaml`. |
-| [openapi.md](openapi.md)                     | Notes on the embedded spec and Swagger UI.                          |
+| [OPENAPI.yaml](OPENAPI.yaml)                 | Machine-readable OpenAPI 3.0 spec served at `GET /v1/openapi.yaml`. |
+| [OPENAPI.md](OPENAPI.md)                     | Notes on the embedded spec and Swagger UI.                          |
 | [CONFIGURATION.md](CONFIGURATION.md)         | Every env var the binary reads, defaults, validation rules.         |
 | [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md) | Run the full stack locally with Docker Compose.                     |
 | [TESTING.md](TESTING.md)                     | Unit / integration / e2e layout, build tags, coverage.              |
@@ -24,7 +24,6 @@ this order: **ARCHITECTURE → LOCAL_DEVELOPMENT → CONFIGURATION → API**.
 | [CACHING.md](CACHING.md)                     | Layered cache model: in-process, Redis, HTTP response headers.      |
 | [CI_CD.md](CI_CD.md)                         | GitHub Actions workflow map; blocking vs advisory jobs.             |
 | [ERROR_HANDLING.md](ERROR_HANDLING.md)       | Typed-error model, HTTP status mapping, stable error codes.         |
-| [NGINX_LOCAL_HTTPS.md](NGINX_LOCAL_HTTPS.md) | Run the local stack with TLS via mkcert + nginx.                    |
 | [PERFORMANCE.md](PERFORMANCE.md)             | Latency / throughput targets and how they're measured.              |
 | [RELEASING.md](RELEASING.md)                 | Version bump, tag, and rollback checklist.                          |
 | [STREAMING_USER.md](STREAMING_USER.md)       | End-user guide to consuming the HLS streaming endpoints.            |

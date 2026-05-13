@@ -1,14 +1,6 @@
 name: bi8s-local
 
-# Local development stack: API + UI + full observability pipeline.
-#
-# Telemetry flow (strict):
-#   Go app  ─OTLP/gRPC:4317─►  otel-collector  ──►  prometheus / tempo / loki
-#                                          ▲
-#                              promtail (docker logs) ┘
-#
-# All services share `bi8s-net`. Sensitive values come from `.env` (see
-# `.env.example`); never hard-code credentials in this file.
+# Local development stack: API + UI + full observability pipeline
 
 x-restart-policy: &restart-policy
   restart: unless-stopped
@@ -62,7 +54,7 @@ services:
       DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX:-visibility-createdAt-index}
       DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX:-visibility-releaseDate-index}
       S3_BUCKET: ${S3_BUCKET:-bi8s-storage-dev}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8443,http://127.0.0.1:8443,https://localhost,https://127.0.0.1,https://100.98.33.20,https://dev.d3uphs6spds7z1.amplifyapp.com}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080}
       CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api}
       OTEL_ENABLED: ${OTEL_ENABLED:-true}
@@ -104,9 +96,7 @@ services:
     networks:
       - bi8s-net
 
-  # UI — Next.js frontend. Pulled from ECR, no local build needed.
-  # Plain HTTP; nginx on :443 and the tunnel on :8081 proxy in front of it.
-  # Access directly at http://localhost:${UI_PORT:-3000}
+  # UI — Next.js frontend
   ui:
     <<: [*restart-policy, *default-logging]
     image: ${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:efx-image-dev-latest}
@@ -146,7 +136,6 @@ services:
   # Redis - Shared rate-limit backend. Single replica for local; in prod use
   # a managed Redis (ElastiCache / Upstash) and set REDIS_URL accordingly.
   redis:
-    <<: [*restart-policy, *default-logging]
     image: redis:7-alpine
     container_name: bi8s_redis_local
     command:
@@ -292,7 +281,6 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor traceToMetrics"
-      # AWS credentials for the CloudWatch datasource. Falls through to instance/IRSA in cloud.
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
@@ -311,121 +299,6 @@ services:
         condition: service_started
     networks:
       - bi8s-net
-
-  # Infrastructure exporters
-  cadvisor:
-    <<: [*restart-policy, *default-logging]
-    image: gcr.io/cadvisor/cadvisor:v0.50.0
-    container_name: bi8s_cadvisor
-    privileged: true
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /sys:/sys:ro
-      - /var/lib/docker:/var/lib/docker:ro
-    command:
-      - --docker_only=true
-      - --store_container_labels=true
-      - --disable_metrics=disk,diskIO
-    ports:
-      - "${CADVISOR_PORT:-8090}:8080"
-    networks:
-      - bi8s-net
-
-  node-exporter:
-    <<: [*restart-policy, *default-logging]
-    image: prom/node-exporter:v1.8.2
-    container_name: bi8s_node_exporter
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - "--path.procfs=/host/proc"
-      - "--path.sysfs=/host/sys"
-      - "--path.rootfs=/rootfs"
-      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|r\
-        un/host_.*|host_mnt)($$|/)"
-      - "--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgrou\
-        p2?|configfs|debugfs|devpts|devtmpfs|efivarfs|fusectl|hugetlbfs|iso9660\
-        |mqueue|nsfs|overlay|proc|procfs|pstore|ramfs|rpc_pipefs|securityfs|sel\
-        inuxfs|squashfs|sysfs|tmpfs|tracefs|fakeowner|selfowner|fuse\\..*|virti\
-        ofs.*)$"
-    ports:
-      - "${NODE_EXPORTER_PORT:-9100}:9100"
-    networks:
-      - bi8s-net
-
-  # Self-signed cert generator for the local nginx HTTPS terminator.
-  # Runs once on `--profile https`; skips regeneration if cert already exists.
-  cert-init:
-    image: alpine/openssl:latest
-    container_name: bi8s_cert_init
-    user: "0:0"
-    volumes:
-      - ./infra/docker/nginx/ssl/live:/ssl
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -e
-        if [ ! -f /ssl/cert.crt ] || [ ! -f /ssl/cert.key ]; then
-          echo "generating self-signed cert for localhost (365d)"
-          openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
-            -keyout /ssl/cert.key -out /ssl/cert.crt \
-            -subj "/CN=localhost/O=bi8s-local/C=US" \
-            -addext "subjectAltName=DNS:localhost,DNS:*.localhost,IP:127.0.0.1,IP:::1"
-          chmod 644 /ssl/cert.crt /ssl/cert.key
-        else
-          echo "cert already present; skipping"
-        fi
-    restart: "no"
-    profiles: ["https"]
-
-  # Local nginx HTTPS terminator. Reuses the prod-style configs in
-  # infra/docker/nginx so behavior stays consistent. Activate with:
-  #   docker compose -f docker-compose.local.yml --profile https up -d
-  nginx:
-    <<: [*restart-policy, *default-logging]
-    image: nginx:alpine
-    container_name: bi8s_nginx_local
-    depends_on:
-      cert-init:
-        condition: service_completed_successfully
-      api:
-        condition: service_started
-    ports:
-      - "${NGINX_HTTP_PORT:-80}:80"
-      - "${NGINX_HTTPS_PORT:-443}:443"
-      - "${NGINX_TUNNEL_PORT:-8081}:8081"
-    volumes:
-      - ./infra/docker/nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
-      - ./infra/docker/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./infra/docker/nginx/snippets:/etc/nginx/snippets:ro
-      - ./infra/docker/nginx/ssl/live:/etc/nginx/ssl/live:ro
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    networks:
-      - bi8s-net
-    profiles: ["https"]
-
-  cloudflared:
-    <<: [*restart-policy, *default-logging]
-    container_name: cloudflared
-    image: cloudflare/cloudflared:latest
-    command: tunnel run
-    environment:
-      TZ: UTC
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      nginx:
-        condition: service_started
-    networks:
-      - bi8s-net
-    profiles: ["https"]
 
 networks:
   bi8s-net:

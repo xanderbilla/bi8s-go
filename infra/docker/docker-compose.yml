@@ -1,14 +1,4 @@
-# Production stack on EC2.
-#
-# Layout (managed by infra/tofu user-data on first boot):
-#   /opt/${PROJECT_NAME}/compose/docker-compose.yml   -> repo/infra/docker/docker-compose.yml (symlink)
-#   /opt/${PROJECT_NAME}/compose/observability/       -> repo/observability/                  (symlink)
-#   /opt/${PROJECT_NAME}/compose/.env                 (rendered by user-data: image tag, AWS, table names)
-#   /opt/${PROJECT_NAME}/nginx/conf.d|ssl|certbot/www (rendered by user-data, dynamic public IP)
-#   /opt/${PROJECT_NAME}/prometheus-data              (EBS volume mount)
-#
-# Telemetry flow: app  -OTLP/gRPC-> otel-collector -> {tempo,loki,prometheus(via /metrics scrape)}
-# AWS access: Loki/Tempo S3 use the EC2 instance profile (no creds in env).
+# Production stack on EC2
 
 name: bi8s
 
@@ -40,13 +30,10 @@ services:
     pull_policy: always
     expose:
       - "8080"
-    # Container hardening — drop all kernel capabilities, prevent privilege
-    # escalation. The Go binary does not need any caps; ffmpeg is invoked as
-    # a child process and also needs none.
     security_opt:
       - no-new-privileges:true
     cap_drop: ["ALL"]
-    read_only: false # encoder writes intermediate files to BI8S_TMP_DIR
+    read_only: false
     mem_limit: ${API_MEM_LIMIT:-1g}
     cpus: ${API_CPUS:-1.5}
     environment:
@@ -54,9 +41,6 @@ services:
       PORT: ":8080"
       LOG_LEVEL: ${LOG_LEVEL:-info}
       AWS_REGION: ${AWS_REGION}
-      # AWS credentials are intentionally NOT injected — production EC2 hosts
-      # use the instance profile (see infra/tofu/modules/iam). Setting these
-      # would shadow the role and break least-privilege auditing.
       DYNAMODB_CONTENT_TABLE: ${DYNAMODB_CONTENT_TABLE}
       DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE}
       DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE}
@@ -113,66 +97,7 @@ services:
       retries: 5
       start_period: 40s
 
-  nginx:
-    <<: [*restart-policy, *default-logging]
-    image: nginx:alpine
-    container_name: ${PROJECT_NAME:-bi8s}-nginx
-    security_opt:
-      - no-new-privileges:true
-    cap_drop: ["ALL"]
-    cap_add: ["CHOWN", "DAC_OVERRIDE", "SETGID", "SETUID", "NET_BIND_SERVICE"]
-    mem_limit: ${NGINX_MEM_LIMIT:-256m}
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ../nginx/conf.d:/etc/nginx/conf.d:ro
-      - ../nginx/snippets:/etc/nginx/snippets:ro
-      - ../nginx/ssl:/etc/nginx/ssl:ro
-      - ../nginx/certbot/www:/var/www/certbot:ro
-    depends_on:
-      api:
-        condition: service_started
-    networks: [app-network]
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://127.0.0.1/health",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # ─────────────────────────────── UI ──────────────────────────────────────
-  # Optional UI service pulled from ECR. Activated by `--profile ui` so the
-  # backend-only deploy path (current default) is unaffected. Image and tag
-  # are env-driven; pin to an immutable vX.Y.Z in production.
-  ui:
-    <<: [*restart-policy, *default-logging]
-    image: ${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:efx-image-prod-latest}
-    container_name: ${PROJECT_NAME:-bi8s}-ui
-    pull_policy: always
-    profiles: ["ui"]
-    security_opt:
-      - no-new-privileges:true
-    cap_drop: ["ALL"]
-    mem_limit: ${UI_MEM_LIMIT:-512m}
-    cpus: ${UI_CPUS:-1.0}
-    expose:
-      - "8443"
-    environment:
-      NODE_ENV: ${UI_NODE_ENV:-production}
-    networks: [app-network]
-
-  # ────────────────────────────── Redis ────────────────────────────────────
-  # Co-located Redis for shared rate-limit state. For true multi-replica
-  # deployments behind an ALB, replace with a managed Redis (ElastiCache)
-  # and set REDIS_URL via SSM/Secrets Manager.
+  # Redis - shared rate-limit backend
   redis:
     <<: [*restart-policy, *default-logging]
     image: redis:7-alpine
@@ -213,10 +138,6 @@ services:
     depends_on:
       tempo:
         condition: service_started
-      loki:
-        condition: service_started
-    networks: [app-network]
-
   prometheus:
     <<: [*restart-policy, *default-logging]
     image: prom/prometheus:v2.55.1

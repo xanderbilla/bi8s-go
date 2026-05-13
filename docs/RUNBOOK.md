@@ -207,10 +207,9 @@ aws s3api copy-object \
 
 ## 12. Routine ops
 
-| Task                 | Cadence     | How                                                    |
-| -------------------- | ----------- | ------------------------------------------------------ |
-| Renew TLS            | auto / 60 d | `infra/scripts/setup-ssl-letsencrypt.sh` (cron).       |
-| Rotate Grafana admin | first boot  | UI.                                                    |
-| Review CVE alerts    | weekly      | Dependabot PRs + `govulncheck` CI.                     |
-| Verify backups       | monthly     | Spot-restore a DynamoDB PITR snapshot to a temp table. |
-| Capacity review      | monthly     | Check Grafana "API Overview" + DynamoDB metrics.       |
+| Task                 | Cadence    | How                                                    |
+| -------------------- | ---------- | ------------------------------------------------------ |
+| Rotate Grafana admin | first boot | UI.                                                    |
+| Review CVE alerts    | weekly     | Dependabot PRs + `govulncheck` CI.                     |
+| Verify backups       | monthly    | Spot-restore a DynamoDB PITR snapshot to a temp table. |
+| Capacity review      | monthly    | Check Grafana "API Overview" + DynamoDB metrics.       |
