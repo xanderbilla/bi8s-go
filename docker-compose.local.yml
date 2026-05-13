@@ -300,6 +300,30 @@ services:
     networks:
       - bi8s-net
 
+  cloudflared:
+    <<: [*restart-policy, *default-logging]
+    container_name: cloudflared
+    image: cloudflare/cloudflared:latest
+    command:
+      [
+        "tunnel",
+        "--no-autoupdate",
+        "--metrics",
+        "0.0.0.0:${CLOUDFLARED_METRICS_PORT:-2000}",
+        "run",
+      ]
+    environment:
+      TZ: UTC
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - bi8s-net
+    labels:
+      logging: "alloy"
+    profiles: ["tunnel"]
+
 networks:
   bi8s-net:
     driver: bridge
