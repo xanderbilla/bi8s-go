@@ -24,6 +24,34 @@ services:
     networks:
       - bi8s-net
 
+  # Traefik: single ingress; mirrors production routing so local behaviour matches prod.
+  # Access the dashboard at http://localhost:8081 during development.
+  traefik:
+    <<: [*restart-policy, *default-logging]
+    image: traefik:v3.7
+    container_name: bi8s_traefik_local
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=bi8s-net"
+      - "--entrypoints.web.address=:80"
+      - "--api.insecure=true"
+      - "--ping=true"
+      - "--log.level=INFO"
+    ports:
+      - "${TRAEFIK_PORT:-80}:80"
+      - "${TRAEFIK_DASHBOARD_PORT:-8081}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - bi8s-net
+
   # Application
   api:
     <<: [*restart-policy, *default-logging]
@@ -54,7 +82,7 @@ services:
       DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX:-visibility-createdAt-index}
       DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX:-visibility-releaseDate-index}
       S3_BUCKET: ${S3_BUCKET:-bi8s-storage-dev}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://ui.${APP_DOMAIN:-localhost},https://ops.${APP_DOMAIN:-localhost},https://api.${APP_DOMAIN:-localhost},http://localhost:3000,http://localhost:8080,http://localhost:8443,http://localhost}
       CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api}
       OTEL_ENABLED: ${OTEL_ENABLED:-true}
@@ -93,6 +121,12 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    labels:
+      # Reachable at http://api.localhost via Traefik; direct port :8080 still available
+      traefik.enable: "true"
+      traefik.http.routers.api.rule: "Host(`api.localhost`) || Host(`api.${APP_DOMAIN:-localhost}`)"
+      traefik.http.routers.api.entrypoints: "web"
+      traefik.http.services.api.loadbalancer.server.port: "8080"
     networks:
       - bi8s-net
 
@@ -109,7 +143,7 @@ services:
       NEXT_PUBLIC_ENABLE_LOGGING: ${NEXT_PUBLIC_ENABLE_LOGGING:-true}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
       NEXT_PUBLIC_HTTP_TIMEOUT_MS: ${NEXT_PUBLIC_HTTP_TIMEOUT_MS:-10000}
-      NEXT_PUBLIC_CUSTOM_API_URL: ${NEXT_PUBLIC_CUSTOM_API_URL:-http://localhost:8080/v1}
+      NEXT_PUBLIC_CUSTOM_API_URL: ${NEXT_PUBLIC_CUSTOM_API_URL:-https://api.${APP_DOMAIN:-localhost}/v1}
       NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL: ${NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL:-https://bi8s-storage-dev.s3.amazonaws.com}
       NEXT_PUBLIC_IMAGE_HOSTS: ${NEXT_PUBLIC_IMAGE_HOSTS:-}
       NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-}
@@ -129,6 +163,12 @@ services:
     depends_on:
       api:
         condition: service_started
+    labels:
+      # Reachable at http://localhost via Traefik; direct port :3000 still available
+      traefik.enable: "true"
+      traefik.http.routers.ui.rule: "Host(`localhost`) || Host(`ui.${APP_DOMAIN:-localhost}`)"
+      traefik.http.routers.ui.entrypoints: "web"
+      traefik.http.services.ui.loadbalancer.server.port: "3000"
     networks:
       - bi8s-net
     profiles: ["ui"]
@@ -297,6 +337,12 @@ services:
         condition: service_started
       loki:
         condition: service_started
+    labels:
+      # Reachable at http://ops.localhost via Traefik; direct port :4000 still available
+      traefik.enable: "true"
+      traefik.http.routers.grafana.rule: "Host(`ops.localhost`) || Host(`ops.${APP_DOMAIN:-localhost}`)"
+      traefik.http.routers.grafana.entrypoints: "web"
+      traefik.http.services.grafana.loadbalancer.server.port: "3000"
     networks:
       - bi8s-net
 
@@ -316,8 +362,9 @@ services:
       TZ: UTC
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
     depends_on:
-      api:
-        condition: service_started
+      # Tunnel must point to Traefik only; update public hostname in CF Zero Trust to http://traefik:80
+      traefik:
+        condition: service_healthy
     networks:
       - bi8s-net
     labels:
@@ -327,6 +374,7 @@ services:
 networks:
   bi8s-net:
     driver: bridge
+    name: bi8s-net
 
 volumes:
   prometheus-data:

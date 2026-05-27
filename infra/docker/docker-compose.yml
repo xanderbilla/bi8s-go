@@ -23,6 +23,36 @@ services:
     profiles: ["quality"]
     networks: [app-network]
 
+  # Traefik: single ingress point for all external traffic.
+  # Cloudflare Tunnel must point only to this service, not to individual containers.
+  # Configure public hostnames (bi8s.example.com, api.*, ops.*) in CF Zero Trust dashboard
+  # and set them to forward to http://traefik:80.
+  traefik:
+    <<: [*restart-policy, *default-logging]
+    image: traefik:v3.2
+    container_name: ${PROJECT_NAME:-bi8s}-traefik
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=app-network"
+      - "--entrypoints.web.address=:80"
+      - "--ping=true"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks: [app-network]
+
   api:
     <<: [*restart-policy, *default-logging]
     image: ${IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/bi8s-dev:latest}
@@ -96,6 +126,12 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+    labels:
+      # Route api.DOMAIN to this container; set DOMAIN in your .env
+      traefik.enable: "true"
+      traefik.http.routers.api.rule: "Host(`api.${DOMAIN:-bi8s.example.com}`)"
+      traefik.http.routers.api.entrypoints: "web"
+      traefik.http.services.api.loadbalancer.server.port: "8080"
 
   # Redis - shared rate-limit backend
   redis:
@@ -138,6 +174,8 @@ services:
     depends_on:
       tempo:
         condition: service_started
+    networks: [app-network]
+
   prometheus:
     <<: [*restart-policy, *default-logging]
     image: prom/prometheus:v2.55.1
@@ -204,6 +242,8 @@ services:
         condition: service_started
     networks: [app-network]
 
+  # Grafana: not directly reachable; accessed only via Traefik.
+  # Protect ops.DOMAIN with a Cloudflare Access policy in the CF Zero Trust dashboard.
   grafana:
     <<: [*restart-policy, *default-logging]
     image: grafana/grafana:11.3.0
@@ -213,14 +253,14 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor traceToMetrics"
-      GF_SERVER_ROOT_URL: "${GRAFANA_ROOT_URL:-https://grafana.xanderbilla.com/bi8s}"
-      GF_SERVER_SERVE_FROM_SUB_PATH: "${GF_SERVER_SERVE_FROM_SUB_PATH:-true}"
+      GF_SERVER_ROOT_URL: "${GRAFANA_ROOT_URL:-https://ops.bi8s.example.com}"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "${GF_SERVER_SERVE_FROM_SUB_PATH:-false}"
       AWS_REGION: ${AWS_REGION}
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana-data:/var/lib/grafana
-    ports:
-      - "4000:3000"
+    expose:
+      - "3000"
     depends_on:
       prometheus:
         condition: service_started
@@ -229,6 +269,12 @@ services:
       loki:
         condition: service_started
     networks: [app-network]
+    labels:
+      # Route ops.DOMAIN to Grafana; add Cloudflare Access policy in CF dashboard
+      traefik.enable: "true"
+      traefik.http.routers.grafana.rule: "Host(`ops.${DOMAIN:-bi8s.example.com}`)"
+      traefik.http.routers.grafana.entrypoints: "web"
+      traefik.http.services.grafana.loadbalancer.server.port: "3000"
 
   cadvisor:
     <<: [*restart-policy, *default-logging]
@@ -283,8 +329,9 @@ services:
       TZ: UTC
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
     depends_on:
-      api:
-        condition: service_started
+      # Tunnel must point to Traefik only; update public hostname in CF Zero Trust to http://traefik:80
+      traefik:
+        condition: service_healthy
     labels:
       logging: "alloy"
     networks: [app-network]
