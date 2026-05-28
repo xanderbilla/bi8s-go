@@ -13,7 +13,6 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
 API_URL="${API_URL:-http://localhost:8080}"
-S3_BUCKET="${S3_BUCKET:-bi8s-storage-dev}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 SKIP_WIPE="${SKIP_WIPE:-0}"
 SKIP_SEED="${SKIP_SEED:-0}"
@@ -86,8 +85,6 @@ if [ "$SKIP_WIPE" = "0" ]; then
   _wipe_dynamo_table "${DYNAMODB_CONTENT_CAST_TABLE:-${_project}-content-cast-table-${_env}}"
   _wipe_dynamo_table "${DYNAMODB_CONTENT_ATTRIBUTE_TABLE:-${_project}-content-attribute-table-${_env}}"
   _wipe_dynamo_table "${DYNAMODB_ENCODER_TABLE:-${_project}-video-table-${_env}}"
-  aws s3 rm "s3://$S3_BUCKET/movies/"  --recursive --region "$AWS_REGION" 2>&1 | grep -v "^$" || true
-  aws s3 rm "s3://$S3_BUCKET/persons/" --recursive --region "$AWS_REGION" 2>&1 | grep -v "^$" || true
   log "wipe done"
 else
   log "SKIP_WIPE=1, skipping wipe"
@@ -115,24 +112,77 @@ if [ "$SKIP_SEED" = "0" ]; then
 
   _create_attribute() {
     local key="$1" name="$2" attr_type="$3"
-    local resp id
-    resp=$(_api_post /v1/a/attributes \
+    local resp id http_code
+    http_code=$(curl -s -o /tmp/_attr_resp.json -w "%{http_code}" --max-time 60 -X POST "${API_URL}/v1/a/attributes/" \
       -F "name=${name}" \
-      -F "attribute_type=${attr_type}") || { err "failed: attribute $name"; exit 1; }
-    log "$resp"
-    id=$(echo "$resp" | jq -r '.data.id')
+      -F "attribute_type=${attr_type}")
+    resp=$(cat /tmp/_attr_resp.json)
+    if [ "$http_code" = "201" ] || [ "$http_code" = "200" ]; then
+      id=$(echo "$resp" | jq -r '.data.id')
+    elif [ "$http_code" = "409" ]; then
+      id=$(curl -sf --max-time 30 "${API_URL}/v1/a/attributes/" \
+        | jq -r --arg n "$name" '.data[] | select(.name == $n) | .id')
+      [ -z "$id" ] && { err "attribute $name exists but lookup failed"; exit 1; }
+      log "attribute $name already exists (id=$id)"
+    else
+      err "failed to create attribute $name (http $http_code): $resp"; exit 1
+    fi
     _attr_id["$key"]="$id"
   }
 
   _create_attribute "action"         "Action"         "GENRE"
   _create_attribute "drama"          "Drama"          "GENRE"
   _create_attribute "sci-fi"         "Sci-Fi"         "GENRE"
+  _create_attribute "anime"          "Anime"          "GENRE"
+  _create_attribute "fantasy"        "Fantasy"        "GENRE"
   _create_attribute "epic"           "Epic"           "MOOD,TAG"
   _create_attribute "marvel-studios" "Marvel Studios" "STUDIO"
+  _create_attribute "a1-pictures"    "A-1 Pictures"   "STUDIO"
   _create_attribute "superhero"      "Superhero"      "CATEGORY,SPECIALITY"
 
-  _resp=$(_api_post /v1/a/people \
-    -F "name=Angelina Jolie" \
+  declare -A _content_id
+
+  _create_person() {
+    local key="$1" name="$2"; shift 2
+    local resp id http_code
+    http_code=$(curl -s -o /tmp/_person_resp.json -w "%{http_code}" --max-time 60 -X POST "${API_URL}/v1/a/people/" \
+      -F "name=${name}" "$@")
+    resp=$(cat /tmp/_person_resp.json)
+    if [ "$http_code" = "201" ] || [ "$http_code" = "200" ]; then
+      id=$(echo "$resp" | jq -r '.data.id')
+    elif [ "$http_code" = "409" ]; then
+      id=$(curl -sf --max-time 30 "${API_URL}/v1/a/people/" \
+        | jq -r --arg n "$name" '.data[] | select(.name == $n) | .id' | head -1)
+      [ -z "$id" ] || [ "$id" = "null" ] && { err "person $name exists but lookup failed"; exit 1; }
+      log "person $name already exists (id=$id)"
+    else
+      err "failed to create person $name (http $http_code): $resp"; exit 1
+    fi
+    _person_id["$key"]="$id"
+    log "person: $name → $id"
+  }
+
+  _create_content() {
+    local key="$1" title="$2"; shift 2
+    local resp id http_code
+    http_code=$(curl -s -o /tmp/_content_resp.json -w "%{http_code}" --max-time 60 -X POST "${API_URL}/v1/a/content/" \
+      -F "title=${title}" "$@")
+    resp=$(cat /tmp/_content_resp.json)
+    if [ "$http_code" = "201" ] || [ "$http_code" = "200" ]; then
+      id=$(echo "$resp" | jq -r '.data.id')
+    elif [ "$http_code" = "409" ]; then
+      id=$(curl -sf --max-time 30 "${API_URL}/v1/a/content/" \
+        | jq -r --arg t "$title" '.data[] | select(.title == $t) | .id' | head -1)
+      [ -z "$id" ] || [ "$id" = "null" ] && { err "content $title exists but lookup failed"; exit 1; }
+      log "content $title already exists (id=$id)"
+    else
+      err "failed to create content $title (http $http_code): $resp"; exit 1
+    fi
+    _content_id["$key"]="$id"
+    log "content: $title → $id"
+  }
+
+  _create_person "648032" "Angelina Jolie" \
     -F "stage_name=AJ" \
     -F "roles=PERFORMER,CONTENT_CREATOR" \
     -F "bio=Angelina Jolie is an American actress, filmmaker, and humanitarian. Known for iconic roles in Lara Croft: Tomb Raider, Mr. & Mrs. Smith, Maleficent, and Eternals, she is one of the most celebrated and influential figures in Hollywood. She won an Academy Award for Best Supporting Actress for Girl, Interrupted." \
@@ -156,14 +206,9 @@ if [ "$SKIP_SEED" = "0" ]; then
     -F "categories=${_attr_id[superhero]}:Superhero" \
     -F "specialties=${_attr_id[superhero]}:Superhero" \
     -F "profile=@${IMG_DIR}/persons/person-542131-profile.jpg;type=image/jpeg" \
-    -F "backdrop=@${IMG_DIR}/persons/person-542131-backdrop.jpg;type=image/jpeg") || {
-    err "failed: Angelina Jolie"; exit 1; }
-  log "$_resp"
-  _person_id["648032"]=$(echo "$_resp" | jq -r '.data.id')
-  log "person: Angelina Jolie → ${_person_id[648032]}"
+    -F "backdrop=@${IMG_DIR}/persons/person-542131-backdrop.jpg;type=image/jpeg"
 
-  _resp=$(_api_post /v1/a/people \
-    -F "name=Robert Downey Jr." \
+  _create_person "542131" "Robert Downey Jr." \
     -F "stage_name=RDJ" \
     -F "roles=PERFORMER,CONTENT_CREATOR" \
     -F "bio=Robert John Downey Jr. is an American actor renowned for his portrayal of Tony Stark / Iron Man in the Marvel Cinematic Universe. With a career spanning over five decades, he is celebrated as one of the most talented and versatile actors of his generation, earning two Academy Award nominations and a BAFTA." \
@@ -187,15 +232,10 @@ if [ "$SKIP_SEED" = "0" ]; then
     -F "categories=${_attr_id[superhero]}:Superhero" \
     -F "specialties=${_attr_id[superhero]}:Superhero" \
     -F "profile=@${IMG_DIR}/persons/person-648032-profile.jpg;type=image/jpeg" \
-    -F "backdrop=@${IMG_DIR}/persons/person-648032-backdrop.jpg;type=image/jpeg") || {
-    err "failed: Robert Downey Jr."; exit 1; }
-  log "$_resp"
-  _person_id["542131"]=$(echo "$_resp" | jq -r '.data.id')
-  log "person: Robert Downey Jr. → ${_person_id[542131]}"
+    -F "backdrop=@${IMG_DIR}/persons/person-648032-backdrop.jpg;type=image/jpeg"
 
 
-  _resp=$(_api_post /v1/a/content \
-    -F "title=Eternals" \
+  _create_content "eternals" "Eternals" \
     -F "overview=The Eternals, a race of immortal beings with superhuman powers who have secretly lived on Earth for thousands of years, reunite to battle the monstrous Deviants and uncover a startling secret about their own existence." \
     -F "content_type=MOVIE" \
     -F "status=RELEASED" \
@@ -213,14 +253,9 @@ if [ "$SKIP_SEED" = "0" ]; then
     -F "mood_tags=${_attr_id[epic]}:Epic" \
     -F "studios=${_attr_id[marvel-studios]}:Marvel Studios" \
     -F "poster=@${IMG_DIR}/movies/ironman-poster.jpg;type=image/jpeg" \
-    -F "cover=@${IMG_DIR}/movies/ironman-backdrop.jpg;type=image/jpeg") || {
-    err "failed: Eternals"; exit 1; }
-  log "$_resp"
-  _eternals_id=$(echo "$_resp" | jq -r '.data.id')
-  log "movie: Eternals → ${_eternals_id}"
+    -F "cover=@${IMG_DIR}/movies/ironman-backdrop.jpg;type=image/jpeg"
 
-  _resp=$(_api_post /v1/a/content \
-    -F "title=Marvel Anime: Iron Man" \
+  _create_content "ironman-anime" "Marvel Anime: Iron Man" \
     -F "overview=Tony Stark travels to Japan to build a new arc reactor and unveil Iron Man Dio. When the villainous ZODIAC steals the suit, Tony dons the original armor to stop them in an epic clash across the neon-lit streets of Tokyo." \
     -F "content_type=TV" \
     -F "status=ENDED" \
@@ -238,14 +273,30 @@ if [ "$SKIP_SEED" = "0" ]; then
     -F "mood_tags=${_attr_id[epic]}:Epic" \
     -F "studios=${_attr_id[marvel-studios]}:Marvel Studios" \
     -F "poster=@${IMG_DIR}/movies/eternals-poster.jpg;type=image/jpeg" \
-    -F "cover=@${IMG_DIR}/movies/eternals-backdrop.jpg;type=image/jpeg") || {
-    err "failed: Marvel Anime: Iron Man"; exit 1; }
-  log "$_resp"
-  log "movie: Marvel Anime: Iron Man → $(echo "$_resp" | jq -r '.data.id')"
+    -F "cover=@${IMG_DIR}/movies/eternals-backdrop.jpg;type=image/jpeg"
+
+  _create_content "solo-leveling" "Solo Leveling" \
+    -F "overview=After a brutal battle that nearly kills him, the weakest hunter Sung Jin-Woo gains an unprecedented ability to level up in strength, launching his rise from the bottom to the most powerful hunter in the world." \
+    -F "content_type=TV" \
+    -F "status=RETURNING_SERIES" \
+    -F "visibility=PUBLIC" \
+    -F "adult=false" \
+    -F "content_rating=18_PLUS" \
+    -F "original_language=ja" \
+    -F "runtime=24" \
+    -F "first_air_date=2024-01-06" \
+    -F "tagline=Arise." \
+    -F "origin_country=JP,KR" \
+    -F "genres=${_attr_id[anime]}:Anime,${_attr_id[action]}:Action,${_attr_id[fantasy]}:Fantasy" \
+    -F "tags=${_attr_id[epic]}:Epic" \
+    -F "mood_tags=${_attr_id[epic]}:Epic" \
+    -F "studios=${_attr_id[a1-pictures]}:A-1 Pictures" \
+    -F "poster=@${IMG_DIR}/movies/solo-leveling-poster.jpg;type=image/jpeg" \
+    -F "cover=@${IMG_DIR}/movies/solo-leveling-backdrop.jpg;type=image/jpeg"
 
   log "Phase 4: encoder job"
-  _resp=$(curl -sf --max-time 300 -X POST "${API_URL}/v1/a/encoder" \
-    -F "contentId=${_eternals_id}" \
+  _resp=$(curl -sf --max-time 300 -X POST "${API_URL}/v1/a/encoder/" \
+    -F "contentId=${_content_id[eternals]}" \
     -F "contentType=MOVIE" \
     -F "video=@${VID_DIR}/sample.mp4;type=video/mp4") || {
     err "failed: encoder job"; exit 1; }

@@ -53,7 +53,7 @@ func TestConfigValidate_Errors(t *testing.T) {
 		{"bad max json", func(c *Config) { c.HTTPMaxJSONBytes = 0 }, "HTTP_MAX_JSON_BYTES"},
 		{"bad max multipart", func(c *Config) { c.HTTPMaxMultipartBytes = 0 }, "HTTP_MAX_MULTIPART_BYTES"},
 		{"bad router timeout", func(c *Config) { c.RouterTimeoutSecond = 0 }, "ROUTER_TIMEOUT_SECONDS"},
-		{"missing bucket", func(c *Config) { c.S3Bucket = "" }, "S3_BUCKET"},
+		{"missing bucket", func(c *Config) { c.S3Bucket = ""; c.B2.Bucket = "" }, "no storage provider configured"},
 		{"missing region", func(c *Config) { c.AWS.Region = "" }, "AWS_REGION"},
 		{"missing table", func(c *Config) { c.TableName = "" }, "DYNAMODB"},
 		{"missing encoder index", func(c *Config) { c.EncoderContentIDIndex = "" }, "DYNAMODB_ENCODER_CONTENT_ID_INDEX"},

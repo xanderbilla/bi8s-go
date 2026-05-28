@@ -21,7 +21,7 @@ export DYNAMODB_ENCODER_TABLE="bi8s-video-table-dev"
 export DYNAMODB_ENCODER_CONTENT_ID_INDEX="contentId-index"
 
 # --- S3 ---------------------------------------------------------------------
-export S3_BUCKET="bi8s-storage-dev"
+# export S3_BUCKET="bi8s-storage-dev"  # disabled — using B2 Blaze; uncomment to switch back to AWS S3
 export STORAGE_BASE_URL="http://localhost:8080"
 
 # --- CORS -------------------------------------------------------------------

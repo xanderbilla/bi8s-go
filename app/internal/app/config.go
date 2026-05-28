@@ -14,6 +14,13 @@ type AWSCredentials struct {
 	Region          string
 }
 
+type B2Credentials struct {
+	KeyID    string
+	AppKey   string
+	Bucket   string
+	Endpoint string // e.g. https://s3.us-east-005.backblazeb2.com
+}
+
 type Config struct {
 	Addr string
 	Env  string
@@ -37,6 +44,7 @@ type Config struct {
 	ContentVisibilityReleaseDateIndex string
 
 	S3Bucket string
+	B2       B2Credentials
 
 	CORSAllowedOrigins      []string
 	CORSAllowPrivateNetwork bool
@@ -97,8 +105,20 @@ func (c Config) Validate() error {
 	if c.RouterTimeoutSecond <= 0 {
 		return errors.New("ROUTER_TIMEOUT_SECONDS must be > 0")
 	}
-	if strings.TrimSpace(c.S3Bucket) == "" {
-		return errors.New("S3_BUCKET is required")
+	if strings.TrimSpace(c.B2.Bucket) == "" && strings.TrimSpace(c.S3Bucket) == "" {
+		return errors.New("no storage provider configured: set B2_BUCKET+B2_ENDPOINT+B2_KEY_ID+B2_APPLICATION_KEY for B2 Blaze, or S3_BUCKET for AWS S3")
+	}
+	// When B2 is the configured provider, its credentials must also be present.
+	if strings.TrimSpace(c.B2.Bucket) != "" || strings.TrimSpace(c.B2.Endpoint) != "" {
+		if strings.TrimSpace(c.B2.KeyID) == "" {
+			return errors.New("B2_KEY_ID is required when B2_BUCKET or B2_ENDPOINT is set")
+		}
+		if strings.TrimSpace(c.B2.AppKey) == "" {
+			return errors.New("B2_APPLICATION_KEY is required when B2_BUCKET or B2_ENDPOINT is set")
+		}
+		if strings.TrimSpace(c.B2.Endpoint) == "" {
+			return errors.New("B2_ENDPOINT is required when B2_BUCKET is set")
+		}
 	}
 	if strings.TrimSpace(c.AWS.Region) == "" {
 		return errors.New("AWS_REGION is required")

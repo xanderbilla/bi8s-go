@@ -25,6 +25,7 @@ var (
 	ErrFileUploaderNotConfigured = errors.New("file uploader is not configured")
 	ErrAWSRegionRequired         = errors.New("aws region is required")
 	ErrS3BucketNotConfigured     = errors.New("s3 bucket is not configured")
+	ErrNoStorageProvider         = errors.New("no storage provider configured: set B2_BUCKET/B2_ENDPOINT or S3_BUCKET")
 	ErrFileEmpty                 = errors.New("file is empty")
 
 	ErrResultTooLarge = errors.New("result set too large; add filters or pagination")
@@ -158,7 +159,8 @@ func classifyTyped(err error) (*APIError, bool) {
 		return NewBadRequest(err.Error()), true
 	case errors.Is(err, ErrFileUploaderNotConfigured),
 		errors.Is(err, ErrAWSRegionRequired),
-		errors.Is(err, ErrS3BucketNotConfigured):
+		errors.Is(err, ErrS3BucketNotConfigured),
+		errors.Is(err, ErrNoStorageProvider):
 		return NewInternal(err), true
 	}
 	return nil, false

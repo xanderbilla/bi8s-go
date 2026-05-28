@@ -29,16 +29,18 @@ type FileUploader interface {
 }
 
 type S3FileUploader struct {
-	client *transfermanager.Client
-	rawS3  *s3.Client
-	bucket string
+	client     *transfermanager.Client
+	rawS3      *s3.Client
+	bucket     string
+	sseEnabled bool // true for AWS S3 (AES-256); false for B2 which rejects this field
 }
 
-func NewS3FileUploader(client *s3.Client, bucket string) *S3FileUploader {
+func NewS3FileUploader(client *s3.Client, bucket string, sseEnabled bool) *S3FileUploader {
 	return &S3FileUploader{
-		client: transfermanager.New(client),
-		rawS3:  client,
-		bucket: strings.TrimSpace(bucket),
+		client:     transfermanager.New(client),
+		rawS3:      client,
+		bucket:     strings.TrimSpace(bucket),
+		sseEnabled: sseEnabled,
 	}
 }
 
@@ -151,19 +153,21 @@ func (u *S3FileUploader) UploadFileStream(ctx context.Context, prefix, resourceI
 		cacheControl = "public, max-age=31536000, immutable"
 	}
 
-	_, err := u.client.UploadObject(ctx, &transfermanager.UploadObjectInput{
+	uploadInput := &transfermanager.UploadObjectInput{
 		Bucket:       aws.String(u.bucket),
 		Key:          aws.String(key),
 		Body:         body,
 		ContentType:  aws.String(contentType),
 		CacheControl: aws.String(cacheControl),
-
-		ServerSideEncryption: tmtypes.ServerSideEncryptionAes256,
 		Metadata: map[string]string{
 			"resource-id": asciiSanitizeMetadata(resourceID),
 			"purpose":     asciiSanitizeMetadata(purpose),
 		},
-	})
+	}
+	if u.sseEnabled {
+		uploadInput.ServerSideEncryption = tmtypes.ServerSideEncryptionAes256
+	}
+	_, err := u.client.UploadObject(ctx, uploadInput)
 	if err != nil {
 		return "", fmt.Errorf("upload file to s3: %w", err)
 	}

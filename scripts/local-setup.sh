@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# local-setup.sh — Create only the DynamoDB tables and S3 bucket needed for
-# local development.  Safe to run multiple times (idempotent).
+# local-setup.sh — Create the DynamoDB tables needed for local development.
+# Storage uses B2 Blaze (configured via .env); no S3/LocalStack bucket is created.
+# Safe to run multiple times (idempotent).
 #
 # Environment variables (all optional — defaults match docker-compose.local.yml):
 #   AWS_REGION               — default: us-east-1
@@ -16,7 +17,6 @@
 #   DYNAMODB_ENCODER_CONTENT_ID_INDEX
 #   DYNAMODB_CONTENT_CAST_TABLE
 #   DYNAMODB_CONTENT_ATTRIBUTE_TABLE
-#   S3_BUCKET
 #
 # Usage:
 #   ./scripts/local-setup.sh                          # real AWS
@@ -54,8 +54,6 @@ ENCODER_TABLE="${DYNAMODB_ENCODER_TABLE:-${_project}-video-table-${_env}}"
 ENCODER_GSI="${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}"
 CONTENT_CAST_TABLE="${DYNAMODB_CONTENT_CAST_TABLE:-${_project}-content-cast-table-${_env}}"
 CONTENT_ATTRIBUTE_TABLE="${DYNAMODB_CONTENT_ATTRIBUTE_TABLE:-${_project}-content-attribute-table-${_env}}"
-BUCKET="${S3_BUCKET:-${_project}-storage-${_env}}"
-
 # Build endpoint flag (empty string when using real AWS).
 _ep_flag=()
 [ -n "$ENDPOINT" ] && _ep_flag=(--endpoint-url "$ENDPOINT")
@@ -313,101 +311,7 @@ _create_encoder_table() {
   ok "Created: $table"
 }
 
-# ── S3 helpers ────────────────────────────────────────────────────────────────
 
-_bucket_exists() {
-  aws s3api head-bucket \
-    --bucket "$1" \
-    --region "$REGION" \
-    "${_ep_flag[@]}" 2>/dev/null
-}
-
-_configure_bucket() {
-  local bucket="$1"
-
-  # 1. Disable block-public-access so the bucket policy can take effect.
-  log "Configuring public-access block: $bucket"
-  aws s3api put-public-access-block \
-    --bucket "$bucket" \
-    --region "$REGION" \
-    "${_ep_flag[@]}" \
-    --public-access-block-configuration \
-      "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false" \
-    --output json > /dev/null
-  ok "Public-access block disabled: $bucket"
-
-  # 2. Attach a bucket policy that allows anonymous GET (public read).
-  log "Applying public-read bucket policy: $bucket"
-  aws s3api put-bucket-policy \
-    --bucket "$bucket" \
-    --region "$REGION" \
-    "${_ep_flag[@]}" \
-    --policy "{
-      \"Version\": \"2012-10-17\",
-      \"Statement\": [{
-        \"Sid\": \"PublicReadGetObject\",
-        \"Effect\": \"Allow\",
-        \"Principal\": \"*\",
-        \"Action\": \"s3:GetObject\",
-        \"Resource\": \"arn:aws:s3:::${bucket}/*\"
-      }]
-    }" \
-    --output json > /dev/null
-  ok "Public-read policy applied: $bucket"
-
-  # 3. Set CORS so browser requests (local frontend / Grafana) are accepted.
-  log "Applying CORS rules: $bucket"
-  aws s3api put-bucket-cors \
-    --bucket "$bucket" \
-    --region "$REGION" \
-    "${_ep_flag[@]}" \
-    --cors-configuration '{
-      "CORSRules": [{
-        "AllowedHeaders": ["*"],
-        "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
-        "AllowedOrigins": [
-          "http://localhost:3000",
-          "http://localhost:8080",
-          "http://localhost:8443",
-          "https://localhost:8443",
-          "http://127.0.0.1:3000",
-          "http://127.0.0.1:8080",
-          "http://127.0.0.1:8443",
-          "https://127.0.0.1:8443"
-        ],
-        "ExposeHeaders": ["ETag"],
-        "MaxAgeSeconds": 3000
-      }]
-    }' \
-    --output json > /dev/null
-  ok "CORS configured: $bucket"
-}
-
-_create_bucket() {
-  local bucket="$1"
-  if _bucket_exists "$bucket"; then
-    ok "S3 bucket already exists: $bucket"
-  else
-    log "Creating S3 bucket: $bucket"
-    if [ "$REGION" = "us-east-1" ]; then
-      aws s3api create-bucket \
-        --bucket "$bucket" \
-        --region "$REGION" \
-        "${_ep_flag[@]}" \
-        --output json > /dev/null
-    else
-      aws s3api create-bucket \
-        --bucket "$bucket" \
-        --region "$REGION" \
-        --create-bucket-configuration LocationConstraint="$REGION" \
-        "${_ep_flag[@]}" \
-        --output json > /dev/null
-    fi
-    ok "Created: s3://$bucket"
-  fi
-  # Always (re-)apply public-access, policy, and CORS — idempotent.
-  _configure_bucket "$bucket"
-}
 
 # ── main ──────────────────────────────────────────────────────────────────────
 
@@ -429,9 +333,6 @@ _create_encoder_table      "$ENCODER_TABLE" "$ENCODER_GSI"
 _create_content_cast_table "$CONTENT_CAST_TABLE"
 _create_content_attribute_table "$CONTENT_ATTRIBUTE_TABLE"
 
-echo ""
-log "--- S3 bucket ---"
-_create_bucket "$BUCKET"
 
 echo ""
 log "=== Done — all local resources are ready ==="

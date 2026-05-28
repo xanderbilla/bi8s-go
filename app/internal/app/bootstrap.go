@@ -19,6 +19,7 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/aws"
 	"github.com/xanderbilla/bi8s-go/internal/ctxutil"
 	"github.com/xanderbilla/bi8s-go/internal/env"
+	"github.com/xanderbilla/bi8s-go/internal/errs"
 	"github.com/xanderbilla/bi8s-go/internal/http/middleware/ratelimit"
 	redispkg "github.com/xanderbilla/bi8s-go/internal/redis"
 	"github.com/xanderbilla/bi8s-go/internal/repository"
@@ -100,6 +101,12 @@ func LoadConfigFromEnv() (Config, error) {
 		ContentVisibilityContentTypeIndex: env.GetString("DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX", "visibility-contentType-index"),
 		ContentVisibilityReleaseDateIndex: env.GetString("DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX", ""),
 		S3Bucket:                          env.GetSecret("S3_BUCKET"),
+		B2: B2Credentials{
+			KeyID:    env.GetSecret("B2_KEY_ID"),
+			AppKey:   env.GetSecret("B2_APPLICATION_KEY"),
+			Bucket:   env.GetString("B2_BUCKET", ""),
+			Endpoint: env.GetString("B2_ENDPOINT", ""),
+		},
 		CORSAllowedOrigins:                env.ParseCommaSeparated(env.GetString("CORS_ALLOWED_ORIGINS", defaultCORSOrigins)),
 		CORSAllowPrivateNetwork:           corsAllowPrivateNetwork,
 		RateLimitBackend:                  env.GetString("RATE_LIMIT_BACKEND", "memory"),
@@ -157,7 +164,35 @@ func Build(ctx context.Context, cfg Config) (*Application, error) {
 	}
 
 	clients := aws.NewClients(awsCfg)
-	uploader := storage.NewS3FileUploader(clients.S3, cfg.S3Bucket)
+
+	var uploader storage.FileUploader
+	switch {
+	case strings.TrimSpace(cfg.B2.Bucket) != "" && strings.TrimSpace(cfg.B2.Endpoint) != "":
+		b2Client, err := aws.NewB2S3Client(cfg.B2.KeyID, cfg.B2.AppKey, cfg.B2.Endpoint)
+		if err != nil {
+			slog.Error("B2 Blaze storage init failed",
+				"error", err,
+				"endpoint", cfg.B2.Endpoint,
+				"bucket", cfg.B2.Bucket,
+				"b2_key_id_set", cfg.B2.KeyID != "",
+				"b2_app_key_set", cfg.B2.AppKey != "",
+			)
+			return nil, fmt.Errorf("init B2 storage: %w", err)
+		}
+		uploader = storage.NewS3FileUploader(b2Client, cfg.B2.Bucket, false)
+		slog.Info("storage: B2 Blaze (primary)", "bucket", cfg.B2.Bucket, "endpoint", cfg.B2.Endpoint)
+	case strings.TrimSpace(cfg.S3Bucket) != "":
+		uploader = storage.NewS3FileUploader(clients.S3, cfg.S3Bucket, true)
+		slog.Info("storage: AWS S3 (fallback)", "bucket", cfg.S3Bucket)
+	default:
+		slog.Error("no storage provider configured",
+			"hint", "set B2_BUCKET+B2_ENDPOINT+B2_KEY_ID+B2_APPLICATION_KEY for B2 Blaze, or S3_BUCKET for AWS S3",
+			"b2_bucket_set", cfg.B2.Bucket != "",
+			"b2_endpoint_set", cfg.B2.Endpoint != "",
+			"s3_bucket_set", cfg.S3Bucket != "",
+		)
+		return nil, errs.ErrNoStorageProvider
+	}
 
 	rlFactory, redisClient, err := buildRateLimitFactory(ctx, cfg)
 	if err != nil {
@@ -237,7 +272,11 @@ func Build(ctx context.Context, cfg Config) (*Application, error) {
 				_, err := clients.Dynamo.DescribeTable(ctx, &dynamodb.DescribeTableInput{TableName: awsSDK.String(cfg.TableName)})
 				return err
 			},
-			"s3": func(ctx context.Context) error {
+			"storage": func(ctx context.Context) error {
+				if strings.TrimSpace(cfg.S3Bucket) == "" {
+					// B2 is primary provider; S3 health check not applicable
+					return nil
+				}
 				_, err := clients.S3.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: awsSDK.String(cfg.S3Bucket)})
 				return err
 			},
