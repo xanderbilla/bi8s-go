@@ -144,8 +144,7 @@ func ScanPage(ctx context.Context, client DynamoAPI, input *dynamodb.ScanInput) 
 func GetByID[T any](ctx context.Context, b *BaseRepository, operation, id string) (*T, error) {
 	return WithTimeoutResult(ctx, operation, func(ctx context.Context) (*T, error) {
 		out, err := b.GetClient().GetItem(ctx, &dynamodb.GetItemInput{
-			TableName:      aws.String(b.GetTableName()),
-			ConsistentRead: aws.Bool(true),
+			TableName: aws.String(b.GetTableName()),
 			Key: map[string]types.AttributeValue{
 				"id": &types.AttributeValueMemberS{Value: id},
 			},

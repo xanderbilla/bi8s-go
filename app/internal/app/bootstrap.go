@@ -64,7 +64,7 @@ func LoadConfigFromEnv() (Config, error) {
 
 	httpMaxJSONBytes := getInt("HTTP_MAX_JSON_BYTES", 1<<20)
 	httpMaxMultipartBytes := getInt("HTTP_MAX_MULTIPART_BYTES", 1<<30)
-	routerTimeoutSeconds := getInt("ROUTER_TIMEOUT_SECONDS", 60)
+	routerTimeoutSeconds := getInt("ROUTER_TIMEOUT_SECONDS", 8)
 	rateLimitRedisTimeoutMS := getInt("RATE_LIMIT_REDIS_TIMEOUT_MS", 50)
 	rateLimitGlobalBurst := getInt("RATELIMIT_GLOBAL_BURST", 100)
 	rateLimitGlobalPerMin := getInt("RATELIMIT_GLOBAL_PER_MIN", 100)
@@ -164,6 +164,29 @@ func Build(ctx context.Context, cfg Config) (*Application, error) {
 		return nil, err
 	}
 
+	// Build a cache Redis client independently of the rate-limit backend.
+	// When RATE_LIMIT_BACKEND=memory the rate-limit factory returns nil, but
+	// REDIS_URL may still point to a reachable Redis that should be used for
+	// service-level caching (content, person, discover).
+	cacheRedisClient := redisClient
+	if cacheRedisClient == nil && cfg.RedisURL != "" {
+		dialCtx, dialCancel := context.WithTimeout(ctx, 5*time.Second)
+		cacheRedisClient, err = redispkg.New(dialCtx, redispkg.Options{
+			URL:          cfg.RedisURL,
+			DialTimeout:  time.Duration(cfg.RedisDialTimeoutMS) * time.Millisecond,
+			ReadTimeout:  time.Duration(cfg.RedisReadTimeoutMS) * time.Millisecond,
+			WriteTimeout: time.Duration(cfg.RedisWriteTimeoutMS) * time.Millisecond,
+			PoolSize:     cfg.RedisPoolSize,
+		})
+		dialCancel()
+		if err != nil {
+			slog.Warn("cache Redis unavailable, service caching disabled", "error", err)
+			cacheRedisClient = nil
+		} else {
+			slog.Info("cache Redis connected", "url", cfg.RedisURL)
+		}
+	}
+
 	attributeRepo := repository.NewAttributeDynamoRepository(clients.Dynamo, cfg.AttributeTableName, cfg.AttributeNameIndex)
 	personRepo := repository.NewPersonDynamoRepository(clients.Dynamo, cfg.PersonTableName)
 	contentCastRepo := repository.NewContentCastRepository(clients.Dynamo, cfg.ContentCastTableName)
@@ -183,8 +206,8 @@ func Build(ctx context.Context, cfg Config) (*Application, error) {
 	personService := service.NewPersonService(personRepo, attributeRepo, uploader)
 	contentService := service.NewContentService(contentRepo, personRepo, attributeRepo, encoderRepo, uploader)
 	encoderService := service.NewEncoderService(encoderRepo, uploader)
-	contentService.SetRedisClient(redisClient)
-	personService.SetRedisClient(redisClient)
+	contentService.SetRedisClient(cacheRedisClient)
+	personService.SetRedisClient(cacheRedisClient)
 	contentService.SetPlaybackURLTTL(time.Duration(env.GetInt("PLAYBACK_URL_TTL_MINUTES", 20)) * time.Minute)
 
 	searchProvider, err := buildSearchProvider(ctx, cfg)

@@ -16,6 +16,7 @@ import (
 
 	"github.com/xanderbilla/bi8s-go/internal/app"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
+	"github.com/xanderbilla/bi8s-go/internal/http/middleware/httpcache"
 	"github.com/xanderbilla/bi8s-go/internal/http/middleware/ratelimit"
 	"github.com/xanderbilla/bi8s-go/internal/http/routes"
 )
@@ -151,6 +152,8 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 		"validate.consumerAttributeId": staticMW(ValidateURLParams(ConsumerAttributeIDValidator)),
 		"validate.jobId":               staticMW(ValidateURLParams(JobIDValidator)),
 		"validate.contentTypeAndId":    staticMW(ValidateURLParams(ContentTypeValidator, ContentIDValidator)),
+		"httpcache.discover":           staticMW(httpcache.Middleware(httpcache.NewMemoryStore(500), httpcache.Options{TTL: 2 * time.Minute})),
+		"httpcache.attributes":         staticMW(httpcache.Middleware(httpcache.NewMemoryStore(50), httpcache.Options{TTL: 10 * time.Minute})),
 	}
 
 	cfg, err := loadRoutesConfig()

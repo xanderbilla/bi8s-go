@@ -23,7 +23,7 @@ type PersonService struct {
 	searchService *SearchService
 }
 
-const personRedisTTL = 60 * time.Second
+const personRedisTTL = 10 * time.Minute
 
 func NewPersonService(repo repository.PersonRepository, attributeRepo repository.AttributeRepository, fileUploader storage.FileUploader) *PersonService {
 	return &PersonService{

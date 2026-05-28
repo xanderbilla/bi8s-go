@@ -28,6 +28,7 @@ type ContentRepository interface {
 	GetContentByPersonIdAdmin(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error)
 	GetContentByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error)
 	GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error)
+	GetBannerCandidates(ctx context.Context, contentTypeFilter string) ([]model.Movie, error)
 	GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error)
 }
 
@@ -158,9 +159,8 @@ func (d *DynamoContentRepository) GetAllAdmin(ctx context.Context, limit int32, 
 func (d *DynamoContentRepository) Get(ctx context.Context, id string) (*model.Movie, error) {
 	return WithTimeoutResult(ctx, "get_movie", func(ctx context.Context) (*model.Movie, error) {
 		result, err := d.GetClient().GetItem(ctx, &dynamodb.GetItemInput{
-			TableName:      aws.String(d.GetTableName()),
-			Key:            map[string]types.AttributeValue{"id": &types.AttributeValueMemberS{Value: id}},
-			ConsistentRead: aws.Bool(true),
+			TableName: aws.String(d.GetTableName()),
+			Key:       map[string]types.AttributeValue{"id": &types.AttributeValueMemberS{Value: id}},
 		})
 		if err != nil {
 			return nil, err
@@ -434,8 +434,8 @@ func (d *DynamoContentRepository) GetContentByAttributeId(ctx context.Context, a
 	return movies, nextKey, nil
 }
 
-func (d *DynamoContentRepository) GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error) {
-	return WithTimeoutResult(ctx, "get_banner", func(ctx context.Context) (*model.Movie, error) {
+func (d *DynamoContentRepository) GetBannerCandidates(ctx context.Context, contentTypeFilter string) ([]model.Movie, error) {
+	return WithTimeoutResult(ctx, "get_banner_candidates", func(ctx context.Context) ([]model.Movie, error) {
 		vals := map[string]types.AttributeValue{
 			":visibility":      &types.AttributeValueMemberS{Value: string(model.VisibilityPublic)},
 			":released":        &types.AttributeValueMemberS{Value: string(model.StatusReleased)},
@@ -482,12 +482,23 @@ func (d *DynamoContentRepository) GetBanner(ctx context.Context, contentTypeFilt
 		if err := attributevalue.UnmarshalListOfMaps(items, &movies); err != nil {
 			return nil, err
 		}
-		idx, err := secureRandIndex(len(movies))
-		if err != nil {
-			idx = int(time.Now().UnixNano()) % len(movies)
-		}
-		return &movies[idx], nil
+		return movies, nil
 	})
+}
+
+func (d *DynamoContentRepository) GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error) {
+	movies, err := d.GetBannerCandidates(ctx, contentTypeFilter)
+	if err != nil {
+		return nil, err
+	}
+	if len(movies) == 0 {
+		return nil, nil
+	}
+	idx, err := secureRandIndex(len(movies))
+	if err != nil {
+		idx = int(time.Now().UnixNano()) % len(movies)
+	}
+	return &movies[idx], nil
 }
 
 func (d *DynamoContentRepository) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {

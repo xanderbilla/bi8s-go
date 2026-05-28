@@ -24,8 +24,8 @@ func LoadConfig(ctx context.Context, region, accessKey, secretKey string) (aws.C
 
 	loadOpts := []func(*config.LoadOptions) error{
 		config.WithRegion(region),
-		config.WithRetryMode(aws.RetryModeAdaptive),
-		config.WithRetryMaxAttempts(5),
+		config.WithRetryMode(aws.RetryModeStandard),
+		config.WithRetryMaxAttempts(2),
 	}
 	if accessKey != "" && secretKey != "" {
 		loadOpts = append(loadOpts,

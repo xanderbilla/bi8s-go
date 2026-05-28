@@ -53,7 +53,10 @@ func NewContentService(repo repository.ContentRepository, personRepo repository.
 const bannerRedisTTL = 5 * time.Minute
 
 const bannerLocalTTL = 5 * time.Second
-const contentRedisTTL = 60 * time.Second
+const contentRedisTTL = 10 * time.Minute
+const discoverRedisTTL = 2 * time.Minute
+const personContentRedisTTL = 5 * time.Minute
+const attributeContentRedisTTL = 5 * time.Minute
 
 func (s *ContentService) SetRedisClient(client *goredis.Client) {
 	s.redisClient = client
@@ -264,6 +267,19 @@ func (s *ContentService) GetContentByPersonIdSimple(ctx context.Context, personI
 }
 
 func (s *ContentService) GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	// Cache only first-page requests (no cursor). Paginated pages bypass cache.
+	if s.redisClient != nil && len(startKey) == 0 {
+		key := personContentCacheKey(personId, contentTypeFilter, limit)
+		if cached, ok := cacheGetJSON[[]model.Movie](ctx, s.redisClient, key); ok {
+			return *cached, nil, nil
+		}
+		movies, nextKey, err := s.repo.GetContentByPersonId(ctx, personId, contentTypeFilter, limit, startKey)
+		if err != nil {
+			return nil, nil, err
+		}
+		cacheSetJSON(ctx, s.redisClient, key, movies, personContentRedisTTL, "person-content", "personId", personId)
+		return movies, nextKey, nil
+	}
 	return s.repo.GetContentByPersonId(ctx, personId, contentTypeFilter, limit, startKey)
 }
 
@@ -272,24 +288,44 @@ func (s *ContentService) GetContentByPersonIdAdmin(ctx context.Context, personId
 }
 
 func (s *ContentService) GetContentByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	// Cache only first-page requests (no cursor). Paginated pages bypass cache.
+	if s.redisClient != nil && len(startKey) == 0 {
+		key := attributeContentCacheKey(attributeId, contentTypeFilter, limit)
+		if cached, ok := cacheGetJSON[[]model.Movie](ctx, s.redisClient, key); ok {
+			return *cached, nil, nil
+		}
+		movies, nextKey, err := s.repo.GetContentByAttributeId(ctx, attributeId, contentTypeFilter, limit, startKey)
+		if err != nil {
+			return nil, nil, err
+		}
+		cacheSetJSON(ctx, s.redisClient, key, movies, attributeContentRedisTTL, "attribute-content", "attributeId", attributeId)
+		return movies, nextKey, nil
+	}
 	return s.repo.GetContentByAttributeId(ctx, attributeId, contentTypeFilter, limit, startKey)
 }
 
 func (s *ContentService) GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error) {
 	if s.redisClient != nil {
-		key := bannerCacheKey(contentTypeFilter)
-		if cached, ok := cacheGetJSON[model.Movie](ctx, s.redisClient, key); ok {
-			return cached, nil
+		// Cache the candidate pool so random selection happens on every request.
+		poolKey := bannerPoolCacheKey(contentTypeFilter)
+		var pool []model.Movie
+		if cached, ok := cacheGetJSON[[]model.Movie](ctx, s.redisClient, poolKey); ok {
+			pool = *cached
+		} else {
+			var err error
+			pool, err = s.repo.GetBannerCandidates(ctx, contentTypeFilter)
+			if err != nil {
+				return nil, err
+			}
+			if len(pool) > 0 {
+				cacheSetJSON(ctx, s.redisClient, poolKey, pool, bannerRedisTTL, "banner-pool", "filter", contentTypeFilter)
+			}
 		}
-
-		movie, err := s.repo.GetBanner(ctx, contentTypeFilter)
-		if err != nil {
-			return nil, err
+		if len(pool) == 0 {
+			return nil, nil
 		}
-		if movie != nil {
-			cacheSetJSON(ctx, s.redisClient, key, movie, bannerRedisTTL, "banner", "key", key)
-		}
-		return movie, nil
+		idx := int(time.Now().UnixNano()) % len(pool)
+		return &pool[idx], nil
 	}
 
 	if entry, ok := s.bannerCache.Load(contentTypeFilter); ok {
@@ -310,7 +346,31 @@ func (s *ContentService) GetBanner(ctx context.Context, contentTypeFilter string
 	return movie, nil
 }
 
+func discoverCacheKey(discoverType, contentTypeFilter string, limit int32) string {
+	return fmt.Sprintf("bi8s:discover:%s:%s:%d", discoverType, contentTypeFilter, limit)
+}
+
+func personContentCacheKey(personID, contentTypeFilter string, limit int32) string {
+	return fmt.Sprintf("bi8s:person-content:%s:%s:%d", personID, contentTypeFilter, limit)
+}
+
+func attributeContentCacheKey(attributeID, contentTypeFilter string, limit int32) string {
+	return fmt.Sprintf("bi8s:attr-content:%s:%s:%d", attributeID, contentTypeFilter, limit)
+}
+
 func (s *ContentService) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
+	// Cache only first-page requests (no cursor). Paginated pages bypass cache.
+	if s.redisClient != nil && len(startKey) == 0 {
+		key := discoverCacheKey(discoverType, contentTypeFilter, limit)
+		if cached, ok := cacheGetJSON[[]model.Movie](ctx, s.redisClient, key); ok {
+			return *cached, nil, nil
+		}
+		movies, nextKey, err := s.repo.GetDiscoverContent(ctx, discoverType, contentTypeFilter, limit, startKey)
+		if err == nil && len(movies) > 0 {
+			cacheSetJSON(ctx, s.redisClient, key, movies, discoverRedisTTL, "discover", "type", discoverType)
+		}
+		return movies, nextKey, err
+	}
 	return s.repo.GetDiscoverContent(ctx, discoverType, contentTypeFilter, limit, startKey)
 }
 
@@ -394,8 +454,8 @@ func contentCacheKey(id string) string {
 	return "bi8s:content:" + id
 }
 
-func bannerCacheKey(contentTypeFilter string) string {
-	return "bi8s:banner:" + contentTypeFilter
+func bannerPoolCacheKey(contentTypeFilter string) string {
+	return "bi8s:banner-pool:" + contentTypeFilter
 }
 
 func (s *ContentService) uploadSingleAsset(
