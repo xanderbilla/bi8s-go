@@ -107,32 +107,32 @@ func LoadConfigFromEnv() (Config, error) {
 			Bucket:   env.GetString("B2_BUCKET", ""),
 			Endpoint: env.GetString("B2_ENDPOINT", ""),
 		},
-		CORSAllowedOrigins:                env.ParseCommaSeparated(env.GetString("CORS_ALLOWED_ORIGINS", defaultCORSOrigins)),
-		CORSAllowPrivateNetwork:           corsAllowPrivateNetwork,
-		RateLimitBackend:                  env.GetString("RATE_LIMIT_BACKEND", "memory"),
-		RateLimitRedisFailMode:            env.GetString("RATE_LIMIT_REDIS_FAIL_MODE", "fail-open"),
-		RateLimitRedisTimeoutMS:           rateLimitRedisTimeoutMS,
-		RateLimitGlobalBurst:              rateLimitGlobalBurst,
-		RateLimitGlobalPerMin:             rateLimitGlobalPerMin,
-		RateLimitEncoderBurst:             rateLimitEncoderBurst,
-		RateLimitEncoderPerMin:            rateLimitEncoderPerMin,
-		RateLimitMovieBurst:               rateLimitMovieBurst,
-		RateLimitMoviePerMin:              rateLimitMoviePerMin,
-		RateLimitPersonBurst:              rateLimitPersonBurst,
-		RateLimitPersonPerMin:             rateLimitPersonPerMin,
-		RedisURL:                          env.GetString("REDIS_URL", ""),
-		RedisDialTimeoutMS:                getInt("REDIS_DIAL_TIMEOUT_MS", 0),
-		RedisReadTimeoutMS:                getInt("REDIS_READ_TIMEOUT_MS", 0),
-		RedisWriteTimeoutMS:               getInt("REDIS_WRITE_TIMEOUT_MS", 0),
-		RedisPoolSize:                     getInt("REDIS_POOL_SIZE", 0),
-		SearchEnabled:                     env.GetBool("SEARCH_ENABLED", false),
-		SearchProvider:                    env.GetString("SEARCH_PROVIDER", "none"),
-		SearchEndpoint:                    env.GetString("SEARCH_ENDPOINT", ""),
-		SearchUsername:                    env.GetString("SEARCH_USERNAME", ""),
-		SearchPassword:                    env.GetString("SEARCH_PASSWORD", ""),
-		SearchContentIndexName:            env.GetString("SEARCH_CONTENT_INDEX", "bi8s-content-search"),
-		SearchPeopleIndexName:             env.GetString("SEARCH_PEOPLE_INDEX", "bi8s-people-search"),
-		SearchRequestTimeoutMS:            searchRequestTimeoutMS,
+		CORSAllowedOrigins:      env.ParseCommaSeparated(env.GetString("CORS_ALLOWED_ORIGINS", defaultCORSOrigins)),
+		CORSAllowPrivateNetwork: corsAllowPrivateNetwork,
+		RateLimitBackend:        env.GetString("RATE_LIMIT_BACKEND", "memory"),
+		RateLimitRedisFailMode:  env.GetString("RATE_LIMIT_REDIS_FAIL_MODE", "fail-open"),
+		RateLimitRedisTimeoutMS: rateLimitRedisTimeoutMS,
+		RateLimitGlobalBurst:    rateLimitGlobalBurst,
+		RateLimitGlobalPerMin:   rateLimitGlobalPerMin,
+		RateLimitEncoderBurst:   rateLimitEncoderBurst,
+		RateLimitEncoderPerMin:  rateLimitEncoderPerMin,
+		RateLimitMovieBurst:     rateLimitMovieBurst,
+		RateLimitMoviePerMin:    rateLimitMoviePerMin,
+		RateLimitPersonBurst:    rateLimitPersonBurst,
+		RateLimitPersonPerMin:   rateLimitPersonPerMin,
+		RedisURL:                env.GetString("REDIS_URL", ""),
+		RedisDialTimeoutMS:      getInt("REDIS_DIAL_TIMEOUT_MS", 0),
+		RedisReadTimeoutMS:      getInt("REDIS_READ_TIMEOUT_MS", 0),
+		RedisWriteTimeoutMS:     getInt("REDIS_WRITE_TIMEOUT_MS", 0),
+		RedisPoolSize:           getInt("REDIS_POOL_SIZE", 0),
+		SearchEnabled:           env.GetBool("SEARCH_ENABLED", false),
+		SearchProvider:          env.GetString("SEARCH_PROVIDER", "none"),
+		SearchEndpoint:          env.GetString("SEARCH_ENDPOINT", ""),
+		SearchUsername:          env.GetString("SEARCH_USERNAME", ""),
+		SearchPassword:          env.GetString("SEARCH_PASSWORD", ""),
+		SearchContentIndexName:  env.GetString("SEARCH_CONTENT_INDEX", "bi8s-content-search"),
+		SearchPeopleIndexName:   env.GetString("SEARCH_PEOPLE_INDEX", "bi8s-people-search"),
+		SearchRequestTimeoutMS:  searchRequestTimeoutMS,
 		AWS: AWSCredentials{
 			AccessKey:       env.GetSecret("AWS_ACCESS_KEY_ID"),
 			SecretAccessKey: env.GetSecret("AWS_SECRET_ACCESS_KEY"),
@@ -199,10 +199,6 @@ func Build(ctx context.Context, cfg Config) (*Application, error) {
 		return nil, err
 	}
 
-	// Build a cache Redis client independently of the rate-limit backend.
-	// When RATE_LIMIT_BACKEND=memory the rate-limit factory returns nil, but
-	// REDIS_URL may still point to a reachable Redis that should be used for
-	// service-level caching (content, person, discover).
 	cacheRedisClient := redisClient
 	if cacheRedisClient == nil && cfg.RedisURL != "" {
 		dialCtx, dialCancel := context.WithTimeout(ctx, 5*time.Second)
@@ -274,7 +270,7 @@ func Build(ctx context.Context, cfg Config) (*Application, error) {
 			},
 			"storage": func(ctx context.Context) error {
 				if strings.TrimSpace(cfg.S3Bucket) == "" {
-					// B2 is primary provider; S3 health check not applicable
+
 					return nil
 				}
 				_, err := clients.S3.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: awsSDK.String(cfg.S3Bucket)})

@@ -108,7 +108,7 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.B2.Bucket) == "" && strings.TrimSpace(c.S3Bucket) == "" {
 		return errors.New("no storage provider configured: set B2_BUCKET+B2_ENDPOINT+B2_KEY_ID+B2_APPLICATION_KEY for B2 Blaze, or S3_BUCKET for AWS S3")
 	}
-	// When B2 is the configured provider, its credentials must also be present.
+
 	if strings.TrimSpace(c.B2.Bucket) != "" || strings.TrimSpace(c.B2.Endpoint) != "" {
 		if strings.TrimSpace(c.B2.KeyID) == "" {
 			return errors.New("B2_KEY_ID is required when B2_BUCKET or B2_ENDPOINT is set")

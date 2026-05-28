@@ -37,7 +37,7 @@ func (s *AttributeService) GetAll(ctx context.Context) ([]model.Attribute, error
 
 	s.allCacheMu.Lock()
 	defer s.allCacheMu.Unlock()
-	// Re-check after acquiring write lock (another goroutine may have refreshed).
+
 	if s.allCache != nil && time.Now().Before(s.allCacheExp) {
 		return s.allCache, nil
 	}

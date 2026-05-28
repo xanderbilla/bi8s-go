@@ -267,7 +267,7 @@ func (s *ContentService) GetContentByPersonIdSimple(ctx context.Context, personI
 }
 
 func (s *ContentService) GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
-	// Cache only first-page requests (no cursor). Paginated pages bypass cache.
+
 	if s.redisClient != nil && len(startKey) == 0 {
 		key := personContentCacheKey(personId, contentTypeFilter, limit)
 		if cached, ok := cacheGetJSON[[]model.Movie](ctx, s.redisClient, key); ok {
@@ -288,7 +288,7 @@ func (s *ContentService) GetContentByPersonIdAdmin(ctx context.Context, personId
 }
 
 func (s *ContentService) GetContentByAttributeId(ctx context.Context, attributeId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
-	// Cache only first-page requests (no cursor). Paginated pages bypass cache.
+
 	if s.redisClient != nil && len(startKey) == 0 {
 		key := attributeContentCacheKey(attributeId, contentTypeFilter, limit)
 		if cached, ok := cacheGetJSON[[]model.Movie](ctx, s.redisClient, key); ok {
@@ -306,7 +306,7 @@ func (s *ContentService) GetContentByAttributeId(ctx context.Context, attributeI
 
 func (s *ContentService) GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error) {
 	if s.redisClient != nil {
-		// Cache the candidate pool so random selection happens on every request.
+
 		poolKey := bannerPoolCacheKey(contentTypeFilter)
 		var pool []model.Movie
 		if cached, ok := cacheGetJSON[[]model.Movie](ctx, s.redisClient, poolKey); ok {
@@ -359,7 +359,7 @@ func attributeContentCacheKey(attributeID, contentTypeFilter string, limit int32
 }
 
 func (s *ContentService) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
-	// Cache only first-page requests (no cursor). Paginated pages bypass cache.
+
 	if s.redisClient != nil && len(startKey) == 0 {
 		key := discoverCacheKey(discoverType, contentTypeFilter, limit)
 		if cached, ok := cacheGetJSON[[]model.Movie](ctx, s.redisClient, key); ok {

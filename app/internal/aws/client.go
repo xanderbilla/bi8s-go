@@ -31,7 +31,7 @@ func NewClients(cfg aws.Config) *Clients {
 		Dynamo: dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
 			o.HTTPClient = dynamoHTTP
 		}),
-		S3:     s3.NewFromConfig(cfg),
+		S3: s3.NewFromConfig(cfg),
 	}
 }
 
@@ -43,8 +43,6 @@ func NewB2S3Client(keyID, appKey, endpoint string) (*s3.Client, error) {
 		return nil, errors.New("B2_KEY_ID, B2_APPLICATION_KEY, and B2_ENDPOINT are all required")
 	}
 
-	// Extract the region from the B2 endpoint hostname.
-	// e.g. https://s3.us-east-005.backblazeb2.com → us-east-005
 	region := b2RegionFromEndpoint(endpoint)
 
 	cfg, err := config.LoadDefaultConfig(context.Background(),
@@ -70,7 +68,7 @@ func b2RegionFromEndpoint(endpoint string) string {
 	if err != nil {
 		return "us-east-005"
 	}
-	// hostname: s3.<region>.backblazeb2.com
+
 	host := strings.TrimSuffix(u.Hostname(), ".backblazeb2.com")
 	if after, ok := strings.CutPrefix(host, "s3."); ok && after != "" {
 		return after
