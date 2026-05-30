@@ -230,7 +230,7 @@ runbuild: build
 # Compose runs detached but every quality step is verbose so failures surface.
 run: docker-prune tidy fmt-check vet lint staticcheck govulncheck test-unit openapi-validate build
 	@printf "\n$(BOLD)$(BLUE)[run] Starting local stack (detached, https+ui profiles)...$(RESET)\n\n"
-	@./scripts/compose.sh -f docker-compose.local.yml --profile https --profile ui up -d --build
+	@./scripts/compose.sh -f docker-compose.dev.yml --profile https --profile ui up -d --build
 	@printf "\n$(BLUE)[run] Waiting for API readiness...$(RESET)\n"
 	@for i in $$(seq 1 60); do \
 		if curl -fsS http://localhost:8080/v1/livez > /dev/null 2>&1; then \
@@ -286,7 +286,7 @@ run-summary:
 # build is fully fresh. Safe to run repeatedly.
 docker-prune:
 	@printf "\n$(BOLD)$(BLUE)[run] Pruning previous local stack...$(RESET)\n\n"
-	@./scripts/compose.sh -f docker-compose.local.yml --profile https --profile ui down -v --remove-orphans --rmi local || true
+	@./scripts/compose.sh -f docker-compose.dev.yml --profile https --profile ui down -v --remove-orphans --rmi local || true
 	@printf "$(GREEN)✓ docker-prune$(RESET)\n"
 
 tidy:
@@ -350,7 +350,7 @@ openapi-validate:
 # working tree so the api image always carries real ldflags values.
 docker-up:
 	@printf "\n$(BOLD)$(BLUE)Starting local stack...$(RESET)\n\n"
-	@./scripts/compose.sh -f docker-compose.local.yml up -d --build
+	@./scripts/compose.sh -f docker-compose.dev.yml up -d --build
 	@printf "$(BLUE)Waiting for API readiness...$(RESET)\n"
 	@for i in $$(seq 1 60); do \
 		if curl -fsS http://localhost:8080/v1/livez > /dev/null 2>&1; then \
@@ -368,11 +368,11 @@ docker-up:
 
 docker-down:
 	@printf "\n$(BOLD)$(BLUE)Stopping local stack...$(RESET)\n\n"
-	@./scripts/compose.sh -f docker-compose.local.yml down -v
+	@./scripts/compose.sh -f docker-compose.dev.yml down -v
 	@printf "$(GREEN)✓ docker-down$(RESET)\n"
 
 docker-logs:
-	@./scripts/compose.sh -f docker-compose.local.yml logs -f --tail=200
+	@./scripts/compose.sh -f docker-compose.dev.yml logs -f --tail=200
 
 # OpenTofu shortcuts (delegates to scripts/deploy.sh for parity with CI)
 tofu-plan: check-env validate-env

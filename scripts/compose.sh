@@ -4,7 +4,7 @@
 # any local compose invocation so the api image always carries real ldflags
 # values instead of the "dev"/"unknown" defaults baked into the Dockerfile.
 #
-# Usage: scripts/compose.sh -f docker-compose.local.yml up -d --build
+# Usage: scripts/compose.sh -f docker-compose.dev.yml up -d --build
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

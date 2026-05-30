@@ -3,7 +3,7 @@
 # Storage uses B2 Blaze (configured via .env); no S3/LocalStack bucket is created.
 # Safe to run multiple times (idempotent).
 #
-# Environment variables (all optional — defaults match docker-compose.local.yml):
+# Environment variables (all optional — defaults match docker-compose.dev.yml):
 #   AWS_REGION               — default: us-east-1
 #   AWS_ACCESS_KEY_ID        — default: test   (for LocalStack)
 #   AWS_SECRET_ACCESS_KEY    — default: test   (for LocalStack)
