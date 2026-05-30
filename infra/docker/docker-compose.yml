@@ -327,7 +327,7 @@ services:
       ]
     environment:
       TZ: UTC
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
     depends_on:
       # Tunnel must point to Traefik only; update public hostname in CF Zero Trust to http://traefik:80
       traefik:
