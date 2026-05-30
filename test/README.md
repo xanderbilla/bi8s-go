@@ -6,7 +6,7 @@ co-locate with the source under `app/internal/...`.
 | Folder         | Purpose                                                                            | Run with                           |
 | -------------- | ---------------------------------------------------------------------------------- | ---------------------------------- |
 | `integration/` | Wire real adapters (DynamoDB Local, MinIO, Redis) and exercise full handlers.      | `make test-integration`            |
-| `e2e/`         | Black-box tests against a running stack (`docker-compose.local.yml`).              | `go test -tags=e2e ./test/e2e/...` |
+| `e2e/`         | Black-box tests against a running stack (`docker-compose.dev.yml`).                | `go test -tags=e2e ./test/e2e/...` |
 | `fixtures/`    | Static request/response payloads, golden files, and seed data shared across tests. | n/a                                |
 | `testdata/`    | Per-test inputs (binary blobs, sample HLS segments, image thumbnails).             | n/a                                |
 

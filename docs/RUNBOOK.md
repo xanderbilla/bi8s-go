@@ -155,7 +155,7 @@ on-demand for prod.
 SDK drops on backpressure rather than blocking requests.
 
 **Fix**: restart the collector; if persistent, redeploy the
-observability stack (`docker compose -f docker-compose.local.yml up -d`).
+observability stack (`docker compose -f docker-compose.dev.yml up -d`).
 
 ---
 

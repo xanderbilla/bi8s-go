@@ -110,7 +110,7 @@ For Compose-only flows the API reads from real AWS by default. To use
 DynamoDB Local instead:
 
 ```bash
-# add a dynamodb-local service to docker-compose.local.yml and set
+# add a dynamodb-local service to docker-compose.dev.yml and set
 AWS_ENDPOINT_URL=http://dynamodb-local:8000
 # create tables with the AWS CLI:
 aws dynamodb create-table \

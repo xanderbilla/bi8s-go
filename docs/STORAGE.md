@@ -72,7 +72,7 @@ host, then writes the HLS master + variant playlists + segments to
 
 ## Local equivalent
 
-Add MinIO to `docker-compose.local.yml` and set
+Add MinIO to `docker-compose.dev.yml` and set
 `AWS_ENDPOINT_URL=http://minio:9000` to keep all S3 traffic local. The
 SDK respects the endpoint override transparently; no code changes are
 needed.

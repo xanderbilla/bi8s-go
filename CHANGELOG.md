@@ -72,7 +72,7 @@ Initial public version.
   Prometheus; logs shipped via Promtail → Loki.
 - Rate limiting with pluggable memory or Redis backend.
 - Multi-stage Dockerfile (non-root UID 10001, ffmpeg, slim runtime).
-- Local development stack (`docker-compose.local.yml`) including Grafana,
+- Local development stack (`docker-compose.dev.yml`) including Grafana,
   Prometheus, Loki, Tempo, Promtail, MinIO, Redis, OTel Collector.
 - Production stack (`infra/docker/docker-compose.yml`) with NGINX TLS edge.
 - OpenTofu modules under `infra/tofu/` for VPC, EC2, DynamoDB, S3, IAM.
