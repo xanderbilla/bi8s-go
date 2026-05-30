@@ -5,6 +5,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
+	"github.com/xanderbilla/bi8s-go/internal/model"
+	"github.com/xanderbilla/bi8s-go/internal/repository"
+	"github.com/xanderbilla/bi8s-go/internal/response"
 	"github.com/xanderbilla/bi8s-go/internal/service"
 )
 
@@ -19,13 +22,22 @@ func NewPersonHandler(personService *service.PersonService) *PersonHandler {
 }
 
 func (h *PersonHandler) GetAllPeople(w http.ResponseWriter, r *http.Request) {
-	persons, err := h.personService.GetAll(r.Context())
+	limit, startKey, err := parsePaginationParams(r)
+	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+	persons, nextKey, err := h.personService.GetAll(r.Context(), limit, startKey)
 	if err != nil {
 		errs.Write(w, r, err)
 		return
 	}
-
-	writeOK(w, r, http.StatusOK, "people fetched", persons)
+	cursor, _ := repository.EncodeCursor(nextKey)
+	writeOK(w, r, http.StatusOK, "people fetched", response.PagedData[model.Person]{
+		Items:      persons,
+		NextCursor: cursor,
+		Count:      len(persons),
+	})
 }
 
 func (h *PersonHandler) GetPerson(w http.ResponseWriter, r *http.Request) {

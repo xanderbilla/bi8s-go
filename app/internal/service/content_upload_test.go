@@ -247,12 +247,12 @@ func newMockPersonRepository() *mockPersonRepository {
 	return &mockPersonRepository{people: make(map[string]model.Person)}
 }
 
-func (m *mockPersonRepository) GetAll(ctx context.Context) ([]model.Person, error) {
+func (m *mockPersonRepository) GetAll(ctx context.Context, limit int32, startKey map[string]types.AttributeValue) ([]model.Person, map[string]types.AttributeValue, error) {
 	result := make([]model.Person, 0, len(m.people))
 	for _, p := range m.people {
 		result = append(result, p)
 	}
-	return result, nil
+	return result, nil, nil
 }
 
 func (m *mockPersonRepository) Get(ctx context.Context, id string) (*model.Person, error) {
@@ -376,6 +376,10 @@ func (m *mockContentRepository) GetContentByAttributeId(ctx context.Context, att
 
 func (m *mockContentRepository) GetBanner(ctx context.Context, contentTypeFilter string) (*model.Movie, error) {
 	return nil, nil
+}
+
+func (m *mockContentRepository) GetBannerCandidates(ctx context.Context, contentTypeFilter string) ([]model.Movie, error) {
+	return []model.Movie{}, nil
 }
 
 func (m *mockContentRepository) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {

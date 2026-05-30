@@ -87,17 +87,28 @@ func run() error {
 }
 
 func reindexPeople(ctx context.Context, application *app.Application) (int, error) {
-	people, err := application.PersonService.GetAll(ctx)
-	if err != nil {
-		return 0, err
-	}
-	for _, person := range people {
-		if err := application.SearchService.IndexPerson(ctx, person); err != nil {
+	var (
+		startKey map[string]types.AttributeValue
+		total    int
+	)
+	for {
+		people, nextKey, err := application.PersonService.GetAll(ctx, 100, startKey)
+		if err != nil {
 			return 0, err
 		}
+		for _, person := range people {
+			if err := application.SearchService.IndexPerson(ctx, person); err != nil {
+				return 0, err
+			}
+		}
+		total += len(people)
+		if len(nextKey) == 0 {
+			break
+		}
+		startKey = nextKey
 	}
-	slog.Info("people reindexed", "count", len(people))
-	return len(people), nil
+	slog.Info("people reindexed", "count", total)
+	return total, nil
 }
 
 func reindexContent(ctx context.Context, application *app.Application) (int, error) {

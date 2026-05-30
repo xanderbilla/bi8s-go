@@ -6,11 +6,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/xanderbilla/bi8s-go/internal/model"
 )
 
 type PersonRepository interface {
-	GetAll(ctx context.Context) ([]model.Person, error)
+	GetAll(ctx context.Context, limit int32, startKey map[string]types.AttributeValue) ([]model.Person, map[string]types.AttributeValue, error)
 	Get(ctx context.Context, id string) (*model.Person, error)
 	Create(ctx context.Context, person model.Person) error
 	Delete(ctx context.Context, id string) error
@@ -26,19 +27,24 @@ func NewPersonDynamoRepository(client *dynamodb.Client, tableName string) *Perso
 	}
 }
 
-func (r *PersonDynamoRepository) GetAll(ctx context.Context) ([]model.Person, error) {
-	return WithTimeoutResult(ctx, "person.GetAll", func(ctx context.Context) ([]model.Person, error) {
-		input := &dynamodb.ScanInput{TableName: aws.String(r.GetTableName())}
-		items, err := ScanAllPaged(ctx, r.GetClient(), input, DefaultMaxScanPages)
+func (r *PersonDynamoRepository) GetAll(ctx context.Context, limit int32, startKey map[string]types.AttributeValue) ([]model.Person, map[string]types.AttributeValue, error) {
+	return WithTimeoutResultPage(ctx, "person.GetAll", func(ctx context.Context) ([]model.Person, map[string]types.AttributeValue, error) {
+		items, nextKey, err := ScanPage(ctx, r.GetClient(), &dynamodb.ScanInput{
+			TableName:         aws.String(r.GetTableName()),
+			Limit:             aws.Int32(defaultLimit(limit)),
+			ExclusiveStartKey: startKey,
+		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-
+		if len(items) == 0 {
+			return []model.Person{}, nil, nil
+		}
 		var persons []model.Person
 		if err := attributevalue.UnmarshalListOfMaps(items, &persons); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return persons, nil
+		return persons, nextKey, nil
 	})
 }
 

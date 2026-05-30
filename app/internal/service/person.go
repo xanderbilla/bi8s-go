@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/xanderbilla/bi8s-go/internal/errs"
@@ -46,8 +47,8 @@ func (s *PersonService) SetRedisClient(client *goredis.Client) {
 	s.redisClient = client
 }
 
-func (s *PersonService) GetAll(ctx context.Context) ([]model.Person, error) {
-	return s.repo.GetAll(ctx)
+func (s *PersonService) GetAll(ctx context.Context, limit int32, startKey map[string]types.AttributeValue) ([]model.Person, map[string]types.AttributeValue, error) {
+	return s.repo.GetAll(ctx, limit, startKey)
 }
 
 func (s *PersonService) Get(ctx context.Context, id string) (*model.Person, error) {

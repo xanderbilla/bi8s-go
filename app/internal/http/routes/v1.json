@@ -94,7 +94,7 @@
       "method": "GET",
       "route": "/v1/c/discover",
       "handler": "content.GetDiscover",
-      "middlewares": ["timeout"]
+      "middlewares": ["timeout", "httpcache.discover"]
     },
     {
       "id": "consumer.play",

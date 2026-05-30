@@ -353,14 +353,21 @@ func reindexSearchFromDynamo(
 	personService *service.PersonService,
 	searchService *service.SearchService,
 ) error {
-	people, err := personService.GetAll(ctx)
-	if err != nil {
-		return err
-	}
-	for _, person := range people {
-		if err := searchService.IndexPerson(ctx, person); err != nil {
+	var personStartKey map[string]types.AttributeValue
+	for {
+		people, nextPersonKey, err := personService.GetAll(ctx, 100, personStartKey)
+		if err != nil {
 			return err
 		}
+		for _, person := range people {
+			if err := searchService.IndexPerson(ctx, person); err != nil {
+				return err
+			}
+		}
+		if len(nextPersonKey) == 0 {
+			break
+		}
+		personStartKey = nextPersonKey
 	}
 
 	var startKey map[string]types.AttributeValue
