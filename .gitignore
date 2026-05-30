@@ -125,5 +125,7 @@ coverage.html
 *.cov
 .env
 .env.local
+.env.dev
+.env.bi8s
 *.log
 scripts/seed/seed
