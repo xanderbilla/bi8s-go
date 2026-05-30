@@ -1,0 +1,399 @@
+name: bi8s-nsfw
+
+x-restart-policy: &restart-policy
+  restart: unless-stopped
+
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  quality:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+      target: quality
+    container_name: bi8s_quality_nsfw
+    command: ["/bin/sh", "-c", "echo quality checks passed"]
+    profiles: ["quality"]
+    networks:
+      - bi8s-nsfw-net
+
+  traefik:
+    <<: [*restart-policy, *default-logging]
+    image: traefik:v3.7
+    container_name: bi8s_traefik_nsfw
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=bi8s-nsfw-net"
+      - "--providers.docker.constraints=Label(`traefik.constraint`,`bi8s-nsfw`)"
+      - "--entrypoints.web.address=:80"
+      - "--api.insecure=true"
+      - "--ping=true"
+      - "--log.level=INFO"
+    ports:
+      - "${TRAEFIK_PORT:-81}:80"
+      - "${TRAEFIK_DASHBOARD_PORT:-8082}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - bi8s-nsfw-net
+
+  api:
+    <<: [*restart-policy, *default-logging]
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        VERSION: ${BUILD_VERSION:-dev}
+        COMMIT: ${BUILD_COMMIT:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    container_name: bi8s_api_nsfw
+    env_file:
+      - .env.bi8s
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      PORT: ${PORT:-:8080}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      STARTUP_HEALTH_CHECK: ${STARTUP_HEALTH_CHECK:-false}
+      DYNAMODB_CONTENT_TABLE: ${DYNAMODB_CONTENT_TABLE:-bi8s-nsfw-content-table}
+      DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE:-bi8s-nsfw-person-table}
+      DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE:-bi8s-nsfw-attributes-table}
+      DYNAMODB_ATTRIBUTE_NAME_INDEX: ${DYNAMODB_ATTRIBUTE_NAME_INDEX:-name-index}
+      DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE:-bi8s-nsfw-video-table}
+      DYNAMODB_ENCODER_CONTENT_ID_INDEX: ${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}
+      DYNAMODB_CONTENT_CAST_TABLE: ${DYNAMODB_CONTENT_CAST_TABLE:-bi8s-nsfw-content-cast-table}
+      DYNAMODB_CONTENT_ATTRIBUTE_TABLE: ${DYNAMODB_CONTENT_ATTRIBUTE_TABLE:-bi8s-nsfw-content-attribute-table}
+      DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX:-visibility-createdAt-index}
+      DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX:-visibility-releaseDate-index}
+      B2_KEY_ID: ${B2_KEY_ID:-}
+      B2_APPLICATION_KEY: ${B2_APPLICATION_KEY:-}
+      B2_BUCKET: ${B2_BUCKET:-}
+      B2_ENDPOINT: ${B2_ENDPOINT:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://ui.${APP_DOMAIN:-localhost},https://ops.${APP_DOMAIN:-localhost},https://api.${APP_DOMAIN:-localhost},http://localhost:3000,http://localhost:8080,http://localhost:8443,http://localhost}
+      CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api-nsfw}
+      OTEL_ENABLED: ${OTEL_ENABLED:-true}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-otel-collector:4317}
+      OTEL_EXPORTER_OTLP_INSECURE: ${OTEL_EXPORTER_OTLP_INSECURE:-true}
+      OTEL_TRACES_ENABLED: ${OTEL_TRACES_ENABLED:-true}
+      OTEL_METRICS_ENABLED: ${OTEL_METRICS_ENABLED:-true}
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-1.0}
+      OTEL_METRIC_EXPORT_INTERVAL_SECONDS: ${OTEL_METRIC_EXPORT_INTERVAL_SECONDS:-15}
+      OTEL_SHUTDOWN_TIMEOUT_SECONDS: ${OTEL_SHUTDOWN_TIMEOUT_SECONDS:-5}
+      BUILD_VERSION: ${BUILD_VERSION:-dev}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-memory}
+      RATE_LIMIT_REDIS_FAIL_MODE: ${RATE_LIMIT_REDIS_FAIL_MODE:-fail-open}
+      RATE_LIMIT_REDIS_TIMEOUT_MS: ${RATE_LIMIT_REDIS_TIMEOUT_MS:-50}
+      SEARCH_ENABLED: ${SEARCH_ENABLED:-true}
+      SEARCH_PROVIDER: ${SEARCH_PROVIDER:-opensearch}
+      SEARCH_ENDPOINT: ${SEARCH_ENDPOINT:-http://opensearch:9200}
+      SEARCH_USERNAME: ${SEARCH_USERNAME:-}
+      SEARCH_PASSWORD: ${SEARCH_PASSWORD:-}
+      SEARCH_CONTENT_INDEX: ${SEARCH_CONTENT_INDEX:-bi8s-nsfw-content-search}
+      SEARCH_PEOPLE_INDEX: ${SEARCH_PEOPLE_INDEX:-bi8s-nsfw-people-search}
+      SEARCH_REQUEST_TIMEOUT_MS: ${SEARCH_REQUEST_TIMEOUT_MS:-3000}
+    ports:
+      - "${API_PORT:-8181}:8080"
+    depends_on:
+      otel-collector:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/v1/livez"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    labels:
+      traefik.enable: "true"
+      traefik.constraint: "bi8s-nsfw"
+      traefik.http.routers.api.rule: "Host(`api.localhost`) || Host(`api.${APP_DOMAIN:-localhost}`)"
+      traefik.http.routers.api.entrypoints: "web"
+      traefik.http.services.api.loadbalancer.server.port: "8080"
+    networks:
+      - bi8s-nsfw-net
+
+  ui:
+    <<: [*restart-policy, *default-logging]
+    image: ${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:efx-image-dev-latest}
+    container_name: bi8s_ui_nsfw
+    pull_policy: ${UI_PULL_POLICY:-always}
+    # All NEXT_PUBLIC_* vars are delivered via env_file.
+    # URL vars (CUSTOM_API_URL, IMAGE_BASE_URL, SITE_URL) are runtime-injectable:
+    # entrypoint.sh sed-replaces placeholder URLs baked into the bundle at startup.
+    # Baked vars (ENABLE_LOGGING, HTTP_TIMEOUT_MS, APP_ENV, APP_VERSION) are
+    # compiled into the client bundle at image build time — they cannot be changed
+    # at runtime; rebuild the image with updated build args to change them.
+    env_file:
+      - .env.bi8s
+    environment:
+      # Runtime server vars — not bundled by Next.js
+      NODE_ENV: ${UI_NODE_ENV:-development}
+      PORT: ${UI_CONTAINER_PORT:-3000}
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "${UI_PORT:-3001}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider http://127.0.0.1:3000/ || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      api:
+        condition: service_started
+    labels:
+      traefik.enable: "true"
+      traefik.constraint: "bi8s-nsfw"
+      traefik.http.routers.ui.rule: "Host(`localhost`) || Host(`ui.${APP_DOMAIN:-localhost}`)"
+      traefik.http.routers.ui.entrypoints: "web"
+      traefik.http.services.ui.loadbalancer.server.port: "3000"
+      com.centurylinklabs.watchtower.enable: "true"
+    networks:
+      - bi8s-nsfw-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: bi8s_redis_nsfw
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "128mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    ports:
+      - "${REDIS_PORT:-6479}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - bi8s-nsfw-net
+
+  opensearch:
+    <<: [*restart-policy, *default-logging]
+    image: opensearchproject/opensearch:2.16.0
+    container_name: bi8s_opensearch_nsfw
+    environment:
+      discovery.type: single-node
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch-data-nsfw:/usr/share/opensearch/data
+    ports:
+      - "${OPENSEARCH_PORT:-9201}:9200"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9200/_cluster/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    networks:
+      - bi8s-nsfw-net
+
+  otel-collector:
+    <<: [*restart-policy, *default-logging]
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    container_name: bi8s_otel_collector_nsfw
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "${OTEL_GRPC_PORT:-4417}:4317"
+      - "${OTEL_HTTP_PORT:-4418}:4318"
+      - "${OTEL_PROM_PORT:-8989}:8889"
+      - "13134:13133"
+    depends_on:
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
+    networks:
+      - bi8s-nsfw-net
+
+  prometheus:
+    <<: [*restart-policy, *default-logging]
+    image: prom/prometheus:v2.55.1
+    container_name: bi8s_prometheus_nsfw
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-72h}"
+      - "--web.enable-remote-write-receiver"
+      - "--enable-feature=exemplar-storage"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus-rules.yml:/etc/prometheus/rules/prometheus-rules.yml:ro
+      - prometheus-data-nsfw:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+    networks:
+      - bi8s-nsfw-net
+
+  tempo:
+    <<: [*restart-policy, *default-logging]
+    image: grafana/tempo:2.6.1
+    container_name: bi8s_tempo_nsfw
+    command: ["-config.file=/etc/tempo/tempo.yaml", "-config.expand-env=true"]
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-bi8s-nsfw-storage}
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data-nsfw:/var/tempo
+    ports:
+      - "${TEMPO_HTTP_PORT:-3201}:3200"
+    networks:
+      - bi8s-nsfw-net
+
+  loki:
+    <<: [*restart-policy, *default-logging]
+    image: grafana/loki:3.2.1
+    container_name: bi8s_loki_nsfw
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    volumes:
+      - ./observability/loki-config-local.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data-nsfw:/loki
+    ports:
+      - "${LOKI_PORT:-3101}:3100"
+    networks:
+      - bi8s-nsfw-net
+
+  promtail:
+    <<: [*restart-policy, *default-logging]
+    image: grafana/promtail:3.2.1
+    container_name: bi8s_promtail_nsfw
+    command: ["-config.file=/etc/promtail/config.yaml"]
+    volumes:
+      - ./observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      loki:
+        condition: service_started
+    networks:
+      - bi8s-nsfw-net
+
+  grafana:
+    <<: [*restart-policy, *default-logging]
+    image: grafana/grafana:11.3.0
+    container_name: bi8s_grafana_nsfw
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor traceToMetrics"
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data-nsfw:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-4001}:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
+    labels:
+      traefik.enable: "true"
+      traefik.constraint: "bi8s-nsfw"
+      traefik.http.routers.grafana.rule: "Host(`ops.localhost`) || Host(`ops.${APP_DOMAIN:-localhost}`)"
+      traefik.http.routers.grafana.entrypoints: "web"
+      traefik.http.services.grafana.loadbalancer.server.port: "3000"
+    networks:
+      - bi8s-nsfw-net
+
+  cloudflared:
+    <<: [*restart-policy, *default-logging]
+    container_name: bi8s_cloudflared_nsfw
+    image: cloudflare/cloudflared:latest
+    env_file:
+      - path: .env.bi8s
+    command:
+      [
+        "tunnel",
+        "--no-autoupdate",
+        "--metrics",
+        "0.0.0.0:${CLOUDFLARED_METRICS_PORT:-2000}",
+        "run",
+      ]
+    environment:
+      TZ: UTC
+      # TUNNEL_TOKEN is supplied via env_file (.env.bi8s) — do not override here.
+    depends_on:
+      traefik:
+        condition: service_healthy
+    networks:
+      - bi8s-nsfw-net
+    labels:
+      logging: "alloy"
+
+  watchtower:
+    <<: [*restart-policy, *default-logging]
+    image: containrrr/watchtower:1.7.1
+    container_name: bi8s_watchtower_nsfw
+    command:
+      - "--label-enable"
+      - "--interval"
+      - "${WATCHTOWER_INTERVAL:-300}"
+      - "--cleanup"
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      DOCKER_API_VERSION: "1.44"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - bi8s-nsfw-net
+
+networks:
+  bi8s-nsfw-net:
+    driver: bridge
+    name: bi8s-nsfw-net
+
+volumes:
+  prometheus-data-nsfw:
+  tempo-data-nsfw:
+  loki-data-nsfw:
+  grafana-data-nsfw:
+  opensearch-data-nsfw:
