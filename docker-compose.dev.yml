@@ -1,4 +1,4 @@
-name: bi8s-local
+name: bi8s-dev
 
 # Local development stack: API + UI + full observability pipeline
 
@@ -18,22 +18,23 @@ services:
       context: ./app
       dockerfile: Dockerfile
       target: quality
-    container_name: bi8s_quality_local
+    container_name: bi8s_quality_dev
     command: ["/bin/sh", "-c", "echo quality checks passed"]
     profiles: ["quality"]
     networks:
-      - bi8s-net
+      - bi8s-dev-net
 
   # Traefik: single ingress; mirrors production routing so local behaviour matches prod.
   # Access the dashboard at http://localhost:8081 during development.
   traefik:
     <<: [*restart-policy, *default-logging]
     image: traefik:v3.7
-    container_name: bi8s_traefik_local
+    container_name: bi8s_traefik_dev
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=bi8s-net"
+      - "--providers.docker.network=bi8s-dev-net"
+      - "--providers.docker.constraints=Label(`traefik.constraint`,`bi8s-dev`)"
       - "--entrypoints.web.address=:80"
       - "--api.insecure=true"
       - "--ping=true"
@@ -50,7 +51,7 @@ services:
       retries: 5
       start_period: 5s
     networks:
-      - bi8s-net
+      - bi8s-dev-net
 
   # Application
   api:
@@ -63,9 +64,9 @@ services:
         VERSION: ${BUILD_VERSION:-dev}
         COMMIT: ${BUILD_COMMIT:-unknown}
         BUILD_DATE: ${BUILD_DATE:-unknown}
-    container_name: bi8s_api_local
+    container_name: bi8s_api_dev
     env_file:
-      - .env
+      - .env.dev
     environment:
       APP_ENV: ${APP_ENV:-dev}
       PORT: ${PORT:-:8080}
@@ -83,10 +84,7 @@ services:
       DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX:-visibility-releaseDate-index}
       # S3_BUCKET: disabled — app storage uses B2 Blaze; uncomment to switch back to AWS S3
       # S3_BUCKET: ${S3_BUCKET:-}
-      B2_KEY_ID: ${B2_KEY_ID:-}
-      B2_APPLICATION_KEY: ${B2_APPLICATION_KEY:-}
-      B2_BUCKET: ${B2_BUCKET:-}
-      B2_ENDPOINT: ${B2_ENDPOINT:-}
+      # B2_* vars are sourced from env_file (.env.dev / .env.bi8s) — do not override here
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://ui.${APP_DOMAIN:-localhost},https://ops.${APP_DOMAIN:-localhost},https://api.${APP_DOMAIN:-localhost},http://localhost:3000,http://localhost:8080,http://localhost:8443,http://localhost}
       CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api}
@@ -129,30 +127,32 @@ services:
     labels:
       # Reachable at http://api.localhost via Traefik; direct port :8080 still available
       traefik.enable: "true"
-      traefik.http.routers.api.rule: "Host(`api.localhost`) || Host(`api.${APP_DOMAIN:-localhost}`)"
+      traefik.constraint: "bi8s-dev"
+      traefik.http.routers.api.rule: "Host(`api.localhost`) || Host(`api-dev.emm4bi8s.dev`)"
       traefik.http.routers.api.entrypoints: "web"
       traefik.http.services.api.loadbalancer.server.port: "8080"
     networks:
-      - bi8s-net
+      - bi8s-dev-net
 
   # UI — Next.js frontend
   ui:
+    profiles: [ui]
     <<: [*restart-policy, *default-logging]
     image: ${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:efx-image-dev-latest}
-    container_name: bi8s_ui_local
+    container_name: bi8s_ui_dev
     pull_policy: ${UI_PULL_POLICY:-always}
+    # NEXT_PUBLIC_* vars are delivered via env_file (see .env.dev).
+    # The image's entrypoint.sh sed-replaces the placeholder URLs baked into the
+    # Next.js bundle at startup using NEXT_PUBLIC_CUSTOM_API_URL,
+    # NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL, and NEXT_PUBLIC_SITE_URL.
+    # No command override needed — just pass the env vars and let entrypoint.sh run.
+    env_file:
+      - .env.dev
     environment:
+      # Runtime server vars — not bundled by Next.js
       NODE_ENV: ${UI_NODE_ENV:-development}
       PORT: ${UI_CONTAINER_PORT:-3000}
       HOSTNAME: "0.0.0.0"
-      NEXT_PUBLIC_ENABLE_LOGGING: ${NEXT_PUBLIC_ENABLE_LOGGING:-true}
-      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
-      NEXT_PUBLIC_HTTP_TIMEOUT_MS: ${NEXT_PUBLIC_HTTP_TIMEOUT_MS:-10000}
-      NEXT_PUBLIC_CUSTOM_API_URL: ${NEXT_PUBLIC_CUSTOM_API_URL:-https://api.${APP_DOMAIN:-localhost}/v1}
-      NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL: ${NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL:-https://bi8s-storage-dev.s3.amazonaws.com}
-      NEXT_PUBLIC_IMAGE_HOSTS: ${NEXT_PUBLIC_IMAGE_HOSTS:-}
-      NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-}
-      NEXT_PUBLIC_APP_ENV: ${NEXT_PUBLIC_APP_ENV:-dev}
     ports:
       - "${UI_PORT:-3000}:3000"
     healthcheck:
@@ -171,18 +171,19 @@ services:
     labels:
       # Reachable at http://localhost via Traefik; direct port :3000 still available
       traefik.enable: "true"
-      traefik.http.routers.ui.rule: "Host(`localhost`) || Host(`ui.${APP_DOMAIN:-localhost}`)"
+      traefik.constraint: "bi8s-dev"
+      traefik.http.routers.ui.rule: "Host(`localhost`) || Host(`ui-dev.emm4bi8s.dev`)"
       traefik.http.routers.ui.entrypoints: "web"
       traefik.http.services.ui.loadbalancer.server.port: "3000"
+      com.centurylinklabs.watchtower.enable: "true"
     networks:
-      - bi8s-net
-    profiles: ["ui"]
+      - bi8s-dev-net
 
   # Redis - Shared rate-limit backend. Single replica for local; in prod use
   # a managed Redis (ElastiCache / Upstash) and set REDIS_URL accordingly.
   redis:
     image: redis:7-alpine
-    container_name: bi8s_redis_local
+    container_name: bi8s_redis_dev
     command:
       [
         "redis-server",
@@ -203,12 +204,12 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - bi8s-net
+      - bi8s-dev-net
 
   opensearch:
     <<: [*restart-policy, *default-logging]
     image: opensearchproject/opensearch:2.16.0
-    container_name: bi8s_opensearch_local
+    container_name: bi8s_opensearch_dev
     environment:
       discovery.type: single-node
       DISABLE_INSTALL_DEMO_CONFIG: "true"
@@ -220,7 +221,7 @@ services:
         soft: -1
         hard: -1
     volumes:
-      - opensearch-data:/usr/share/opensearch/data
+      - opensearch-data-dev:/usr/share/opensearch/data
     ports:
       - "${OPENSEARCH_PORT:-9200}:9200"
     healthcheck:
@@ -229,13 +230,13 @@ services:
       timeout: 5s
       retries: 20
     networks:
-      - bi8s-net
+      - bi8s-dev-net
 
   # Observability stack
   otel-collector:
     <<: [*restart-policy, *default-logging]
     image: otel/opentelemetry-collector-contrib:0.111.0
-    container_name: bi8s_otel_collector
+    container_name: bi8s_otel_collector_dev
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
@@ -250,12 +251,12 @@ services:
       loki:
         condition: service_started
     networks:
-      - bi8s-net
+      - bi8s-dev-net
 
   prometheus:
     <<: [*restart-policy, *default-logging]
     image: prom/prometheus:v2.55.1
-    container_name: bi8s_prometheus
+    container_name: bi8s_prometheus_dev
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -265,16 +266,16 @@ services:
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./observability/prometheus-rules.yml:/etc/prometheus/rules/prometheus-rules.yml:ro
-      - prometheus-data:/prometheus
+      - prometheus-data-dev:/prometheus
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
     networks:
-      - bi8s-net
+      - bi8s-dev-net
 
   tempo:
     <<: [*restart-policy, *default-logging]
     image: grafana/tempo:2.6.1
-    container_name: bi8s_tempo
+    container_name: bi8s_tempo_dev
     command: ["-config.file=/etc/tempo/tempo.yaml", "-config.expand-env=true"]
     environment:
       AWS_REGION: ${AWS_REGION:-us-east-1}
@@ -283,29 +284,29 @@ services:
       S3_BUCKET: ${S3_BUCKET:-bi8s-storage-dev}
     volumes:
       - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
-      - tempo-data:/var/tempo
+      - tempo-data-dev:/var/tempo
     ports:
       - "${TEMPO_HTTP_PORT:-3200}:3200"
     networks:
-      - bi8s-net
+      - bi8s-dev-net
 
   loki:
     <<: [*restart-policy, *default-logging]
     image: grafana/loki:3.2.1
-    container_name: bi8s_loki
+    container_name: bi8s_loki_dev
     command: ["-config.file=/etc/loki/loki-config.yaml"]
     volumes:
       - ./observability/loki-config-local.yaml:/etc/loki/loki-config.yaml:ro
-      - loki-data:/loki
+      - loki-data-dev:/loki
     ports:
       - "${LOKI_PORT:-3100}:3100"
     networks:
-      - bi8s-net
+      - bi8s-dev-net
 
   promtail:
     <<: [*restart-policy, *default-logging]
     image: grafana/promtail:3.2.1
-    container_name: bi8s_promtail
+    container_name: bi8s_promtail_dev
     command: ["-config.file=/etc/promtail/config.yaml"]
     volumes:
       - ./observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
@@ -315,12 +316,12 @@ services:
       loki:
         condition: service_started
     networks:
-      - bi8s-net
+      - bi8s-dev-net
 
   grafana:
     <<: [*restart-policy, *default-logging]
     image: grafana/grafana:11.3.0
-    container_name: bi8s_grafana
+    container_name: bi8s_grafana_dev
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
@@ -332,7 +333,7 @@ services:
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
-      - grafana-data:/var/lib/grafana
+      - grafana-data-dev:/var/lib/grafana
     ports:
       - "${GRAFANA_PORT:-4000}:3000"
     depends_on:
@@ -345,16 +346,19 @@ services:
     labels:
       # Reachable at http://ops.localhost via Traefik; direct port :4000 still available
       traefik.enable: "true"
-      traefik.http.routers.grafana.rule: "Host(`ops.localhost`) || Host(`ops.${APP_DOMAIN:-localhost}`)"
+      traefik.constraint: "bi8s-dev"
+      traefik.http.routers.grafana.rule: "Host(`ops.localhost`) || Host(`ops-dev.emm4bi8s.dev`)"
       traefik.http.routers.grafana.entrypoints: "web"
       traefik.http.services.grafana.loadbalancer.server.port: "3000"
     networks:
-      - bi8s-net
+      - bi8s-dev-net
 
   cloudflared:
     <<: [*restart-policy, *default-logging]
-    container_name: cloudflared
+    container_name: bi8s_cloudflared_dev
     image: cloudflare/cloudflared:latest
+    env_file:
+      - path: .env.dev
     command:
       [
         "tunnel",
@@ -365,25 +369,44 @@ services:
       ]
     environment:
       TZ: UTC
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+      # TUNNEL_TOKEN is sourced from env_file (.env.dev) — do not override here
     depends_on:
       # Tunnel must point to Traefik only; update public hostname in CF Zero Trust to http://traefik:80
       traefik:
         condition: service_healthy
     networks:
-      - bi8s-net
+      - bi8s-dev-net
     labels:
       logging: "alloy"
-    profiles: ["tunnel"]
+
+  watchtower:
+    profiles: [ui]
+    <<: [*restart-policy, *default-logging]
+    image: containrrr/watchtower:1.7.1
+    container_name: bi8s_watchtower_dev
+    command:
+      - "--label-enable"
+      - "--interval"
+      - "${WATCHTOWER_INTERVAL:-300}"
+      - "--cleanup"
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      DOCKER_API_VERSION: "1.44"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - bi8s-dev-net
 
 networks:
-  bi8s-net:
+  bi8s-dev-net:
     driver: bridge
-    name: bi8s-net
+    name: bi8s-dev-net
 
 volumes:
-  prometheus-data:
-  tempo-data:
-  loki-data:
-  grafana-data:
-  opensearch-data:
+  prometheus-data-dev:
+  tempo-data-dev:
+  loki-data-dev:
+  grafana-data-dev:
+  opensearch-data-dev:
