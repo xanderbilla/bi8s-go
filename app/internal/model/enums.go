@@ -49,6 +49,8 @@ const (
 	AttributeTypeCategory   AttributeType = "CATEGORY"
 	AttributeTypeSpeciality AttributeType = "SPECIALITY"
 	AttributeTypeStudio     AttributeType = "STUDIO"
+	AttributeTypeSocial     AttributeType = "SOCIAL"
+	AttributeTypePlatform   AttributeType = "PLATFORM"
 )
 
 type Status string

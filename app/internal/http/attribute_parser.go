@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/xanderbilla/bi8s-go/internal/errs"
@@ -13,9 +14,18 @@ func ParseAttributeFromForm(formValues url.Values) (model.Attribute, error) {
 
 	attributeTypes := parseAttributeTypes(formValues, "attribute_type")
 
+	activeStr := strings.TrimSpace(formValues.Get("active"))
+	active := true // default to active
+	if activeStr != "" {
+		active, _ = strconv.ParseBool(activeStr)
+	}
+
 	attribute := model.Attribute{
 		Name:          strings.TrimSpace(formValues.Get("name")),
 		AttributeType: attributeTypes,
+		Logo:          strings.TrimSpace(formValues.Get("logo")),
+		SVG:           strings.TrimSpace(formValues.Get("svg")),
+		Active:        active,
 	}
 
 	if err := validation.ValidateStruct(attribute); err != nil {

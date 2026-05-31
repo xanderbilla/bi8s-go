@@ -52,6 +52,18 @@ func (h *PersonHandler) GetPerson(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, r, http.StatusOK, "person fetched", toPersonPublicDetail(person))
 }
 
+func (h *PersonHandler) GetPersonAdmin(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "peopleId")
+
+	person, err := h.personService.Get(r.Context(), id)
+	if err != nil {
+		errs.Write(w, r, err)
+		return
+	}
+
+	writeOK(w, r, http.StatusOK, "person fetched", person)
+}
+
 func (h *PersonHandler) CreatePerson(w http.ResponseWriter, r *http.Request) {
 	formValues, files, err := ParseFormAndFiles(w, r, []string{"profile", "backdrop"})
 	if err != nil {

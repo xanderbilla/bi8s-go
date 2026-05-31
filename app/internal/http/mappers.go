@@ -30,28 +30,39 @@ func toContentPublicDetail(m *model.Movie) model.MoviePublicDetail {
 }
 
 func toPersonPublicDetail(p *model.Person) model.PersonPublicDetail {
+	measurements := p.Measurements
+	if p.Gender == model.GenderMale {
+		measurements.Bust = 0
+		measurements.Waist = 0
+		measurements.Hips = 0
+	}
 	return model.PersonPublicDetail{
-		ID:           p.ID,
-		ContentType:  p.ContentType,
-		Name:         p.Name,
-		Roles:        p.Roles,
-		StageName:    p.StageName,
-		Bio:          p.Bio,
-		BirthDate:    p.BirthDate,
-		BirthPlace:   p.BirthPlace,
-		Nationality:  p.Nationality,
-		Gender:       p.Gender,
-		Height:       p.Height,
-		Verified:     p.Verified,
-		Active:       p.Active,
-		DebutYear:    p.DebutYear,
-		CareerStatus: p.CareerStatus,
-		ProfilePath:  p.ProfilePath,
-		BackdropPath: p.BackdropPath,
-		Measurements: p.Measurements,
-		Tags:         p.Tags,
-		Categories:   p.Categories,
-		Specialties:  p.Specialties,
+		ID:             p.ID,
+		ContentType:    p.ContentType,
+		Name:           p.Name,
+		LegalName:      p.LegalName,
+		Roles:          p.Roles,
+		StageName:      p.StageName,
+		Bio:            p.Bio,
+		BirthDate:      p.BirthDate,
+		BirthPlace:     p.BirthPlace,
+		Nationality:    p.Nationality,
+		Gender:         p.Gender,
+		Height:         p.Height,
+		Weight:         p.Weight,
+		Verified:       p.Verified,
+		Active:         p.Active,
+		DebutYear:      p.DebutYear,
+		CareerStatus:   p.CareerStatus,
+		ProfilePath:    p.ProfilePath,
+		BackdropPath:   p.BackdropPath,
+		Aliases:        p.Aliases,
+		Measurements:   measurements,
+		Tags:           p.Tags,
+		Categories:     p.Categories,
+		Specialties:    p.Specialties,
+		Career:         p.Career,
+		SocialPresence: p.SocialPresence,
 	}
 }
 
@@ -60,6 +71,8 @@ func toAttributePublicDetail(a *model.Attribute) model.AttributePublicDetail {
 		ID:            a.ID,
 		Name:          a.Name,
 		AttributeType: a.AttributeType,
+		Logo:          a.Logo,
+		SVG:           a.SVG,
 		ContentType:   a.ContentType,
 		Active:        a.Active,
 	}

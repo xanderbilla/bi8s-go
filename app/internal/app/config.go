@@ -207,7 +207,7 @@ func (c Config) Validate() error {
 		if perr != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
 			return errors.New("CORS_ALLOWED_ORIGINS contains invalid URL: " + origin)
 		}
-		if prod && u.Scheme != "https" {
+		if prod && u.Scheme != "https" && u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1" {
 			return errors.New("CORS_ALLOWED_ORIGINS in prod must use https:// scheme: " + origin)
 		}
 	}

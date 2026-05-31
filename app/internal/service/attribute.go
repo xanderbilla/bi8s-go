@@ -86,7 +86,6 @@ func (s *AttributeService) Create(ctx context.Context, attribute model.Attribute
 	}
 
 	attribute.ContentType = model.ContentTypeAttribute
-	attribute.Active = true
 
 	now := time.Now()
 	attribute.Audit = model.Audit{
@@ -103,6 +102,9 @@ func (s *AttributeService) Create(ctx context.Context, attribute model.Attribute
 
 func (s *AttributeService) Delete(ctx context.Context, id string) error {
 	if err := s.repo.Delete(ctx, id); err != nil {
+		if errs.IsConditionalCheckFailed(err) {
+			return errs.NewNotFound("attribute")
+		}
 		return err
 	}
 	s.InvalidateCache()

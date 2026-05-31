@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -75,7 +76,6 @@ func (s *PersonService) Create(ctx context.Context, person model.Person, profile
 	}
 
 	person.ContentType = model.ContentTypePerson
-	person.Verified = false
 
 	if person.StageName == "" {
 		person.StageName = person.Name
@@ -89,12 +89,8 @@ func (s *PersonService) Create(ctx context.Context, person model.Person, profile
 		return model.Person{}, err
 	}
 
-	person.Stats = model.Stats{
-		TotalProductions: 0,
-		TotalViews:       0,
-		SubscriberCount:  0,
-		FollowersCount:   0,
-		AverageRating:    0.0,
+	if err := s.validateAndPopulateSocialPresence(ctx, person.SocialPresence); err != nil {
+		return model.Person{}, err
 	}
 
 	now := time.Now()
@@ -147,6 +143,13 @@ func (s *PersonService) uploadFileToStorage(ctx context.Context, personID, purpo
 
 func (s *PersonService) Delete(ctx context.Context, id string) error {
 	if err := s.repo.Delete(ctx, id); err != nil {
+		if errs.IsConditionalCheckFailed(err) {
+			// Record no longer in DB — still purge any orphaned search document.
+			if serr := s.searchService.DeletePerson(ctx, id); serr != nil {
+				logger.WarnContext(ctx, "search person delete indexing failed", "personId", id, "error", serr.Error())
+			}
+			return errs.NewNotFound("person")
+		}
 		return err
 	}
 	cacheDel(ctx, s.redisClient, personCacheKey(id), "person", "personId", id)
@@ -158,4 +161,27 @@ func (s *PersonService) Delete(ctx context.Context, id string) error {
 
 func personCacheKey(id string) string {
 	return "bi8s:person:" + id
+}
+
+// validateAndPopulateSocialPresence ensures each social presence entry references a valid
+// PLATFORM attribute and populates the Platform name field from the attribute record.
+func (s *PersonService) validateAndPopulateSocialPresence(ctx context.Context, entries []model.SocialPresenceEntry) error {
+	for i := range entries {
+		attr, err := s.attributeRepo.Get(ctx, entries[i].PlatformID)
+		if err != nil || attr == nil {
+			return errs.NewNotFound("attribute not found: " + entries[i].PlatformID)
+		}
+		hasPlatformType := false
+		for _, t := range attr.AttributeType {
+			if t == model.AttributeTypePlatform || t == model.AttributeTypeSocial {
+				hasPlatformType = true
+				break
+			}
+		}
+		if !hasPlatformType {
+			return errs.NewBadRequest("attribute " + entries[i].PlatformID + " is not of type PLATFORM or SOCIAL")
+		}
+		entries[i].Platform = strings.ToLower(attr.Name)
+	}
+	return nil
 }

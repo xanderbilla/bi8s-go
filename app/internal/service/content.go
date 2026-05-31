@@ -217,6 +217,10 @@ func (s *ContentService) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	if movie == nil {
+		// Record no longer in DB — still purge any orphaned search document.
+		if serr := s.searchService.DeleteContent(ctx, id); serr != nil {
+			logger.WarnContext(ctx, "search content delete indexing failed", "contentId", id, "error", serr.Error())
+		}
 		return errs.ErrContentNotFound
 	}
 

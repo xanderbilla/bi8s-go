@@ -130,7 +130,7 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 		"content.GetByPersonAdmin":    contentHandler.GetContentByPersonIdAdmin,
 		"person.GetConsumer":          personHandler.GetPerson,
 		"person.ListAdmin":            personHandler.GetAllPeople,
-		"person.GetAdmin":             personHandler.GetPerson,
+		"person.GetAdmin":             personHandler.GetPersonAdmin,
 		"person.Create":               personHandler.CreatePerson,
 		"person.Delete":               personHandler.DeletePerson,
 		"encoder.Create":              encoderHandler.CreateEncodingJob,

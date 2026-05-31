@@ -47,7 +47,7 @@ func (h *AttributeHandler) GetConsumerAttributes(w http.ResponseWriter, r *http.
 
 	typeFilter, ok := parseAttributeTypeFilter(r.URL.Query().Get("type"))
 	if !ok {
-		errs.Write(w, r, errs.NewBadRequest("type must be one of: GENRE, TAG, MOOD, STUDIO, CATEGORY, SPECIALITY"))
+		errs.Write(w, r, errs.NewBadRequest("type must be one of: GENRE, TAG, MOOD, STUDIO, CATEGORY, SPECIALITY, SOCIAL, PLATFORM"))
 		return
 	}
 	sortMode, err := parseAlphaSort(r.URL.Query().Get("sort"))
@@ -138,6 +138,10 @@ func parseAttributeTypeFilter(raw string) (model.AttributeType, bool) {
 		return model.AttributeTypeCategory, true
 	case string(model.AttributeTypeSpeciality):
 		return model.AttributeTypeSpeciality, true
+	case string(model.AttributeTypeSocial):
+		return model.AttributeTypeSocial, true
+	case string(model.AttributeTypePlatform):
+		return model.AttributeTypePlatform, true
 	default:
 		return "", false
 	}
