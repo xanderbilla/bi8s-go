@@ -1,8 +1,8 @@
 # Storage (S3)
 
 A single S3 bucket — `bi8s-storage-dev` (and `-prod`) — backs every
-binary asset the system handles: uploaded sources, encoded HLS output,
-poster art, profile photos, and the chunk storage for Loki and Tempo.
+binary asset the system handles: uploaded sources, poster art, profile
+photos, and the chunk storage for Loki and Tempo.
 
 Bucket name is configurable via `S3_BUCKET`. Public links are built
 using `STORAGE_BASE_URL` when set.
@@ -16,13 +16,7 @@ s3://bi8s-storage-<env>/
 ├── content/                     # delivery-ready assets
 │   └── {contentId}/
 │       ├── poster.jpg
-│       ├── trailer.mp4
-│       └── hls/
-│           ├── master.m3u8
-│           ├── 1080p/
-│           │   ├── playlist.m3u8
-│           │   └── seg-00001.ts ...
-│           └── 720p/...
+│       └── trailer.mp4
 ├── people/
 │   └── {personId}/profile.jpg
 ├── loki/                        # Loki chunks + indexes (boltdb-shipper)
@@ -39,19 +33,10 @@ reporting, and lifecycle rules in one place.
 2. Handler streams the upload directly to S3 via
    `internal/storage` (multipart upload, no buffering on disk).
 3. The DynamoDB content row is updated with the asset key.
-4. (Optional) An encoder job is enqueued via `POST /v1/a/encoder`.
 
 Multipart parts smaller than 5 MiB are buffered; larger parts go
 through the streaming uploader. Aborted uploads are cleaned up by the
 bucket lifecycle rule (`abort incomplete multipart after 7d`).
-
-## Encoder output
-
-`bi8s-encoder` (the in-process worker) runs ffmpeg locally on the API
-host, then writes the HLS master + variant playlists + segments to
-`content/{contentId}/hls/`. Once the upload completes, the job row in
-`bi8s-video-table-*` is set to `succeeded` and the content row's
-`playback.manifestUrl` is updated.
 
 ## Access control
 

@@ -26,7 +26,6 @@ Operational playbook for `bi8s-go`. Each section: **symptom → diagnose
 3. Check downstream:
    - DynamoDB throttles (`bi8s_dynamodb_calls_total{status="throttled"}`).
    - S3 5xx.
-   - Encoder failures.
 
 **Mitigate**:
 
@@ -107,7 +106,7 @@ on-demand for prod.
 
 ## 6. S3 access errors
 
-**Symptom**: image/video loads fail; encoder uploads error.
+**Symptom**: image/video loads fail.
 
 **Diagnose**: Loki for `AccessDenied` / `NoSuchKey` / `SlowDown`.
 
@@ -121,27 +120,7 @@ on-demand for prod.
 
 ---
 
-## 7. Encoder backlog
-
-**Symptom**: `bi8s_encoder_jobs_total{status="queued"}` rises;
-`/v1/a/encoder` jobs stay `queued` for minutes.
-
-**Diagnose**:
-
-- CPU exhaustion on the EC2 host (encoder is in-process by default).
-- ffmpeg failure loop — check `error` column in `bi8s-video-table-*`.
-
-**Mitigate**:
-
-- Externalize: set `ENCODER_QUEUE_URL` to an SQS queue and run a
-  dedicated worker pool on a larger instance.
-- Pause new submissions by gating `/v1/a/encoder` at NGINX.
-
-**Fix**: scale workers; investigate ffmpeg errors per content id.
-
----
-
-## 8. Telemetry pipeline outage
+## 7. Telemetry pipeline outage
 
 **Symptom**: Grafana panels show "No data".
 

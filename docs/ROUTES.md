@@ -17,11 +17,10 @@ added, removed, or renamed.
 
 ## Rate-limit classes
 
-| Class           | Applied to           |
-| --------------- | -------------------- |
-| `encoder_write` | Encoder job creation |
-| `movie_write`   | Content creation     |
-| `person_write`  | People creation      |
+| Class          | Applied to       |
+| -------------- | ---------------- |
+| `movie_write`  | Content creation |
+| `person_write` | People creation  |
 
 ---
 
@@ -50,13 +49,11 @@ No authentication required.
 
 ### Content
 
-| Method | Path                                   | Handler                  | Middlewares                               | Description                                                                                                                                                          |
-| ------ | -------------------------------------- | ------------------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`  | `/v1/c/content/{contentId}`            | `content.GetConsumer`    | `timeout`, `validate.contentId`           | Public full detail for a single content item.                                                                                                                        |
-| `GET`  | `/v1/c/banner`                         | `content.GetBanner`      | `timeout`                                 | Random featured/banner item for the hero carousel. Optional `?type=movie\|tv`.                                                                                       |
-| `GET`  | `/v1/c/discover`                       | `content.GetDiscover`    | `timeout`, `httpcache.discover`           | Paginated discovery feed (`latest`/`popular`). In-memory cached for 2 min. Supports DynamoDB key-cursor pagination; switches to full-scan offset when `sort` is set. |
-| `GET`  | `/v1/c/attributes/{id}`                | `content.GetByAttribute` | `timeout`, `validate.consumerAttributeId` | Paginated content list for a specific attribute (genre, tag, mood, etc.).                                                                                            |
-| `GET`  | `/v1/c/play/{contentType}/{contentId}` | `content.GetPlayback`    | `timeout`, `validate.contentTypeAndId`    | HLS playback manifest: master playlist, quality tracks, audio, subtitles, thumbnails, preview, sprite.                                                               |
+| Method | Path                        | Handler               | Middlewares                     | Description                                                                                                                                                          |
+| ------ | --------------------------- | --------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/v1/c/content/{contentId}` | `content.GetConsumer` | `timeout`, `validate.contentId` | Public full detail for a single content item.                                                                                                                        |
+| `GET`  | `/v1/c/banner`              | `content.GetBanner`   | `timeout`                       | Random featured/banner item for the hero carousel. Optional `?type=movie\|tv`.                                                                                       |
+| `GET`  | `/v1/c/discover`            | `content.GetDiscover` | `timeout`, `httpcache.discover` | Paginated discovery feed (`latest`/`popular`). In-memory cached for 2 min. Supports DynamoDB key-cursor pagination; switches to full-scan offset when `sort` is set. |
 
 ### People
 
@@ -106,12 +103,11 @@ Require internal/admin network access (auth-stub middleware).
 | `POST`   | `/v1/a/attributes/`              | `attribute.Create`    | `timeout`                         | Create an attribute. `multipart/form-data`. Required: `name`, `attribute_type` (comma-separated: `TAG`\|`MOOD`\|`GENRE`\|`CATEGORY`\|`SPECIALITY`\|`STUDIO`). Returns `201`. |
 | `DELETE` | `/v1/a/attributes/{attributeId}` | `attribute.Delete`    | `timeout`, `validate.attributeId` | Permanently delete an attribute.                                                                                                                                             |
 
-### Encoder
+### System / Operational
 
-| Method | Path                    | Handler          | Middlewares                 | Description                                                                                                                                                                                           |
-| ------ | ----------------------- | ---------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/v1/a/encoder/`        | `encoder.Create` | `ratelimit.encoder`         | Submit a video file for async HLS encoding. `multipart/form-data`. Required: `contentId`, `contentType` (`MOVIE`\|`TV`), `video` (file). Returns `202` with `EncoderJob` (`jobId`, `status: QUEUED`). |
-| `GET`  | `/v1/a/encoder/{jobId}` | `encoder.Get`    | `timeout`, `validate.jobId` | Poll encoding job status and output. Status flow: `QUEUED` → `PROCESSING` → `COMPLETED` \| `COMPLETED_WITH_WARNINGS` \| `FAILED` \| `CANCELLED`.                                                      |
+| Method | Path            | Handler           | Middlewares | Description                                                                                                                                                                          |
+| ------ | --------------- | ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST` | `/v1/a/reindex` | `reindex.Trigger` | —           | Re-creates OpenSearch indexes (if missing), re-indexes all people and content documents, and resyncs all DynamoDB join-table entries. Returns `{people, content, joinTableEntries}`. |
 
 ---
 

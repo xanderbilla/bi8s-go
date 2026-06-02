@@ -1,9 +1,8 @@
 # Architecture
 
 `bi8s-go` is a Go HTTP API that serves a media catalog (movies, people,
-attributes) and orchestrates a video encoder pipeline. State lives in
-DynamoDB and S3; the runtime is a single binary deployed to EC2 behind
-NGINX, with full OpenTelemetry instrumentation.
+attributes). State lives in DynamoDB and S3; the runtime is a single binary
+deployed to EC2 behind NGINX, with full OpenTelemetry instrumentation.
 
 ## Component diagram
 
@@ -25,17 +24,15 @@ NGINX, with full OpenTelemetry instrumentation.
               │  │ /v1/c/*      │ /v1/a/*               │  │
               │  │ consumer     │ admin (writes)        │  │
               │  └──────┬───────┴───────┬───────────────┘  │
-              │         │               │                  │
-              │  ┌──────▼───────┐ ┌─────▼────────────┐     │
-              │  │ MovieService │ │ EncoderService    │    │
-              │  │ PersonSvc    │ │  (ffmpeg → S3 HLS)│    │
-              │  │ AttributeSvc │ │                   │    │
-              │  └──────┬───────┘ └─────┬─────────────┘    │
-              └─────────┼───────────────┼──────────────────┘
-                        │               │
-              ┌─────────▼──┐    ┌───────▼─────┐    ┌───────────┐
+              │         │               │                   │
+              │  ┌──────▼───────────────▼────────────────┐  │
+              │  │ MovieService / PersonSvc / AttributeSvc│  │
+              │  └──────────────────┬─────────────────────┘  │
+              └────────────────────┼──────────────────────────┘
+                                   │
+              ┌─────────▼──┐    ┌──▼──────────┐    ┌───────────┐
               │  DynamoDB  │    │     S3       │   │   Redis   │
-              │ 4 tables   │    │ uploads+HLS  │   │ ratelimit │
+              │  3 tables  │    │   uploads    │   │ ratelimit │
               └────────────┘    └──────┬───────┘   └───────────┘
                                        │
                                        ├──── Loki backend
@@ -55,10 +52,9 @@ NGINX, with full OpenTelemetry instrumentation.
 | `internal/app`                       | Config loading + validation, dependency wiring (`bootstrap.go`).          |
 | `internal/http`                      | Router, middleware, handlers, parsers, validation, Swagger UI.            |
 | `internal/http/middleware/ratelimit` | Pluggable memory/Redis rate-limit backends.                               |
-| `internal/service`                   | Business logic (movie/person/attribute/encoder services).                 |
+| `internal/service`                   | Business logic (movie/person/attribute services).                         |
 | `internal/repository`                | DynamoDB access layer (one file per table).                               |
 | `internal/storage`                   | S3 upload/download/streaming helpers.                                     |
-| `internal/encoder/queue`             | SQS queue publisher for encoder jobs.                                     |
 | `internal/redis`                     | Redis client + rate-limit backend implementation.                         |
 | `internal/aws`                       | AWS SDK config + client construction.                                     |
 | `internal/observability`             | OTel tracer/meter/logger setup, HTTP metrics middleware.                  |
@@ -66,7 +62,7 @@ NGINX, with full OpenTelemetry instrumentation.
 | `internal/response`                  | The single response `Envelope` type used by every handler.                |
 | `internal/errs`                      | Centralized `APIError` and constructors (`NewNotFound`, ...).             |
 | `internal/validation`                | go-playground/validator setup + custom rules (`customdate`, `daterange`). |
-| `internal/model`                     | Domain types (Movie, Person, Attribute, Encoder, Playback, etc.).         |
+| `internal/model`                     | Domain types (Movie, Person, Attribute, etc.).                            |
 | `internal/env`                       | Typed env-var helpers (`GetInt`, `GetString`, `GetBool`).                 |
 | `internal/ctxutil`                   | Request context helpers (request id, deadlines).                          |
 | `internal/utils`                     | Cross-cutting helpers used by multiple packages.                          |
@@ -85,7 +81,7 @@ For a typical `GET /v1/c/content/{contentId}`:
    6. `SecureHeaders` — HSTS, X-Content-Type-Options, frame deny, etc.
    7. `MaxBytesJSON` — caps request body size (default 1 MiB)
    8. **Global rate limit** (memory or Redis backend)
-   9. **Per-route rate limit** for write endpoints (encoder/movie/person)
+   9. **Per-route rate limit** for write endpoints (movie/person)
    10. `middleware.Timeout` — per-request deadline (default 60 s)
 3. **Route handler** parses + validates the request, calls the service.
 4. **Service** invokes one or more **repositories** and returns a domain object.
@@ -101,17 +97,15 @@ For a typical `GET /v1/c/content/{contentId}`:
 - **No global state**: all dependencies are constructed in
   `app.Bootstrap` and injected through `*app.Application`.
 - **Graceful shutdown**: SIGINT/SIGTERM triggers an HTTP server shutdown,
-  closes rate-limit backends, drains in-flight encoder jobs (up to 120 s),
-  and flushes OTel exporters.
+  closes rate-limit backends, and flushes OTel exporters.
 
 ## External services
 
-| Service                   | Purpose                                      | Local equivalent                   |
-| ------------------------- | -------------------------------------------- | ---------------------------------- |
-| AWS DynamoDB              | Movie / Person / Attribute / Encoder tables  | DynamoDB Local container           |
-| AWS S3                    | Uploads, HLS output, Loki/Tempo blob backend | MinIO                              |
-| AWS SQS _(optional)_      | Encoder job queue                            | (in-memory worker pool by default) |
-| Redis                     | Shared rate-limit state                      | redis container                    |
-| OTel Collector            | Telemetry router                             | otel-collector container           |
-| Tempo / Prometheus / Loki | Trace / metric / log storage                 | local containers                   |
-| Grafana                   | Dashboards + alerts                          | local container                    |
+| Service                   | Purpose                           | Local equivalent         |
+| ------------------------- | --------------------------------- | ------------------------ |
+| AWS DynamoDB              | Movie / Person / Attribute tables | DynamoDB Local container |
+| AWS S3                    | Uploads, Loki/Tempo blob backend  | MinIO                    |
+| Redis                     | Shared rate-limit state           | redis container          |
+| OTel Collector            | Telemetry router                  | otel-collector container |
+| Tempo / Prometheus / Loki | Trace / metric / log storage      | local containers         |
+| Grafana                   | Dashboards + alerts               | local container          |

@@ -62,8 +62,6 @@ bi8s-go ───────────►   │   otel-collector-config) │
 | `http_server_active_requests`                | gauge           | concurrency.                             |
 | `http_server_request_body_size_bytes`        | histogram       |                                          |
 | `process_*` / `go_*`                         | gauges/counters | runtime metrics from OTel host detector. |
-| `bi8s_encoder_jobs_total{status}`            | counter         | encoder outcomes.                        |
-| `bi8s_encoder_job_duration_seconds`          | histogram       | per-job time.                            |
 | `bi8s_dynamodb_calls_total{op,table,status}` | counter         | repository instrumentation.              |
 
 ### Alerts
@@ -72,7 +70,6 @@ bi8s-go ───────────►   │   otel-collector-config) │
 
 - API 5xx rate > 1% for 5 min.
 - p95 latency > 1.5 s for 10 min.
-- Encoder failure rate > 5% for 15 min.
 - Container restart loop.
 
 Wire to PagerDuty/Slack via Grafana Alerting (provisioned under
@@ -102,7 +99,6 @@ from a Loki log line to the Tempo trace in one click in Grafana.
   (`admin` / `admin` — change immediately).
 - Dashboards include:
   - **API Overview**: RPS, error rate, p50/p95/p99 latency, top routes.
-  - **Encoder**: jobs in flight, success/failure rate, ffmpeg duration.
   - **DynamoDB**: calls per table/op, throttles, latency.
   - **Runtime**: goroutines, GC pause, memory.
 
@@ -110,11 +106,11 @@ from a Loki log line to the Tempo trace in one click in Grafana.
 
 ```go
 // in app/internal/observability or your service
-counter, _ := otel.Meter("bi8s.encoder").Int64Counter(
-    "bi8s_encoder_retries_total",
-    metric.WithDescription("Encoder retries by reason."),
+counter, _ := otel.Meter("bi8s.content").Int64Counter(
+    "bi8s_content_views_total",
+    metric.WithDescription("Content view count by type."),
 )
-counter.Add(ctx, 1, metric.WithAttributes(attribute.String("reason", "ffmpeg_oom")))
+counter.Add(ctx, 1, metric.WithAttributes(attribute.String("type", "movie")))
 ```
 
 The Prometheus exporter on `:8889` picks it up automatically — no

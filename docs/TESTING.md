@@ -58,7 +58,7 @@ than failing — so a missing local stack doesn't break `go test`.
 
 - **Table-driven tests** for handlers, parsers, and pure functions.
 - **`httptest.NewRecorder` + `chi.NewRouter`** for handler-level coverage
-  (see `health_handler_test.go`, `encoder_handler_test.go`).
+  (see `health_handler_test.go`).
 - **Fuzz tests** for parsers (`parser_fuzz_test.go`); run with
   `go test -run=^$ -fuzz=Fuzz -fuzztime=30s ./internal/http/...`.
 - **No global `init()` magic** — wire dependencies with constructors so
@@ -71,7 +71,7 @@ than failing — so a missing local stack doesn't break `go test`.
 
 - ≥ 70 % for `internal/http`, `internal/response`, `internal/errs`,
   `internal/validation`, `internal/env`, `internal/ctxutil`.
-- Encoder, repository, and AWS client packages are exercised primarily
+- Repository and AWS client packages are exercised primarily
   through integration tests (real DynamoDB + S3 behaviour matters more
   than mocked paths).
 

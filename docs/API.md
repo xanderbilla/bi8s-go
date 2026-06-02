@@ -88,24 +88,21 @@ On error, `data` is `null` and `error` is populated:
 
 ### Consumer (`/v1/c`)
 
-| Method | Path                              | Purpose                                   |
-| ------ | --------------------------------- | ----------------------------------------- |
-| `GET`  | `/content`                        | Recently added content.                   |
-| `GET`  | `/content/{contentId}`            | Single content item by id.                |
-| `GET`  | `/people/{peopleId}`              | Person detail.                            |
-| `GET`  | `/people/{peopleId}/content`      | Content credited to a person.             |
-| `GET`  | `/banner`                         | Curated banner content for the home page. |
-| `GET`  | `/attributes/{id}`                | Content tagged with the given attribute.  |
-| `GET`  | `/discover`                       | Discovery feed.                           |
-| `GET`  | `/play/{contentType}/{contentId}` | Playback manifest URL + DRM metadata.     |
+| Method | Path                         | Purpose                                   |
+| ------ | ---------------------------- | ----------------------------------------- |
+| `GET`  | `/content`                   | Recently added content.                   |
+| `GET`  | `/content/{contentId}`       | Single content item by id.                |
+| `GET`  | `/people/{peopleId}`         | Person detail.                            |
+| `GET`  | `/people/{peopleId}/content` | Content credited to a person.             |
+| `GET`  | `/banner`                    | Curated banner content for the home page. |
+| `GET`  | `/attributes/{id}`           | Content tagged with the given attribute.  |
+| `GET`  | `/discover`                  | Discovery feed.                           |
 
 ### Admin (`/v1/a`)
 
 | Method   | Path                         | Purpose                                                 |
 | -------- | ---------------------------- | ------------------------------------------------------- |
 | `POST`   | `/content/{contentId}`       | Upload assets (multipart) for an existing content item. |
-| `POST`   | `/encoder`                   | Submit an encoding job (write rate-limited).            |
-| `GET`    | `/encoder/{jobId}`           | Encoding job status.                                    |
 | `GET`    | `/content`                   | List all content.                                       |
 | `GET`    | `/content/{contentId}`       | Admin content detail.                                   |
 | `POST`   | `/content`                   | Create content (write rate-limited).                    |
@@ -139,7 +136,6 @@ Defaults (override via env vars; see [CONFIGURATION.md](CONFIGURATION.md)):
 | Bucket                        | Burst | RPM | Env vars                                             |
 | ----------------------------- | ----- | --- | ---------------------------------------------------- |
 | Global (all routes)           | 100   | 100 | `RATELIMIT_GLOBAL_BURST`, `RATELIMIT_GLOBAL_PER_MIN` |
-| `POST /v1/a/encoder`          | 5     | 5   | `RATELIMIT_ENCODER_WRITE_*`                          |
 | `POST/DELETE /v1/a/content/*` | 20    | 20  | `RATELIMIT_MOVIE_WRITE_*`                            |
 | `POST/DELETE /v1/a/people/*`  | 20    | 20  | `RATELIMIT_PERSON_WRITE_*`                           |
 

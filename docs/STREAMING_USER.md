@@ -28,7 +28,6 @@ This document tracks UX gaps identified during session 3 of the bi8s-go health p
 | 8   | Content list endpoint returns full doc        | `/v1/c/search` returns `MoviePublicList` (trimmed); full `ContentPublicDetail` only on single-item GET | No change needed                                                                                          |
 | 9   | Rate limiting hits authenticated users        | Global rate limit applies to all IPs including CI/CDN                                                  | Rate limit is IP-scoped via `X-Forwarded-For`; trusted proxy config documented in `docs/CONFIGURATION.md` |
 | 10  | SSE banner has no fallback                    | If Redis is unavailable, banner fetch fails silently                                                   | `sync.Map` in-process cache is used as fallback when Redis is unreachable                                 |
-| 11  | Encoder concurrency test was flaky            | `panicMockFileUploader` race caused false failures in CI                                               | Fixed — mock now uses mutex; documented in `app/internal/encoder/`                                        |
 
 ---
 
@@ -74,7 +73,6 @@ These items were identified but deferred with documented rationale:
 
 | Item                                        | Effort | Blocker / Rationale                                                                                                                                                      |
 | ------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Encoder real ffmpeg integration test        | Large  | Needs LocalStack + a real test video file seeded in a test bucket. Unit-level mock coverage is sufficient for now.                                                       |
 | Secrets Manager via AWS SSM Parameter Store | Medium | Bootstrap phase-split needed — SSM must be seeded before app starts. `env.GetSecret()` is a clean seam; can swap in a single PR when ops is ready.                       |
 | OpenSearch dedicated master nodes (HA)      | Medium | Cost: 3 dedicated master nodes. `dedicated_master_enabled = false` is hardcoded in `infra/tofu/modules/opensearch/main.tf`. Enable when cluster grows past 5 data nodes. |
 | Negative-path E2E tests (4xx/5xx flows)     | Small  | Rate-limit flakiness in CI makes negative-path E2E unreliable. Unit tests cover all error paths; E2E should focus on happy paths.                                        |

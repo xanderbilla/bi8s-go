@@ -34,7 +34,7 @@ Everything else is optional with the default shown.
 | `CORS_ALLOWED_ORIGINS`       | no       | see `DefaultCORSOrigins` | Comma-separated. **Cannot contain `*`** when credentials are enabled. In `prod`, every origin must use `https://`. |
 | `CORS_ALLOW_PRIVATE_NETWORK` | no       | `false`                  | Enable [Private Network Access](https://wicg.github.io/private-network-access/) preflight.                         |
 | `HTTP_MAX_JSON_BYTES`        | no       | `1048576`                | Per-request JSON body cap (bytes).                                                                                 |
-| `HTTP_MAX_MULTIPART_BYTES`   | no       | `1073741824`             | Per-request multipart/form-data body cap (bytes); applies to encoder and content/people uploads.                   |
+| `HTTP_MAX_MULTIPART_BYTES`   | no       | `1073741824`             | Per-request multipart/form-data body cap (bytes); applies to content and people uploads.                           |
 | `ROUTER_TIMEOUT_SECONDS`     | no       | `60`                     | Per-request deadline.                                                                                              |
 | `TRUSTED_PROXIES`            | no       | (empty)                  | Comma-separated CIDRs. Required when behind NGINX so `X-Forwarded-For` is honoured.                                |
 
@@ -50,46 +50,34 @@ Everything else is optional with the default shown.
 
 ### DynamoDB
 
-| Variable                            | Required | Default      | Notes                                        |
-| ----------------------------------- | -------- | ------------ | -------------------------------------------- |
-| `DYNAMODB_CONTENT_TABLE`            | yes      | —            | Movie / content table name.                  |
-| `DYNAMODB_PERSON_TABLE`             | yes      | —            | Person table name.                           |
-| `DYNAMODB_ATTRIBUTE_TABLE`          | yes      | —            | Attribute table name.                        |
-| `DYNAMODB_ENCODER_TABLE`            | yes      | —            | Encoder job table name.                      |
-| `DYNAMODB_ATTRIBUTE_NAME_INDEX`     | no       | `name-index` | GSI used for attribute lookups by name.      |
-| `DYNAMODB_ENCODER_CONTENT_ID_INDEX` | yes      | —            | GSI used to find encoder jobs by content id. |
-| `DYNAMODB_MAX_SCAN_PAGES`           | no       | `1000`       | Hard cap on paginated scans.                 |
-| `CTX_DB_TIMEOUT_MS`                 | no       | `30000`      | Per-DynamoDB-call deadline.                  |
+| Variable                        | Required | Default      | Notes                                   |
+| ------------------------------- | -------- | ------------ | --------------------------------------- |
+| `DYNAMODB_CONTENT_TABLE`        | yes      | —            | Movie / content table name.             |
+| `DYNAMODB_PERSON_TABLE`         | yes      | —            | Person table name.                      |
+| `DYNAMODB_ATTRIBUTE_TABLE`      | yes      | —            | Attribute table name.                   |
+| `DYNAMODB_ATTRIBUTE_NAME_INDEX` | no       | `name-index` | GSI used for attribute lookups by name. |
+| `DYNAMODB_MAX_SCAN_PAGES`       | no       | `1000`       | Hard cap on paginated scans.            |
+| `CTX_DB_TIMEOUT_MS`             | no       | `30000`      | Per-DynamoDB-call deadline.             |
 
 ### S3
 
-| Variable           | Required | Default | Notes                                                         |
-| ------------------ | -------- | ------- | ------------------------------------------------------------- |
-| `S3_BUCKET`        | yes      | —       | Single bucket used for uploads, HLS, and Loki/Tempo backends. |
-| `STORAGE_BASE_URL` | no       | (empty) | Public base URL prefix when generating links.                 |
-
-### Encoder
-
-| Variable                      | Required | Default | Notes                                   |
-| ----------------------------- | -------- | ------- | --------------------------------------- |
-| `ENCODER_MAX_CONCURRENT`      | no       | `2`     | Max parallel ffmpeg jobs.               |
-| `ENCODER_FFMPEG_PARALLELISM`  | no       | `0`     | ffmpeg `-threads` (`0` = auto).         |
-| `ENCODER_JOB_TIMEOUT_SECONDS` | no       | `1800`  | Hard timeout per encoding job.          |
-| `BI8S_TMP_DIR`                | no       | `/tmp`  | Scratch directory used during encoding. |
+| Variable           | Required | Default | Notes                                                   |
+| ------------------ | -------- | ------- | ------------------------------------------------------- |
+| `S3_BUCKET`        | yes      | —       | Single bucket used for uploads and Loki/Tempo backends. |
+| `STORAGE_BASE_URL` | no       | (empty) | Public base URL prefix when generating links.           |
 
 ### Rate limiting
 
-| Variable                                     | Required    | Default     | Notes                                                                               |
-| -------------------------------------------- | ----------- | ----------- | ----------------------------------------------------------------------------------- |
-| `RATE_LIMIT_BACKEND`                         | no          | `memory`    | `memory` (per-instance) or `redis` (multi-replica safe).                            |
-| `REDIS_URL`                                  | conditional | —           | Required when `RATE_LIMIT_BACKEND=redis`. Format: `redis://[:pass@]host:port[/db]`. |
-| `RATE_LIMIT_REDIS_FAIL_MODE`                 | no          | `fail-open` | `fail-open` allows traffic on Redis outages; `fail-closed` rejects.                 |
-| `RATE_LIMIT_REDIS_TIMEOUT_MS`                | no          | `50`        | Per-call deadline against Redis.                                                    |
-| `RATELIMIT_GLOBAL_BURST`                     | no          | `100`       | Global token bucket burst.                                                          |
-| `RATELIMIT_GLOBAL_PER_MIN`                   | no          | `100`       | Global refill rate (per minute).                                                    |
-| `RATELIMIT_ENCODER_WRITE_BURST` / `_PER_MIN` | no          | `5` / `5`   | Burst / RPM for `POST /v1/a/encoder`.                                               |
-| `RATELIMIT_MOVIE_WRITE_BURST` / `_PER_MIN`   | no          | `20` / `20` | Burst / RPM for movie write routes.                                                 |
-| `RATELIMIT_PERSON_WRITE_BURST` / `_PER_MIN`  | no          | `20` / `20` | Burst / RPM for person write routes.                                                |
+| Variable                                    | Required    | Default     | Notes                                                                               |
+| ------------------------------------------- | ----------- | ----------- | ----------------------------------------------------------------------------------- |
+| `RATE_LIMIT_BACKEND`                        | no          | `memory`    | `memory` (per-instance) or `redis` (multi-replica safe).                            |
+| `REDIS_URL`                                 | conditional | —           | Required when `RATE_LIMIT_BACKEND=redis`. Format: `redis://[:pass@]host:port[/db]`. |
+| `RATE_LIMIT_REDIS_FAIL_MODE`                | no          | `fail-open` | `fail-open` allows traffic on Redis outages; `fail-closed` rejects.                 |
+| `RATE_LIMIT_REDIS_TIMEOUT_MS`               | no          | `50`        | Per-call deadline against Redis.                                                    |
+| `RATELIMIT_GLOBAL_BURST`                    | no          | `100`       | Global token bucket burst.                                                          |
+| `RATELIMIT_GLOBAL_PER_MIN`                  | no          | `100`       | Global refill rate (per minute).                                                    |
+| `RATELIMIT_MOVIE_WRITE_BURST` / `_PER_MIN`  | no          | `20` / `20` | Burst / RPM for movie write routes.                                                 |
+| `RATELIMIT_PERSON_WRITE_BURST` / `_PER_MIN` | no          | `20` / `20` | Burst / RPM for person write routes.                                                |
 
 ### OpenTelemetry
 
@@ -120,8 +108,7 @@ These are read by `docker-compose.dev.yml`, not by the binary.
 `Config.Validate()` will fail fast on:
 
 - Unknown `APP_ENV` (must be `dev`, `staging`, or `prod`).
-- Empty `PORT`, `S3_BUCKET`, `AWS_REGION`, any `DYNAMODB_*_TABLE`, or
-  `DYNAMODB_ENCODER_CONTENT_ID_INDEX`.
+- Empty `PORT`, `S3_BUCKET`, `AWS_REGION`, or any `DYNAMODB_*_TABLE`.
 - `RATE_LIMIT_BACKEND=redis` with empty `REDIS_URL`.
 - `CORS_ALLOWED_ORIGINS=*` (must enumerate explicit origins).
 - Any non-`https://` origin when `APP_ENV=prod`.

@@ -18,8 +18,7 @@ substitute `-prod`. Names are configurable via `DYNAMODB_*_TABLE`.
 | `title`                   | S    |                                                   |
 | `attributes`              | L<S> | Attribute ids referenced by the item.             |
 | `people`                  | L<M> | Cast / crew with role.                            |
-| `assets`                  | M    | Poster, trailer, source, HLS manifest URLs.       |
-| `playback`                | M    | DRM metadata, manifest URL, available qualities.  |
+| `assets`                  | M    | Poster, trailer, source upload URLs.              |
 | `createdAt` / `updatedAt` | S    | RFC 3339.                                         |
 
 Access patterns:
@@ -67,22 +66,6 @@ Access patterns:
 | Get by id   | `GetItem(attributeId)`  |
 | Get by name | `Query` on `name-index` |
 | List all    | `Scan`                  |
-
-### `bi8s-video-table-dev` — Encoder jobs
-
-| Attribute                 | Type | Notes                                                     |
-| ------------------------- | ---- | --------------------------------------------------------- |
-| `jobId`                   | S    | **Partition key**.                                        |
-| `contentId`               | S    | **`contentId-index` GSI** (find jobs for a content item). |
-| `status`                  | S    | `queued`, `running`, `succeeded`, `failed`.               |
-| `inputKey`                | S    | Source S3 key.                                            |
-| `outputPrefix`            | S    | HLS output prefix in S3.                                  |
-| `progress`                | N    | 0–100.                                                    |
-| `error`                   | S    | Populated on failure.                                     |
-| `createdAt` / `updatedAt` | S    |                                                           |
-
-GSI: `contentId-index` — partition key `contentId`. Required at
-startup via `DYNAMODB_ENCODER_CONTENT_ID_INDEX`.
 
 ## Schema rules
 

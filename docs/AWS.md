@@ -50,12 +50,6 @@ Settings: server-side encryption (SSE-S3), versioning enabled, block
 public access on, lifecycle rules for incomplete multipart uploads
 (`abort after 7d`) and Loki/Tempo block expiry (`30d` in dev).
 
-### SQS _(optional)_
-
-When `ENCODER_QUEUE_URL` is set, encoder jobs are published to SQS
-instead of being processed in-process. Provisioned ad-hoc; not in the
-default Tofu config.
-
 ### CloudWatch
 
 - Log group `/bi8s/api/<env>` — populated by the CloudWatch Agent on

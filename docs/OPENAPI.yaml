@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Bi8s API
   description: |
-    REST API for the Bi8s movie / person / encoder backend.
+    REST API for the Bi8s movie / person backend.
 
     All responses follow the standard envelope:
 
@@ -38,8 +38,6 @@ tags:
     description: Public, read-only endpoints under `/v1/c`.
   - name: Admin
     description: Write endpoints under `/v1/a`. Network-level access control only.
-  - name: Encoder
-    description: HLS encoder job submission and status under `/v1/a/encoder`.
 security: []
 paths:
   /health:
@@ -352,60 +350,6 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
       operationId: getConsumerPlayback
-  /a/encoder:
-    post:
-      tags:
-        - Admin
-        - Encoder
-      summary: Submit a video for HLS encoding
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required:
-                - contentId
-                - contentType
-                - video
-              properties:
-                contentId:
-                  type: string
-                contentType:
-                  type: string
-                  enum:
-                    - MOVIE
-                    - TV
-                video:
-                  type: string
-                  format: binary
-      responses:
-        "201":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "429":
-          $ref: "#/components/responses/RateLimited"
-      operationId: createEncoderJob
-  /a/encoder/{jobId}:
-    get:
-      tags:
-        - Admin
-        - Encoder
-      summary: Get encoder job status
-      parameters:
-        - in: path
-          name: jobId
-          required: true
-          schema:
-            type: string
-            pattern: ^job_[A-Za-z0-9-]+$
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "404":
-          $ref: "#/components/responses/NotFound"
-      operationId: getEncoderJob
   /a/content:
     get:
       tags:
@@ -630,6 +574,31 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
       operationId: deleteAdminAttribute
+  /a/reindex:
+    post:
+      tags:
+        - Admin
+      summary: Trigger a full reindex
+      description: |
+        Re-creates OpenSearch indexes (if missing), re-indexes all people and
+        content documents, and resyncs all DynamoDB join-table entries.
+        This is a synchronous long-running operation — do not set a short
+        client timeout. Typically completes in seconds for small datasets.
+      responses:
+        "200":
+          description: Reindex completed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ReindexResult"
+        "500":
+          $ref: "#/components/responses/ServiceUnavailable"
+      operationId: adminTriggerReindex
 components:
   parameters:
     ContentId:
@@ -686,6 +655,22 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
   schemas:
+    ReindexResult:
+      type: object
+      description: Counts of records processed during a full reindex operation.
+      properties:
+        people:
+          type: integer
+          description: Number of people documents re-indexed in OpenSearch.
+          example: 42
+        content:
+          type: integer
+          description: Number of content documents re-indexed in OpenSearch.
+          example: 120
+        joinTableEntries:
+          type: integer
+          description: Number of DynamoDB join-table entries resynced.
+          example: 350
     SuccessEnvelope:
       type: object
       required:
