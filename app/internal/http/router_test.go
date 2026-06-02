@@ -42,16 +42,13 @@ func TestRouter_RouteSnapshot(t *testing.T) {
 		"GET    /v1/c/banner",
 		"GET    /v1/c/attributes/{id}",
 		"GET    /v1/c/discover",
-		"GET    /v1/c/play/{contentType}/{contentId}",
-
-		"POST   /v1/a/content/{contentId}",
-		"POST   /v1/a/encoder/",
-		"GET    /v1/a/encoder/{jobId}",
 
 		"GET    /v1/a/content/",
 		"GET    /v1/a/content/{contentId}",
 		"POST   /v1/a/content/",
+		"POST   /v1/a/content/{contentId}",
 		"DELETE /v1/a/content/{contentId}",
+		"DELETE /v1/a/content/{contentId}/assets/{assetType}/keys/{keyId}",
 
 		"GET    /v1/a/people/",
 		"GET    /v1/a/people/{peopleId}",
@@ -63,6 +60,8 @@ func TestRouter_RouteSnapshot(t *testing.T) {
 		"GET    /v1/a/attributes/{attributeId}",
 		"POST   /v1/a/attributes/",
 		"DELETE /v1/a/attributes/{attributeId}",
+
+		"POST   /v1/a/reindex",
 	}
 
 	sort.Strings(got)

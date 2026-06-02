@@ -17,6 +17,7 @@ import (
 	"github.com/xanderbilla/bi8s-go/internal/app"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
 	"github.com/xanderbilla/bi8s-go/internal/http/middleware/httpcache"
+	"github.com/xanderbilla/bi8s-go/internal/http/middleware/localonly"
 	"github.com/xanderbilla/bi8s-go/internal/http/middleware/ratelimit"
 	"github.com/xanderbilla/bi8s-go/internal/http/routes"
 )
@@ -88,7 +89,6 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 	}
 
 	globalBackend, globalMW := buildRateLimit("global", application.Config.RateLimitGlobalBurst, application.Config.RateLimitGlobalPerMin)
-	encoderBackend, encoderWriteMW := buildRateLimit("encoder_write", application.Config.RateLimitEncoderBurst, application.Config.RateLimitEncoderPerMin)
 	movieBackend, movieWriteMW := buildRateLimit("movie_write", application.Config.RateLimitMovieBurst, application.Config.RateLimitMoviePerMin)
 	personBackend, personWriteMW := buildRateLimit("person_write", application.Config.RateLimitPersonBurst, application.Config.RateLimitPersonPerMin)
 
@@ -101,7 +101,7 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 	personHandler := NewPersonHandler(application.PersonService)
 	searchHandler := NewSearchHandler(application.SearchService)
 	attrHandler := NewAttributeHandler(application.AttributeService)
-	encoderHandler := NewEncoderHandler(application.EncoderService)
+	reindexHandler := NewReindexHandler(application.ContentService, application.PersonService, application.SearchService)
 
 	handlers := routes.HandlerRegistry{
 		"health.HealthCheck":          healthHandler.HealthCheck,
@@ -123,6 +123,7 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 		"content.GetDiscover":         contentHandler.GetDiscoverContent,
 		"content.GetPlayback":         contentHandler.GetPlayback,
 		"content.UploadAssets":        contentHandler.UploadAssets,
+		"content.DeleteAssetKey":       contentHandler.DeleteAssetKey,
 		"content.ListAdmin":           contentHandler.GetAllContentAdmin,
 		"content.GetAdmin":            contentHandler.GetContentAdmin,
 		"content.Create":              contentHandler.CreateContent,
@@ -133,8 +134,7 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 		"person.GetAdmin":             personHandler.GetPersonAdmin,
 		"person.Create":               personHandler.CreatePerson,
 		"person.Delete":               personHandler.DeletePerson,
-		"encoder.Create":              encoderHandler.CreateEncodingJob,
-		"encoder.Get":                 encoderHandler.GetEncodingJob,
+		"reindex.Trigger":             reindexHandler.Trigger,
 	}
 
 	staticMW := func(mw func(http.Handler) http.Handler) routes.MiddlewareConstructor {
@@ -142,7 +142,6 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 	}
 	mws := routes.MiddlewareRegistry{
 		"timeout":                      staticMW(stdTimeout),
-		"ratelimit.encoder":            staticMW(encoderWriteMW),
 		"ratelimit.movie":              staticMW(movieWriteMW),
 		"ratelimit.person":             staticMW(personWriteMW),
 		"validate.contentId":           staticMW(ValidateURLParams(ContentIDValidator)),
@@ -154,6 +153,7 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 		"validate.contentTypeAndId":    staticMW(ValidateURLParams(ContentTypeValidator, ContentIDValidator)),
 		"httpcache.discover":           staticMW(httpcache.Middleware(httpcache.NewMemoryStore(500), httpcache.Options{TTL: 2 * time.Minute})),
 		"httpcache.attributes":         staticMW(httpcache.Middleware(httpcache.NewMemoryStore(50), httpcache.Options{TTL: 10 * time.Minute})),
+		"localonly":                    staticMW(localonly.Middleware()),
 	}
 
 	cfg, err := loadRoutesConfig()
@@ -169,7 +169,6 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 
 	cleanup := func() {
 		_ = globalBackend.Close()
-		_ = encoderBackend.Close()
 		_ = movieBackend.Close()
 		_ = personBackend.Close()
 	}

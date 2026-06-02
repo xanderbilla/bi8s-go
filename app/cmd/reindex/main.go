@@ -82,7 +82,12 @@ func run() error {
 		return err
 	}
 
-	slog.Info("reindex complete", "people", peopleCount, "content", contentCount)
+	joinCount, err := reindexJoinTables(reindexCtx, application)
+	if err != nil {
+		return err
+	}
+
+	slog.Info("reindex complete", "people", peopleCount, "content", contentCount, "joinTableEntries", joinCount)
 	return nil
 }
 
@@ -147,4 +152,13 @@ func cloneKey(src map[string]types.AttributeValue) map[string]types.AttributeVal
 		dst[key] = value
 	}
 	return dst
+}
+
+func reindexJoinTables(ctx context.Context, application *app.Application) (int, error) {
+	count, err := application.ContentService.ResyncAllJoinTables(ctx)
+	if err != nil {
+		return count, err
+	}
+	slog.Info("join tables resynced", "count", count)
+	return count, nil
 }
