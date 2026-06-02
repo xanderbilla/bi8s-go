@@ -1,181 +1,282 @@
 openapi: 3.0.3
 info:
   title: Bi8s API
+  version: "1.0.0"
   description: |
-    REST API for the Bi8s movie / person backend.
+    Route-accurate OpenAPI document for the Bi8s API.
 
-    All responses follow the standard envelope:
+    Every response uses the same JSON envelope with `success`, `status`, `message`,
+    `data`, `error`, `path`, `requestId`, and `timestamp`.
 
-    ```json
-    {
-      "success": true,
-      "status": 200,
-      "message": "ok",
-      "data": {},
-      "error": null,
-      "requestId": "01J...",
-      "path": "/v1/...",
-      "timestamp": "2026-01-01T00:00:00Z"
-    }
-    ```
-
-    Error responses set `success: false` and include an `error` object with
-    machine-readable `type` and `code` fields.
-  version: 1.0.0
-  license:
-    name: Apache-2.0
-    url: https://www.apache.org/licenses/LICENSE-2.0
-  contact:
-    name: bi8s-go maintainers
-    url: https://github.com/xanderbilla/bi8s-go
+    Multipart write endpoints under `/v1/a/*` use exact field names as parsed by
+    the Go handlers. Use the request body schemas below as the source of truth.
 servers:
   - url: /v1
-    description: API root (relative to the service host)
+    description: Relative API base path
 tags:
   - name: Health
-    description: Liveness, readiness, and deep health checks.
+    description: Operational health and documentation endpoints.
   - name: Consumer
-    description: Public, read-only endpoints under `/v1/c`.
+    description: Public read-only endpoints.
   - name: Admin
-    description: Write endpoints under `/v1/a`. Network-level access control only.
-security: []
+    description: Internal/admin routes. Restrict them at the network perimeter.
 paths:
   /health:
     get:
-      tags:
-        - Health
-      summary: Deep health check (parallel dependency probe)
+      tags: [Health]
+      summary: Deep health check
+      description: Runs dependency probes in parallel and reports per-dependency status.
+      operationId: getHealth
       responses:
         "200":
-          $ref: "#/components/responses/OK"
+          description: All dependencies are healthy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthEnvelope"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-      operationId: deepHealthCheck
   /livez:
     get:
-      tags:
-        - Health
-      summary: Liveness probe (cheap, no metadata leaked)
+      tags: [Health]
+      summary: Liveness probe
+      description: Cheap process-alive probe. Does not query downstream dependencies.
+      operationId: getLiveness
       responses:
         "200":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-      operationId: livenessProbe
+          description: Process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LivenessEnvelope"
   /readyz:
     get:
-      tags:
-        - Health
+      tags: [Health]
       summary: Readiness probe
-      description: Returns 503 with code `NOT_READY` during startup or shutdown.
+      description: Returns `503 NOT_READY` until bootstrap completes, then behaves like `/health`.
+      operationId: getReadiness
       responses:
         "200":
-          $ref: "#/components/responses/OK"
+          description: Server is ready and dependencies are healthy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthEnvelope"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /openapi.yaml:
+    get:
+      tags: [Health]
+      summary: Download OpenAPI YAML
+      operationId: getOpenAPISpec
+      responses:
+        "200":
+          description: Raw OpenAPI YAML.
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /docs:
+    get:
+      tags: [Health]
+      summary: Swagger UI
+      operationId: getSwaggerUI
+      responses:
+        "200":
+          description: Swagger UI HTML document.
+          content:
+            text/html:
+              schema:
+                type: string
+  /c/search:
+    get:
+      tags: [Consumer]
+      summary: Search content and people
+      description: |
+        Full-text search backed by OpenSearch.
+
+        `in=all` searches both content and people. Use independent pagination
+        controls for the content and people result sets.
+      operationId: searchConsumer
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema:
+            type: string
+          description: Non-empty search text.
+        - in: query
+          name: in
+          schema:
+            type: string
+            enum: [all, movie, tv, people]
+            default: all
+          description: Result scope.
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [recent, latest, alpha_asc, alpha_desc]
+            default: recent
+          description: Single sort token only.
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - in: query
+          name: contentPage
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for content results. Falls back to `page`.
+        - in: query
+          name: contentPageSize
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Page size for content results. Falls back to `pageSize`.
+        - in: query
+          name: peoplePage
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for people results. Falls back to `page`.
+        - in: query
+          name: peoplePageSize
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Page size for people results. Falls back to `pageSize`.
+      responses:
+        "200":
+          description: Search results.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchEnvelope"
         "400":
           $ref: "#/components/responses/BadRequest"
-      operationId: readinessProbe
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /c/content/{contentId}/related:
+    get:
+      tags: [Consumer]
+      summary: Get related content
+      description: Returns More-Like-This recommendations for the given content item.
+      operationId: getRelatedContent
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Related content page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RelatedContentEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
   /c/content/{contentId}:
     get:
-      tags:
-        - Consumer
-      summary: Get a movie / show by content ID
+      tags: [Consumer]
+      summary: Get content by ID
+      operationId: getConsumerContent
       parameters:
         - $ref: "#/components/parameters/ContentId"
       responses:
         "200":
-          $ref: "#/components/responses/OK"
+          description: Public content detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentPublicEnvelope"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
-      operationId: getConsumerContent
-  /c/people/{peopleId}:
-    get:
-      tags:
-        - Consumer
-      summary: Get a person by ID
-      parameters:
-        - $ref: "#/components/parameters/PeopleId"
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
-      operationId: getConsumerPerson
-  /c/people/{peopleId}/content:
-    get:
-      tags:
-        - Consumer
-      summary: List content associated with a person
-      parameters:
-        - $ref: "#/components/parameters/PeopleId"
-        - in: query
-          name: type
-          schema:
-            type: string
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-      operationId: getConsumerContentByPerson
   /c/banner:
     get:
-      tags:
-        - Consumer
-      summary: Featured banner content
+      tags: [Consumer]
+      summary: Get banner content
+      operationId: getConsumerBanner
       parameters:
-        - in: query
-          name: type
-          schema:
-            type: string
+        - $ref: "#/components/parameters/ContentTypeFilter"
       responses:
         "200":
-          $ref: "#/components/responses/OK"
+          description: Banner item.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BannerEnvelope"
         "404":
           $ref: "#/components/responses/NotFound"
-      operationId: getConsumerBanner
-  /c/attributes:
+  /c/discover:
     get:
-      tags:
-        - Consumer
-      summary: List consumer attributes
-      description: Returns active attributes only. Use `type` to filter by attribute family.
+      tags: [Consumer]
+      summary: Discover content
+      description: Returns a paginated feed of public content cards.
+      operationId: discoverContent
       parameters:
         - in: query
           name: type
           schema:
             type: string
-            enum:
-              - genre
-              - genres
-              - tag
-              - tags
-              - mood
-              - moods
-              - studio
-              - studios
-              - category
-              - categories
-              - speciality
-              - specialities
+            enum: [latest, recent, popular, trending]
+            default: latest
+          description: Discover bucket.
+        - in: query
+          name: content
+          schema:
+            type: string
+            enum: [movie, tv]
+          description: Optional content-type filter.
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/AlphaSort"
       responses:
         "200":
-          $ref: "#/components/responses/OK"
+          description: Paged public content list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedMoviePublicEnvelope"
         "400":
           $ref: "#/components/responses/BadRequest"
+  /c/attributes:
+    get:
+      tags: [Consumer]
+      summary: List active attributes
+      description: Returns active attributes only. Filters by type and optionally sorts alphabetically.
       operationId: listConsumerAttributes
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [genre, genres, tag, tags, mood, moods, studio, studios, category, categories, speciality, specialities, social, socials, platform, platforms]
+          description: Attribute family filter.
+        - $ref: "#/components/parameters/AlphaSort"
+      responses:
+        "200":
+          description: Attribute list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributeListEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
   /c/attributes/{id}:
     get:
-      tags:
-        - Consumer
-      summary: List content for an attribute (genre/tag/etc.)
+      tags: [Consumer]
+      summary: List content by attribute
+      operationId: getContentByAttribute
       parameters:
         - in: path
           name: id
@@ -183,422 +284,387 @@ paths:
           schema:
             type: string
             maxLength: 100
-        - in: query
-          name: content
-          schema:
-            type: string
+            pattern: "^[A-Za-z0-9_-]+$"
+          description: Attribute identifier.
+        - $ref: "#/components/parameters/ContentTypeFilterNamedContent"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/AlphaSort"
       responses:
         "200":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-      operationId: getConsumerContentByAttribute
-  /c/discover:
-    get:
-      tags:
-        - Consumer
-      summary: Discover content
-      parameters:
-        - in: query
-          name: type
-          schema:
-            type: string
-            enum:
-              - latest
-              - recent
-              - popular
-              - trending
-            default: latest
-        - in: query
-          name: content
-          schema:
-            type: string
-            enum:
-              - all
-              - movie
-              - tv
-            default: all
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-      operationId: discoverConsumerContent
-  /c/search:
-    get:
-      tags:
-        - Consumer
-      summary: Search content and people
-      description: |
-        Search across content and people indices. Results may be partial if a backend is unavailable;
-        check the `warnings` array for details on which backends failed (scope: content or people).
-      parameters:
-        - in: query
-          name: query
-          required: true
-          schema:
-            type: string
-        - in: query
-          name: in
-          schema:
-            type: string
-            enum:
-              - all
-              - movie
-              - tv
-              - people
-            default: all
-        - in: query
-          name: page
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - in: query
-          name: pageSize
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
-      responses:
-        "200":
-          description: Search results. May include warnings if partial (one backend unavailable).
+          description: Minimal paged content list.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  content:
-                    type: object
-                    properties:
-                      results:
-                        type: array
-                        items:
-                          type: object
-                          description: Content search result item
-                      page:
-                        type: integer
-                        description: Requested page number
-                      pageSize:
-                        type: integer
-                        description: Results per page
-                      count:
-                        type: integer
-                        description: Total results available for this query
-                  people:
-                    type: object
-                    properties:
-                      results:
-                        type: array
-                        description: Search person results
-                        items:
-                          type: object
-                          description: Person search result item
-                      page:
-                        type: integer
-                        description: Requested page number
-                      pageSize:
-                        type: integer
-                        description: Results per page
-                      count:
-                        type: integer
-                        description: Total results available for this query
-                  warnings:
-                    type: array
-                    description: |
-                      Array of warnings. Present when a search backend partially failed (e.g., one index timeout).
-                      Clients should check this array and may choose to display a notification to users about degraded search.
-                    items:
-                      type: object
-                      properties:
-                        scope:
-                          type: string
-                          enum:
-                            - content
-                            - people
-                          description: Which search backend reported the issue (content or people)
-                        code:
-                          type: string
-                          enum:
-                            - PARTIAL_SEARCH
-                          description: Warning code (PARTIAL_SEARCH indicates incomplete results from this scope)
-                        message:
-                          type: string
-                          description: Human-readable error message from the backend
+                $ref: "#/components/schemas/PagedMinimalContentEnvelope"
         "400":
           $ref: "#/components/responses/BadRequest"
-      operationId: searchConsumer
+  /c/people/{peopleId}:
+    get:
+      tags: [Consumer]
+      summary: Get person by ID
+      operationId: getConsumerPerson
+      parameters:
+        - $ref: "#/components/parameters/PeopleId"
+      responses:
+        "200":
+          description: Public person detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonPublicEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /c/people/{peopleId}/content:
+    get:
+      tags: [Consumer]
+      summary: List content for a person
+      operationId: getConsumerPersonContent
+      parameters:
+        - $ref: "#/components/parameters/PeopleId"
+        - $ref: "#/components/parameters/ContentTypeFilter"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Minimal paged content list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedMinimalContentEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
   /c/play/{contentType}/{contentId}:
     get:
-      tags:
-        - Consumer
-      summary: Get HLS playback information
+      tags: [Consumer]
+      summary: Get playback information
+      description: Returns playback URLs for a finished encoder job.
+      operationId: getPlayback
       parameters:
         - in: path
           name: contentType
           required: true
           schema:
             type: string
-            enum:
-              - movie
-              - tv
+            enum: [movie, tv]
+          description: Lowercase content type path token.
         - $ref: "#/components/parameters/ContentId"
       responses:
         "200":
-          $ref: "#/components/responses/OK"
-        "404":
-          $ref: "#/components/responses/NotFound"
-      operationId: getConsumerPlayback
-  /a/content:
-    get:
-      tags:
-        - Admin
-      summary: List all content (admin view)
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-      operationId: listAdminContent
-    post:
-      tags:
-        - Admin
-      summary: Create content
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-      responses:
-        "201":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "409":
-          $ref: "#/components/responses/Conflict"
-        "429":
-          $ref: "#/components/responses/RateLimited"
-      operationId: createAdminContent
-  /a/content/{contentId}:
-    get:
-      tags:
-        - Admin
-      summary: Get content (admin view)
-      parameters:
-        - $ref: "#/components/parameters/ContentId"
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "404":
-          $ref: "#/components/responses/NotFound"
-      operationId: getAdminContent
-    delete:
-      tags:
-        - Admin
-      summary: Delete content
-      parameters:
-        - $ref: "#/components/parameters/ContentId"
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "404":
-          $ref: "#/components/responses/NotFound"
-      operationId: deleteAdminContent
-    post:
-      tags:
-        - Admin
-      summary: Upload supplementary video assets (trailer/teaser/clip/promo/bts)
-      parameters:
-        - $ref: "#/components/parameters/ContentId"
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required:
-                - assetType
-                - videos
-              properties:
-                assetType:
-                  type: string
-                  enum:
-                    - TRAILER
-                    - TEASER
-                    - CLIP
-                    - PROMO
-                    - BTS
-                videos:
-                  type: array
-                  items:
-                    type: string
-                    format: binary
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-      operationId: uploadAdminContentAssets
-  /a/people:
-    get:
-      tags:
-        - Admin
-      summary: List all people
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-      operationId: listAdminPeople
-    post:
-      tags:
-        - Admin
-      summary: Create a person
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-      responses:
-        "201":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "429":
-          $ref: "#/components/responses/RateLimited"
-      operationId: createAdminPerson
-  /a/people/{peopleId}:
-    get:
-      tags:
-        - Admin
-      summary: Get a person
-      parameters:
-        - $ref: "#/components/parameters/PeopleId"
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "404":
-          $ref: "#/components/responses/NotFound"
-      operationId: getAdminPerson
-    delete:
-      tags:
-        - Admin
-      summary: Delete a person
-      parameters:
-        - $ref: "#/components/parameters/PeopleId"
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "404":
-          $ref: "#/components/responses/NotFound"
-      operationId: deleteAdminPerson
-  /a/people/{peopleId}/content:
-    get:
-      tags:
-        - Admin
-      summary: List content associated with a person (admin view)
-      parameters:
-        - $ref: "#/components/parameters/PeopleId"
-        - in: query
-          name: type
-          schema:
-            type: string
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-      operationId: getAdminContentByPerson
-  /a/attributes:
-    get:
-      tags:
-        - Admin
-      summary: List all attributes
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-      operationId: listAdminAttributes
-    post:
-      tags:
-        - Admin
-      summary: Create an attribute
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "201":
-          $ref: "#/components/responses/OK"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "409":
-          $ref: "#/components/responses/Conflict"
-      operationId: createAdminAttribute
-  /a/attributes/{attributeId}:
-    get:
-      tags:
-        - Admin
-      summary: Get an attribute
-      parameters:
-        - in: path
-          name: attributeId
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "404":
-          $ref: "#/components/responses/NotFound"
-      operationId: getAdminAttribute
-    delete:
-      tags:
-        - Admin
-      summary: Delete an attribute
-      parameters:
-        - in: path
-          name: attributeId
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          $ref: "#/components/responses/OK"
-        "404":
-          $ref: "#/components/responses/NotFound"
-      operationId: deleteAdminAttribute
-  /a/reindex:
-    post:
-      tags:
-        - Admin
-      summary: Trigger a full reindex
-      description: |
-        Re-creates OpenSearch indexes (if missing), re-indexes all people and
-        content documents, and resyncs all DynamoDB join-table entries.
-        This is a synchronous long-running operation — do not set a short
-        client timeout. Typically completes in seconds for small datasets.
-      responses:
-        "200":
-          description: Reindex completed successfully
+          description: Playback payload.
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: "#/components/schemas/SuccessEnvelope"
-                  - type: object
-                    properties:
-                      data:
-                        $ref: "#/components/schemas/ReindexResult"
+                $ref: "#/components/schemas/PlaybackEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /a/content/:
+    get:
+      tags: [Admin]
+      summary: List content (admin)
+      operationId: listAdminContent
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Paged admin content list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedAdminContentEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      tags: [Admin]
+      summary: Create content
+      description: Create a content item using multipart form fields parsed exactly by `ParseContentFromForm`.
+      operationId: createContent
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateContentRequest"
+      responses:
+        "201":
+          description: Created content.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminContentEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /a/content/{contentId}:
+    get:
+      tags: [Admin]
+      summary: Get content (admin)
+      operationId: getAdminContent
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+      responses:
+        "200":
+          description: Full admin content detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminContentEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Admin]
+      summary: Delete content
+      operationId: deleteContent
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+      responses:
+        "200":
+          description: Content deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NullDataEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Admin]
+      summary: Upload a single video asset
+      description: |
+        Uploads a single video file for an existing content item.
+
+        Exact multipart field names are lowercase: `contentid`, `contenttype`, `assettype`, and `video`.
+        `contentid` is optional and overrides the path value if present.
+      operationId: uploadContentAsset
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UploadAssetRequest"
+      responses:
+        "201":
+          description: Upload result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetUploadEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /a/content/{contentId}/assets/{assetType}/keys/{keyId}:
+    delete:
+      tags: [Admin]
+      summary: Delete a single asset key
+      description: Removes one stored asset key from the specified asset bucket.
+      operationId: deleteAssetKey
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+        - in: path
+          name: assetType
+          required: true
+          schema:
+            type: string
+            enum: [TRAILER, TEASER, CLIP, PROMO, BTS]
+          description: Asset bucket to mutate.
+        - in: path
+          name: keyId
+          required: true
+          schema:
+            type: string
+          description: Stored asset key identifier.
+      responses:
+        "200":
+          description: Asset key deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetDeleteEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /a/people/:
+    get:
+      tags: [Admin]
+      summary: List people (admin)
+      operationId: listAdminPeople
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Paged admin people list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedAdminPeopleEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      tags: [Admin]
+      summary: Create person
+      description: Create a person using multipart form fields parsed by `ParsePersonFromForm`.
+      operationId: createPerson
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreatePersonRequest"
+      responses:
+        "201":
+          description: Created person.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPersonEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /a/people/{peopleId}:
+    get:
+      tags: [Admin]
+      summary: Get person (admin)
+      operationId: getAdminPerson
+      parameters:
+        - $ref: "#/components/parameters/PeopleId"
+      responses:
+        "200":
+          description: Full admin person detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPersonEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Admin]
+      summary: Delete person
+      operationId: deletePerson
+      parameters:
+        - $ref: "#/components/parameters/PeopleId"
+      responses:
+        "200":
+          description: Person deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NullDataEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /a/people/{peopleId}/content:
+    get:
+      tags: [Admin]
+      summary: List content for a person (admin)
+      description: Returns the same minimal content cards as the consumer variant, but from the admin route group.
+      operationId: getAdminPersonContent
+      parameters:
+        - $ref: "#/components/parameters/PeopleId"
+        - $ref: "#/components/parameters/ContentTypeFilter"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Minimal paged content list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedMinimalContentEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /a/attributes/:
+    get:
+      tags: [Admin]
+      summary: List attributes (admin)
+      operationId: listAdminAttributes
+      responses:
+        "200":
+          description: All attributes including inactive ones.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributeAdminListEnvelope"
+    post:
+      tags: [Admin]
+      summary: Create attribute
+      description: Multipart form parsed by `ParseAttributeFromForm`.
+      operationId: createAttribute
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateAttributeRequest"
+      responses:
+        "201":
+          description: Created attribute.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributeAdminEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /a/attributes/{attributeId}:
+    get:
+      tags: [Admin]
+      summary: Get attribute (admin)
+      operationId: getAdminAttribute
+      parameters:
+        - $ref: "#/components/parameters/AttributeId"
+      responses:
+        "200":
+          description: Full attribute detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributeAdminEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Admin]
+      summary: Delete attribute
+      operationId: deleteAttribute
+      parameters:
+        - $ref: "#/components/parameters/AttributeId"
+      responses:
+        "200":
+          description: Attribute deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NullDataEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /a/reindex:
+    post:
+      tags: [Admin]
+      summary: Trigger full reindex
+      operationId: triggerReindex
+      responses:
+        "200":
+          description: Reindex counts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReindexEnvelope"
         "500":
-          $ref: "#/components/responses/ServiceUnavailable"
-      operationId: adminTriggerReindex
+          $ref: "#/components/responses/InternalServerError"
 components:
   parameters:
     ContentId:
@@ -608,7 +674,8 @@ components:
       schema:
         type: string
         maxLength: 100
-        pattern: ^[A-Za-z0-9_-]+$
+        pattern: "^[A-Za-z0-9_-]+$"
+      description: Content identifier.
     PeopleId:
       in: path
       name: peopleId
@@ -616,69 +683,111 @@ components:
       schema:
         type: string
         maxLength: 100
-        pattern: ^[A-Za-z0-9_-]+$
+        pattern: "^[A-Za-z0-9_-]+$"
+      description: Person identifier.
+    AttributeId:
+      in: path
+      name: attributeId
+      required: true
+      schema:
+        type: string
+        maxLength: 100
+        pattern: "^[A-Za-z0-9_-]+$"
+      description: Attribute identifier.
+    Page:
+      in: query
+      name: page
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: One-based page number.
+    PageSize:
+      in: query
+      name: pageSize
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Items per page.
+    Limit:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Page size for cursor-based endpoints.
+    Cursor:
+      in: query
+      name: cursor
+      schema:
+        type: string
+      description: Opaque pagination cursor from a previous response.
+    AlphaSort:
+      in: query
+      name: sort
+      schema:
+        type: string
+        enum: [alpha_asc, alpha_desc]
+      description: Alphabetical sort mode.
+    ContentTypeFilter:
+      in: query
+      name: type
+      schema:
+        type: string
+        enum: [movie, tv]
+      description: Optional lowercase content type filter.
+    ContentTypeFilterNamedContent:
+      in: query
+      name: content
+      schema:
+        type: string
+        enum: [movie, tv]
+      description: Optional lowercase content type filter.
   responses:
-    OK:
-      description: Success envelope
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/SuccessEnvelope"
     BadRequest:
-      description: Validation or malformed-input error
+      description: Malformed request or validation failure.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
     NotFound:
-      description: Resource not found
+      description: Resource not found.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
     Conflict:
-      description: Conflicting state (e.g. unique constraint, optimistic lock)
+      description: Conflicting or duplicate state.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
     RateLimited:
-      description: Rate limit exceeded
+      description: Request rejected by rate limiting.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
     ServiceUnavailable:
-      description: Service unavailable / not ready
+      description: Dependency failure or readiness failure.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    InternalServerError:
+      description: Unhandled internal failure.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
   schemas:
-    ReindexResult:
-      type: object
-      description: Counts of records processed during a full reindex operation.
-      properties:
-        people:
-          type: integer
-          description: Number of people documents re-indexed in OpenSearch.
-          example: 42
-        content:
-          type: integer
-          description: Number of content documents re-indexed in OpenSearch.
-          example: 120
-        joinTableEntries:
-          type: integer
-          description: Number of DynamoDB join-table entries resynced.
-          example: 350
     SuccessEnvelope:
       type: object
-      required:
-        - success
-        - status
-        - message
-        - requestId
-        - timestamp
+      required: [success, status, message, data, error, timestamp]
       properties:
         success:
           type: boolean
@@ -686,65 +795,1023 @@ components:
         status:
           type: integer
           example: 200
-        code:
-          type: string
-          example: OK
         message:
           type: string
           example: ok
         data:
-          description: Endpoint-specific payload
-        requestId:
-          type: string
+          description: Endpoint-specific success payload.
+        error:
+          nullable: true
+          example: null
         path:
+          type: string
+        requestId:
           type: string
         timestamp:
           type: string
           format: date-time
-    ErrorEnvelope:
+    ErrorPayload:
       type: object
-      required:
-        - success
-        - status
-        - message
-        - requestId
-        - timestamp
+      required: [type, code, title, detail]
       properties:
-        success:
-          type: boolean
-          example: false
-        status:
-          type: integer
-          example: 400
+        type:
+          type: string
+          enum: [VALIDATION_ERROR, AUTH_ERROR, NOT_FOUND_ERROR, CONFLICT_ERROR, RATE_LIMIT_ERROR, CLIENT_ERROR, SERVER_ERROR, ERROR]
         code:
           type: string
-          enum:
-            - VALIDATION_FAILED
-            - BAD_REQUEST
-            - UNAUTHORIZED
-            - FORBIDDEN
-            - NOT_FOUND
-            - CONFLICT
-            - RATE_LIMITED
-            - INTERNAL_ERROR
-            - METHOD_NOT_ALLOWED
-            - NOT_READY
-            - SERVICE_UNAVAILABLE
-        message:
+        title:
           type: string
-          example: Request validation failed
-        details:
-          description: Machine-readable failure context
-        requestId:
+        detail:
           type: string
-        path:
+        userMessage:
           type: string
-        timestamp:
+        context:
+          description: Optional machine-readable details.
+    ErrorEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            success:
+              example: false
+            data:
+              nullable: true
+            error:
+              $ref: "#/components/schemas/ErrorPayload"
+    EntityRef:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    AssetKey:
+      type: object
+      required: [id, value]
+      properties:
+        id:
+          type: string
+        value:
+          type: string
+    Asset:
+      type: object
+      required: [type, keys]
+      properties:
+        type:
+          type: string
+          enum: [TRAILER, TEASER, CLIP, PROMO, BTS]
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetKey"
+    ContentStats:
+      type: object
+      properties:
+        totalViews:
+          type: integer
+          format: int64
+        totalLikes:
+          type: integer
+          format: int64
+        averageRating:
+          type: number
+          format: double
+    Audit:
+      type: object
+      properties:
+        createdAt:
           type: string
           format: date-time
-  securitySchemes:
-    noAuth:
-      type: apiKey
-      in: header
-      name: X-No-Auth
-      description: Stub scheme. Routes are protected by network-level controls; explicit auth is not implemented in this version.
+        createdBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedBy:
+          type: string
+        version:
+          type: integer
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+    MoviePublicList:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        backdropPath:
+          type: string
+        posterPath:
+          type: string
+        releaseDate:
+          type: string
+        firstAirDate:
+          type: string
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+        contentRating:
+          type: string
+          enum: [18_PLUS, 21_PLUS]
+        contentType:
+          type: string
+          enum: [MOVIE, TV, PERSON, ATTRIBUTE]
+        assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Asset"
+    MoviePublicDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        overview:
+          type: string
+        backdropPath:
+          type: string
+        posterPath:
+          type: string
+        releaseDate:
+          type: string
+        firstAirDate:
+          type: string
+        adult:
+          type: boolean
+        contentRating:
+          type: string
+          enum: [18_PLUS, 21_PLUS]
+        originalLanguage:
+          type: string
+          enum: [en, hi, ja, ko, fr, es]
+        genres:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+        casts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+        contentType:
+          type: string
+          enum: [MOVIE, TV, PERSON, ATTRIBUTE]
+        originCountry:
+          type: array
+          items:
+            type: string
+        moodTags:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+        runtime:
+          type: integer
+        status:
+          type: string
+          enum: [RUMORED, PLANNED, IN_PRODUCTION, POST_PRODUCTION, RELEASED, ENDED, RETURNING_SERIES, CANCELED, PILOT]
+        tagline:
+          type: string
+        studios:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+        assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Asset"
+        stats:
+          $ref: "#/components/schemas/ContentStats"
+    AdminContent:
+      allOf:
+        - $ref: "#/components/schemas/MoviePublicDetail"
+        - type: object
+          properties:
+            visibility:
+              type: string
+              enum: [PUBLIC, PRIVATE]
+            audit:
+              $ref: "#/components/schemas/Audit"
+    MinimalContent:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        backdropPath:
+          type: string
+    BannerContent:
+      type: object
+      properties:
+        id:
+          type: string
+        backdropPath:
+          type: string
+        title:
+          type: string
+        overview:
+          type: string
+        contentRating:
+          type: string
+          enum: [18_PLUS, 21_PLUS]
+        assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Asset"
+    Measurements:
+      type: object
+      properties:
+        bust:
+          type: integer
+        waist:
+          type: integer
+        hips:
+          type: integer
+        unit:
+          type: string
+          enum: [inches, cm]
+        bodyType:
+          type: string
+        eyeColor:
+          type: string
+        hairColor:
+          type: string
+    PersonCareer:
+      type: object
+      properties:
+        startYear:
+          type: integer
+        previousProfession:
+          type: string
+        knownFor:
+          type: array
+          items:
+            type: string
+    SocialPresenceEntry:
+      type: object
+      properties:
+        platformId:
+          type: string
+        platform:
+          type: string
+        username:
+          type: string
+        verified:
+          type: boolean
+        available:
+          type: boolean
+    PersonSourceMetadata:
+      type: object
+      properties:
+        confidenceScore:
+          type: number
+          format: double
+        sources:
+          type: array
+          items:
+            type: string
+        notes:
+          type: string
+    PersonPublicDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        contentType:
+          type: string
+          enum: [MOVIE, TV, PERSON, ATTRIBUTE]
+        name:
+          type: string
+        legalName:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [PERFORMER, CONTENT_CREATOR]
+        stageName:
+          type: string
+        bio:
+          type: string
+        birthDate:
+          type: string
+        birthPlace:
+          type: string
+        nationality:
+          type: string
+        gender:
+          type: string
+          enum: [Male, Female, Trans]
+        height:
+          type: integer
+        weight:
+          type: integer
+        verified:
+          type: boolean
+        active:
+          type: boolean
+        debutYear:
+          type: integer
+        careerStatus:
+          type: string
+          enum: [Active, Retired, Hiatus]
+        profilePath:
+          type: string
+        backdropPath:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        measurements:
+          $ref: "#/components/schemas/Measurements"
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+        specialties:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+        career:
+          $ref: "#/components/schemas/PersonCareer"
+        socialPresence:
+          type: array
+          items:
+            $ref: "#/components/schemas/SocialPresenceEntry"
+    AdminPerson:
+      allOf:
+        - $ref: "#/components/schemas/PersonPublicDetail"
+        - type: object
+          properties:
+            sourceMetadata:
+              $ref: "#/components/schemas/PersonSourceMetadata"
+            audit:
+              $ref: "#/components/schemas/Audit"
+    AttributePublicDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        attributeType:
+          type: array
+          items:
+            type: string
+            enum: [TAG, MOOD, GENRE, CATEGORY, SPECIALITY, STUDIO, SOCIAL, PLATFORM]
+        logo:
+          type: string
+        svg:
+          type: string
+        contentType:
+          type: string
+          enum: [MOVIE, TV, PERSON, ATTRIBUTE]
+        active:
+          type: boolean
+    AttributeAdmin:
+      allOf:
+        - $ref: "#/components/schemas/AttributePublicDetail"
+        - type: object
+          properties:
+            audit:
+              $ref: "#/components/schemas/Audit"
+    SearchPersonResult:
+      type: object
+      properties:
+        id:
+          type: string
+        contentType:
+          type: string
+          enum: [MOVIE, TV, PERSON, ATTRIBUTE]
+        name:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [PERFORMER, CONTENT_CREATOR]
+        stageName:
+          type: string
+        bio:
+          type: string
+        gender:
+          type: string
+          enum: [Male, Female, Trans]
+        verified:
+          type: boolean
+        profilePath:
+          type: string
+        backdropPath:
+          type: string
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+        specialties:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRef"
+    SearchWarning:
+      type: object
+      properties:
+        scope:
+          type: string
+          enum: [content, people]
+        code:
+          type: string
+        message:
+          type: string
+    SearchResponse:
+      type: object
+      properties:
+        content:
+          type: object
+          properties:
+            results:
+              type: array
+              items:
+                $ref: "#/components/schemas/MoviePublicList"
+            count:
+              type: integer
+            page:
+              type: integer
+            pageSize:
+              type: integer
+        people:
+          type: object
+          properties:
+            results:
+              type: array
+              items:
+                $ref: "#/components/schemas/SearchPersonResult"
+            count:
+              type: integer
+            page:
+              type: integer
+            pageSize:
+              type: integer
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchWarning"
+    PlaybackStreaming:
+      type: object
+      properties:
+        type:
+          type: string
+        masterPlaylist:
+          type: string
+    PlaybackVideo:
+      type: object
+      properties:
+        defaultQuality:
+          type: string
+        qualities:
+          type: array
+          items:
+            type: string
+    PlaybackAudioTrack:
+      type: object
+      properties:
+        bitrate:
+          type: string
+        default:
+          type: boolean
+        id:
+          type: string
+        label:
+          type: string
+        language:
+          type: string
+    PlaybackAudio:
+      type: object
+      properties:
+        defaultTrackId:
+          type: string
+        tracks:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlaybackAudioTrack"
+    PlaybackSubtitleTrack:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        language:
+          type: string
+        url:
+          type: string
+    PlaybackSubtitles:
+      type: object
+      properties:
+        defaultTrackId:
+          type: string
+        tracks:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlaybackSubtitleTrack"
+    PlaybackThumbnails:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+    PlaybackPreview:
+      type: object
+      properties:
+        durationSec:
+          type: number
+          format: double
+        url:
+          type: string
+    PlaybackSprite:
+      type: object
+      properties:
+        image:
+          type: string
+        vtt:
+          type: string
+    PlaybackInfo:
+      type: object
+      properties:
+        durationSec:
+          type: number
+          format: double
+        streaming:
+          $ref: "#/components/schemas/PlaybackStreaming"
+        video:
+          $ref: "#/components/schemas/PlaybackVideo"
+        audio:
+          $ref: "#/components/schemas/PlaybackAudio"
+        subtitles:
+          $ref: "#/components/schemas/PlaybackSubtitles"
+        thumbnails:
+          $ref: "#/components/schemas/PlaybackThumbnails"
+        preview:
+          $ref: "#/components/schemas/PlaybackPreview"
+        sprite:
+          $ref: "#/components/schemas/PlaybackSprite"
+    HealthData:
+      type: object
+      properties:
+        env:
+          type: string
+        version:
+          type: string
+        commit:
+          type: string
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [up, down]
+    LivenessData:
+      type: object
+      properties:
+        version:
+          type: string
+    PagedMinimalContent:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MinimalContent"
+        nextCursor:
+          type: string
+        count:
+          type: integer
+    PagedMoviePublic:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MoviePublicList"
+        nextCursor:
+          type: string
+        count:
+          type: integer
+    PagedAdminContent:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminContent"
+        nextCursor:
+          type: string
+        count:
+          type: integer
+    PagedAdminPeople:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminPerson"
+        nextCursor:
+          type: string
+        count:
+          type: integer
+    RelatedContentData:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MoviePublicList"
+        total:
+          type: integer
+        page:
+          type: integer
+        size:
+          type: integer
+    AssetUploadResult:
+      type: object
+      properties:
+        contentId:
+          type: string
+        assetType:
+          type: string
+          enum: [TRAILER, TEASER, CLIP, PROMO, BTS]
+        uploadedCount:
+          type: integer
+        paths:
+          type: array
+          items:
+            type: string
+    AssetDeleteResult:
+      type: object
+      properties:
+        contentId:
+          type: string
+        assetType:
+          type: string
+          enum: [TRAILER, TEASER, CLIP, PROMO, BTS]
+        keyId:
+          type: string
+    ReindexResult:
+      type: object
+      properties:
+        people:
+          type: integer
+        content:
+          type: integer
+        joinTableEntries:
+          type: integer
+    CreateContentRequest:
+      type: object
+      required: [overview, original_language]
+      properties:
+        id:
+          type: string
+          description: Optional explicit content ID.
+        title:
+          type: string
+        overview:
+          type: string
+        release_date:
+          type: string
+          example: 2026-06-02
+          description: `YYYY-MM-DD`.
+        first_air_date:
+          type: string
+          example: 2026-06-02
+          description: `YYYY-MM-DD`.
+        adult:
+          type: boolean
+        content_rating:
+          type: string
+          enum: [18_PLUS, 21_PLUS]
+        original_language:
+          type: string
+          enum: [en, hi, ja, ko, fr, es]
+        content_type:
+          type: string
+          enum: [MOVIE, TV]
+        runtime:
+          type: integer
+        status:
+          type: string
+          enum: [RUMORED, PLANNED, IN_PRODUCTION, POST_PRODUCTION, RELEASED, ENDED, RETURNING_SERIES, CANCELED, PILOT]
+        tagline:
+          type: string
+        visibility:
+          type: string
+          enum: [PUBLIC, PRIVATE]
+        genres:
+          type: string
+          description: Comma-separated `id:name` pairs.
+        casts:
+          type: string
+          description: Comma-separated `id:name` pairs.
+        tags:
+          type: string
+          description: Comma-separated `id:name` pairs.
+        mood_tags:
+          type: string
+          description: Comma-separated `id:name` pairs.
+        studios:
+          type: string
+          description: Comma-separated `id:name` pairs.
+        origin_country:
+          type: string
+          description: Comma-separated country codes.
+        poster:
+          type: string
+          format: binary
+        cover:
+          type: string
+          format: binary
+    CreatePersonRequest:
+      type: object
+      required: [name, roles, gender, career_status]
+      properties:
+        name:
+          type: string
+        legal_name:
+          type: string
+        roles:
+          type: string
+          description: Comma-separated roles from `PERFORMER,CONTENT_CREATOR`.
+        stage_name:
+          type: string
+        bio:
+          type: string
+        birth_date:
+          type: string
+          description: `YYYY-MM-DD`.
+        birth_place:
+          type: string
+        nationality:
+          type: string
+        gender:
+          type: string
+          enum: [Male, Female, Trans]
+        height:
+          type: integer
+        weight:
+          type: integer
+        aliases:
+          type: string
+          description: Comma-separated aliases.
+        verified:
+          type: boolean
+        active:
+          type: boolean
+        debut_year:
+          type: integer
+        career_status:
+          type: string
+          enum: [Active, Retired, Hiatus]
+        measurements_bust:
+          type: integer
+        measurements_waist:
+          type: integer
+        measurements_hips:
+          type: integer
+        measurements_unit:
+          type: string
+          enum: [inches, cm]
+        measurements_body_type:
+          type: string
+        measurements_eye_color:
+          type: string
+        measurements_hair_color:
+          type: string
+        career_start_year:
+          type: integer
+        career_previous_profession:
+          type: string
+        career_known_for:
+          type: string
+          description: Comma-separated values.
+        tags:
+          type: string
+          description: Comma-separated `id:name` pairs.
+        categories:
+          type: string
+          description: Comma-separated `id:name` pairs.
+        specialties:
+          type: string
+          description: Comma-separated `id:name` pairs.
+        sourceMetadata_confidence:
+          type: number
+          format: double
+        sourceMetadata_sources:
+          type: string
+          description: Comma-separated values.
+        sourceMetadata_notes:
+          type: string
+        profile:
+          type: string
+          format: binary
+        backdrop:
+          type: string
+          format: binary
+      description: |
+        Social presence fields are indexed multipart keys:
+        `social[0][platform_id]`, `social[0][username]`, `social[0][verified]`, `social[0][available]`, etc.
+    CreateAttributeRequest:
+      type: object
+      required: [name, attribute_type]
+      properties:
+        name:
+          type: string
+        attribute_type:
+          type: string
+          description: Comma-separated values from `TAG,MOOD,GENRE,CATEGORY,SPECIALITY,STUDIO,SOCIAL,PLATFORM`.
+        logo:
+          type: string
+        svg:
+          type: string
+        active:
+          type: boolean
+    UploadAssetRequest:
+      type: object
+      required: [contenttype, assettype, video]
+      properties:
+        contentid:
+          type: string
+          description: Optional override for the path content ID.
+        contenttype:
+          type: string
+          enum: [movie, tv, MOVIE, TV]
+        assettype:
+          type: string
+          enum: [TRAILER, TEASER, CLIP, PROMO, BTS]
+        video:
+          type: string
+          format: binary
+          description: Exactly one video file.
+    HealthEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/HealthData"
+    LivenessEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/LivenessData"
+    SearchEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SearchResponse"
+    RelatedContentEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/RelatedContentData"
+    ContentPublicEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/MoviePublicDetail"
+    BannerEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BannerContent"
+    PagedMoviePublicEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PagedMoviePublic"
+    PagedMinimalContentEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PagedMinimalContent"
+    PersonPublicEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PersonPublicDetail"
+    PlaybackEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PlaybackInfo"
+    PagedAdminContentEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PagedAdminContent"
+    AdminContentEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AdminContent"
+    AssetUploadEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AssetUploadResult"
+    AssetDeleteEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AssetDeleteResult"
+    PagedAdminPeopleEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PagedAdminPeople"
+    AdminPersonEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AdminPerson"
+    AttributeListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/AttributePublicDetail"
+    AttributeAdminListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/AttributeAdmin"
+    AttributeAdminEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AttributeAdmin"
+    ReindexEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/ReindexResult"
+    NullDataEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              nullable: true
+              example: null

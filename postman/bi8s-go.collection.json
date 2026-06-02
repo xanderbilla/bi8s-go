@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "f4b0870c-a801-4b5b-a312-38a5d4af8d77",
     "name": "bi8s-go API",
-    "description": "Complete Postman collection for bi8s-go API.\n\n**Environments (set `{{baseUrl}}` to one of):**\n- `prod`  → https://api.emm4bi8s.dev/v1\n- `dev`   → https://api-dev.emm4bi8s.dev/v1\n- `local` → http://localhost:8080/v1\n\n**Body format:** CREATE endpoints (Content, People, Attributes) use `multipart/form-data`. All GET endpoints use query params only.\n\n**EntityRef format** for relationship fields (`genres`, `casts`, `tags`, etc.): comma-separated `id:name` pairs, e.g. `genre-action:Action,genre-drama:Drama`.",
+    "description": "Complete Postman collection for bi8s-go API.\n\n**Environments (set `{{baseUrl}}` to one of):**\n- `prod`  → https://api.emm4bi8s.dev/v1\n- `dev`   → https://api-dev.emm4bi8s.dev/v1\n- `local` → http://localhost:8080/v1\n\n**Body format:** CREATE endpoints and asset upload endpoints use `multipart/form-data`.\n\n**EntityRef format** for relationship fields (`genres`, `casts`, `tags`, etc.): comma-separated `id:name` pairs, e.g. `genre-action:Action,genre-drama:Drama`.\n\nAll responses use the standard envelope with `success`, `status`, `message`, `data`, `error`, `path`, `requestId`, `timestamp`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -43,6 +43,12 @@
       "key": "attributeId",
       "value": "genre-action",
       "description": "Sample attribute ID (alphanumeric + -_, max 100 chars).",
+      "type": "string"
+    },
+    {
+      "key": "assetKeyId",
+      "value": "trailer-1080p",
+      "description": "Sample asset key id for /a/content/{contentId}/assets/{assetType}/keys/{keyId}.",
       "type": "string"
     }
   ],
@@ -750,15 +756,21 @@
               "mode": "formdata",
               "formdata": [
                 {
-                  "key": "assetType",
-                  "value": "TRAILER",
-                  "description": "REQUIRED. Asset category. Allowed: `TRAILER`, `TEASER`, `CLIP`, `PROMO`, `BTS`.",
+                  "key": "contenttype",
+                  "value": "movie",
+                  "description": "REQUIRED. Handler expects lowercase content type (`movie` or `tv`).",
                   "type": "text"
                 },
                 {
-                  "key": "videos",
+                  "key": "assettype",
+                  "value": "TRAILER",
+                  "description": "REQUIRED. Allowed: `TRAILER`, `TEASER`, `CLIP`, `PROMO`, `BTS`.",
+                  "type": "text"
+                },
+                {
+                  "key": "video",
                   "value": null,
-                  "description": "REQUIRED. One or more video files (multipart, repeat the `videos` key for each file). At least one file required.",
+                  "description": "REQUIRED. Exactly one file per request.",
                   "type": "file"
                 }
               ]
@@ -774,7 +786,31 @@
                 "{{contentId}}"
               ]
             },
-            "description": "Upload video asset files for an existing content item. Body **must** be `multipart/form-data`.\n\n**Path param `contentId`:** existing content ID (alphanumeric + `-_`, max 100 chars).\n\n**Form fields:**\n- `assetType` (required): `TRAILER` | `TEASER` | `CLIP` | `PROMO` | `BTS`\n- `videos` (required): one or more video files — repeat the field for multiple files\n\nReturns `201 Created` with `{contentId, assetType, uploadedCount, paths[]}`."
+            "description": "Upload one video asset for an existing content item. Body **must** be `multipart/form-data`.\n\n**Path param `contentId`:** existing content ID (alphanumeric + `-_`, max 100 chars).\n\n**Form fields (exact keys):**\n- `contenttype` (required): `movie` | `tv`\n- `assettype` (required): `TRAILER` | `TEASER` | `CLIP` | `PROMO` | `BTS`\n- `video` (required): single file\n- `contentid` (optional): overrides path content id\n\nReturns `201 Created` with `{contentId, assetType, uploadedCount, paths[]}`."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Asset Key (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/a/content/{{contentId}}/assets/TRAILER/keys/{{assetKeyId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "a",
+                "content",
+                "{{contentId}}",
+                "assets",
+                "TRAILER",
+                "keys",
+                "{{assetKeyId}}"
+              ]
+            },
+            "description": "Delete one asset key from a content asset bucket.\n\n**Path params:**\n- `contentId`\n- `assetType`: one of `TRAILER|TEASER|CLIP|PROMO|BTS`\n- `assetKeyId`\n\nReturns `200` with `{contentId, assetType, keyId}`."
           },
           "response": []
         },
