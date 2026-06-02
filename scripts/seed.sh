@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# seed.sh — Wipe content/persons, seed via API, submit encoder job.
+# seed.sh — Wipe content/persons, seed via API.
 #
 # Persons: Angelina Jolie (unverified), Robert Downey Jr. (verified=true)
 # Movies:  Eternals (MOVIE), Marvel Anime: Iron Man (TV)
-# Encoder: one job via assets/videos/sample.mp4
 #
 # SKIP_WIPE=1  — skip wipe phase
 # SKIP_SEED=1  — skip seed phase
@@ -84,7 +83,6 @@ if [ "$SKIP_WIPE" = "0" ]; then
   _wipe_dynamo_table "${DYNAMODB_PERSON_TABLE:-${_project}-person-table-${_env}}"
   _wipe_dynamo_table "${DYNAMODB_CONTENT_CAST_TABLE:-${_project}-content-cast-table-${_env}}"
   _wipe_dynamo_table "${DYNAMODB_CONTENT_ATTRIBUTE_TABLE:-${_project}-content-attribute-table-${_env}}"
-  _wipe_dynamo_table "${DYNAMODB_ENCODER_TABLE:-${_project}-video-table-${_env}}"
   log "wipe done"
 else
   log "SKIP_WIPE=1, skipping wipe"
@@ -294,14 +292,6 @@ if [ "$SKIP_SEED" = "0" ]; then
     -F "poster=@${IMG_DIR}/movies/solo-leveling-poster.jpg;type=image/jpeg" \
     -F "cover=@${IMG_DIR}/movies/solo-leveling-backdrop.jpg;type=image/jpeg"
 
-  log "Phase 4: encoder job"
-  _resp=$(curl -sf --max-time 300 -X POST "${API_URL}/v1/a/encoder/" \
-    -F "contentId=${_content_id[eternals]}" \
-    -F "contentType=MOVIE" \
-    -F "video=@${VID_DIR}/sample.mp4;type=video/mp4") || {
-    err "failed: encoder job"; exit 1; }
-  log "$_resp"
-  log "encoder: job → $(echo "$_resp" | jq -r '.data.id // .data.jobId // empty')"
 
   log "seed done"
 else

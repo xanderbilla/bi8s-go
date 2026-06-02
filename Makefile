@@ -1,4 +1,4 @@
-.PHONY: help setup init-backend create-infra update-infra destroy-infra build-image push-image deploy-app clean test test-unit test-integration coverage lint format fmt-check vet staticcheck govulncheck tidy quality build run run-summary runbuild local-setup reindex openapi-validate tofu-plan tofu-apply docker-up docker-down docker-logs docker-prune
+.PHONY: help setup init-backend create-infra update-infra destroy-infra build-image push-image deploy-app clean test test-unit test-integration coverage lint format fmt-check vet staticcheck govulncheck tidy quality build run run-summary runbuild local-setup reindex openapi-validate tofu-plan tofu-apply docker-up docker-down docker-logs docker-prune docker-up-bi8s docker-down-bi8s docker-logs-bi8s
 
 # Variables
 PROJECT_NAME ?= $(shell echo $$PROJECT_NAME)
@@ -373,6 +373,23 @@ docker-down:
 
 docker-logs:
 	@./scripts/compose.sh -f docker-compose.dev.yml logs -f --tail=200
+
+# Production-like bi8s stack (docker-compose.bi8s.yml).
+# --env-file .env.bi8s is required so that compose-level variable interpolation
+# (e.g. ${APP_DOMAIN} in Traefik labels) resolves to the real domain instead
+# of the localhost default.
+docker-up-bi8s:
+	@printf "\n$(BOLD)$(BLUE)Starting bi8s stack...$(RESET)\n\n"
+	@docker compose --env-file .env.bi8s -f docker-compose.bi8s.yml up -d
+	@printf "$(GREEN)✓ docker-up-bi8s$(RESET)\n"
+
+docker-down-bi8s:
+	@printf "\n$(BOLD)$(BLUE)Stopping bi8s stack...$(RESET)\n\n"
+	@docker compose --env-file .env.bi8s -f docker-compose.bi8s.yml down
+	@printf "$(GREEN)✓ docker-down-bi8s$(RESET)\n"
+
+docker-logs-bi8s:
+	@docker compose --env-file .env.bi8s -f docker-compose.bi8s.yml logs -f --tail=200
 
 # OpenTofu shortcuts (delegates to scripts/deploy.sh for parity with CI)
 tofu-plan: check-env validate-env

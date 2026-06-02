@@ -181,7 +181,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "Only ERROR-level log lines. These are 5xx HTTP responses, failed encoder jobs, or unhandled panics.",
+      "description": "Only ERROR-level log lines. These are 5xx HTTP responses or unhandled panics.",
       "fieldConfig": {
         "defaults": {},
         "overrides": []

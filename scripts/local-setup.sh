@@ -13,8 +13,6 @@
 #   DYNAMODB_CONTENT_TABLE
 #   DYNAMODB_PERSON_TABLE
 #   DYNAMODB_ATTRIBUTE_TABLE
-#   DYNAMODB_ENCODER_TABLE
-#   DYNAMODB_ENCODER_CONTENT_ID_INDEX
 #   DYNAMODB_CONTENT_CAST_TABLE
 #   DYNAMODB_CONTENT_ATTRIBUTE_TABLE
 #
@@ -50,8 +48,6 @@ fi
 CONTENT_TABLE="${DYNAMODB_CONTENT_TABLE:-${_project}-content-table-${_env}}"
 PERSON_TABLE="${DYNAMODB_PERSON_TABLE:-${_project}-person-table-${_env}}"
 ATTRIBUTE_TABLE="${DYNAMODB_ATTRIBUTE_TABLE:-${_project}-attributes-table-${_env}}"
-ENCODER_TABLE="${DYNAMODB_ENCODER_TABLE:-${_project}-video-table-${_env}}"
-ENCODER_GSI="${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}"
 CONTENT_CAST_TABLE="${DYNAMODB_CONTENT_CAST_TABLE:-${_project}-content-cast-table-${_env}}"
 CONTENT_ATTRIBUTE_TABLE="${DYNAMODB_CONTENT_ATTRIBUTE_TABLE:-${_project}-content-attribute-table-${_env}}"
 # Build endpoint flag (empty string when using real AWS).
@@ -279,38 +275,6 @@ _create_content_attribute_table() {
   ok "Created: $table"
 }
 
-_create_encoder_table() {
-  local table="$1"
-  local gsi="$2"
-  if _table_exists "$table"; then
-    ok "DynamoDB table already exists: $table"
-    return
-  fi
-  log "Creating DynamoDB table: $table (with GSI $gsi)"
-  aws dynamodb create-table \
-    --table-name "$table" \
-    --attribute-definitions \
-      AttributeName=id,AttributeType=S \
-      AttributeName=contentId,AttributeType=S \
-    --key-schema AttributeName=id,KeyType=HASH \
-    --global-secondary-indexes "[
-      {
-        \"IndexName\": \"$gsi\",
-        \"KeySchema\": [{\"AttributeName\": \"contentId\", \"KeyType\": \"HASH\"}],
-        \"Projection\": {\"ProjectionType\": \"ALL\"}
-      }
-    ]" \
-    --billing-mode PAY_PER_REQUEST \
-    --region "$REGION" \
-    "${_ep_flag[@]}" \
-    --output json > /dev/null
-  aws dynamodb wait table-exists \
-    --table-name "$table" \
-    --region "$REGION" \
-    "${_ep_flag[@]}"
-  ok "Created: $table"
-}
-
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
@@ -329,7 +293,6 @@ _create_content_table      "$CONTENT_TABLE"
 _add_releasedate_gsi_if_missing "$CONTENT_TABLE"
 _create_simple_table       "$PERSON_TABLE"
 _create_attribute_table    "$ATTRIBUTE_TABLE"
-_create_encoder_table      "$ENCODER_TABLE" "$ENCODER_GSI"
 _create_content_cast_table "$CONTENT_CAST_TABLE"
 _create_content_attribute_table "$CONTENT_ATTRIBUTE_TABLE"
 

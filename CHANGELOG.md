@@ -42,8 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `http`: declarative router split (`Mount`/`buildRouter`), shared
     `respwriter.Recorder`, `alphanumericIDValidator`, `writeOK` response
     helper.
-  - `service`: shared `cacheGetJSON[T]`/`cacheSetJSON`/`cacheDel` Redis
-    helpers; `removeTempFile` helper for encoder temp-file cleanup.
+  - `service`: shared `cacheGetJSON[T]`/`cacheSetJSON`/`cacheDel` Redis helpers.
   - `app`: `LoadConfigFromEnv` first-error closures (`getInt`/`getBool`);
     `Validate` rate-limit bucket loop.
   - `observability`: `NewHTTPMetrics` first-error closure.
@@ -63,7 +62,6 @@ Initial public version.
 ### Added
 
 - Go HTTP API (`/v1/c/*` consumer, `/v1/a/*` admin) backed by DynamoDB and S3.
-- Encoder pipeline (ffmpeg → HLS) with concurrency control and graceful drain.
 - Standardized response envelope (`success`, `status`, `message`, `data`,
   `error`, `path`, `requestId`, `timestamp`).
 - Centralized error types with stable error codes.

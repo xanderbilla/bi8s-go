@@ -80,7 +80,7 @@ groups:
           summary: "bi8s-api p95 latency above 500ms (current: {{ $value }}ms)"
           description: |
             p95 request latency is {{ $value }}ms over the last 5m. Check DynamoDB
-            latency, encoder backpressure, and CPU saturation on the API replicas.
+            latency and CPU saturation on the API replicas.
 
       - alert: Bi8sApiHighP99Latency
         expr: bi8s:http_p99_latency_ms:rate5m > 1500
@@ -147,23 +147,6 @@ groups:
             DynamoDB is throttling requests. On PAY_PER_REQUEST tables this
             usually means adaptive capacity is still scaling — verify hot
             partitions and confirm GSI projections aren't amplifying writes.
-
-      - alert: Bi8sEncoderJobFailures
-        # Encoder jobs run async. A sustained failure rate means uploaded
-        # videos aren't reaching the public manifest, which is silent to the
-        # API caller (job is created successfully but never completes).
-        expr: |
-          sum(rate(bi8s_encoder_jobs_failed_total[10m])) > 0.05
-        for: 15m
-        labels:
-          severity: warning
-          service: bi8s-api
-        annotations:
-          summary: "Encoder failure rate elevated"
-          description: |
-            Encoder jobs are failing at >0.05/s sustained. Check ffmpeg
-            availability, S3 upload errors, and disk-space on the encoder
-            host.
 
   # ────────────────────────────────────────────────────────────────────────
   # Infrastructure: container / host saturation, target up/down.
