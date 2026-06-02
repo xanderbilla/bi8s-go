@@ -52,7 +52,7 @@ services:
 
   api:
     <<: [*restart-policy, *default-logging]
-    image: ${API_IMAGE_NAME:-bi8s:bi8s-image-dev-latest}
+    image: ${API_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/bi8s:dev-latest}
     pull_policy: ${API_PULL_POLICY:-never}
     container_name: bi8s_api_nsfw
     env_file:
@@ -132,7 +132,7 @@ services:
 
   ui:
     <<: [*restart-policy, *default-logging]
-    image: ${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:efx-image-dev-latest}
+    image: ${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:dev-latest}
     container_name: bi8s_ui_nsfw
     pull_policy: ${UI_PULL_POLICY:-always}
     # All NEXT_PUBLIC_* vars are delivered via env_file.
