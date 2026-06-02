@@ -36,6 +36,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=app-network"
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.transport.respondingTimeouts.readTimeout=0"
       - "--ping=true"
       - "--log.level=INFO"
       - "--accesslog=true"
@@ -64,7 +65,7 @@ services:
       - no-new-privileges:true
     cap_drop: ["ALL"]
     read_only: false
-    mem_limit: ${API_MEM_LIMIT:-1g}
+    mem_limit: ${API_MEM_LIMIT:-1.5g}
     cpus: ${API_CPUS:-1.5}
     environment:
       APP_ENV: ${APP_ENV}
@@ -75,8 +76,6 @@ services:
       DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE}
       DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE}
       DYNAMODB_ATTRIBUTE_NAME_INDEX: ${DYNAMODB_ATTRIBUTE_NAME_INDEX:-name-index}
-      DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE}
-      DYNAMODB_ENCODER_CONTENT_ID_INDEX: ${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}
       DYNAMODB_CONTENT_CAST_TABLE: ${DYNAMODB_CONTENT_CAST_TABLE}
       DYNAMODB_CONTENT_ATTRIBUTE_TABLE: ${DYNAMODB_CONTENT_ATTRIBUTE_TABLE}
       DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX:-visibility-createdAt-index}
@@ -88,10 +87,6 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
-      ENCODER_MAX_CONCURRENT: ${ENCODER_MAX_CONCURRENT:-2}
-      ENCODER_FFMPEG_PARALLELISM: ${ENCODER_FFMPEG_PARALLELISM:-0}
-      ENCODER_JOB_TIMEOUT_SECONDS: ${ENCODER_JOB_TIMEOUT_SECONDS:-1800}
-      BI8S_TMP_DIR: ${BI8S_TMP_DIR:-/tmp}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api}
       OTEL_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
@@ -115,8 +110,6 @@ services:
       SEARCH_PEOPLE_INDEX_NAME: ${SEARCH_PEOPLE_INDEX_NAME:-bi8s-people}
       SEARCH_REQUEST_TIMEOUT_MS: ${SEARCH_REQUEST_TIMEOUT_MS:-3000}
     depends_on:
-      otel-collector:
-        condition: service_started
       redis:
         condition: service_healthy
     networks: [app-network]
@@ -164,6 +157,7 @@ services:
     <<: [*restart-policy, *default-logging]
     image: otel/opentelemetry-collector-contrib:0.111.0
     container_name: ${PROJECT_NAME:-bi8s}-otel-collector
+    profiles: ["obs"]
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
@@ -180,6 +174,7 @@ services:
     <<: [*restart-policy, *default-logging]
     image: prom/prometheus:v2.55.1
     container_name: ${PROJECT_NAME:-bi8s}-prometheus
+    profiles: ["obs"]
     user: root
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -199,6 +194,7 @@ services:
     <<: [*restart-policy, *default-logging]
     image: grafana/tempo:2.6.1
     container_name: ${PROJECT_NAME:-bi8s}-tempo
+    profiles: ["obs"]
     command: ["-config.file=/etc/tempo/tempo.yaml", "-config.expand-env=true"]
     environment:
       AWS_REGION: ${AWS_REGION}
@@ -216,6 +212,7 @@ services:
     <<: [*restart-policy, *default-logging]
     image: grafana/loki:3.2.1
     container_name: ${PROJECT_NAME:-bi8s}-loki
+    profiles: ["obs"]
     command:
       ["-config.file=/etc/loki/loki-config.yaml", "-config.expand-env=true"]
     environment:
@@ -232,6 +229,7 @@ services:
     <<: [*restart-policy, *default-logging]
     image: grafana/promtail:3.2.1
     container_name: ${PROJECT_NAME:-bi8s}-promtail
+    profiles: ["obs"]
     command: ["-config.file=/etc/promtail/config.yaml"]
     volumes:
       - ./observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
@@ -248,6 +246,7 @@ services:
     <<: [*restart-policy, *default-logging]
     image: grafana/grafana:11.3.0
     container_name: ${PROJECT_NAME:-bi8s}-grafana
+    profiles: ["obs"]
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
@@ -280,6 +279,7 @@ services:
     <<: [*restart-policy, *default-logging]
     image: gcr.io/cadvisor/cadvisor:v0.50.0
     container_name: ${PROJECT_NAME:-bi8s}-cadvisor
+    profiles: ["obs"]
     privileged: true
     volumes:
       - /:/rootfs:ro
@@ -298,6 +298,7 @@ services:
     <<: [*restart-policy, *default-logging]
     image: prom/node-exporter:v1.8.2
     container_name: ${PROJECT_NAME:-bi8s}-node-exporter
+    profiles: ["obs"]
     pid: host
     volumes:
       - /proc:/host/proc:ro

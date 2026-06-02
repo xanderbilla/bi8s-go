@@ -32,6 +32,7 @@ services:
       - "--providers.docker.network=bi8s-nsfw-net"
       - "--providers.docker.constraints=Label(`traefik.constraint`,`bi8s-nsfw`)"
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.transport.respondingTimeouts.readTimeout=0"
       - "--api.insecure=true"
       - "--ping=true"
       - "--log.level=INFO"
@@ -51,14 +52,8 @@ services:
 
   api:
     <<: [*restart-policy, *default-logging]
-    build:
-      context: ./app
-      dockerfile: Dockerfile
-      target: runtime
-      args:
-        VERSION: ${BUILD_VERSION:-dev}
-        COMMIT: ${BUILD_COMMIT:-unknown}
-        BUILD_DATE: ${BUILD_DATE:-unknown}
+    image: ${API_IMAGE_NAME:-bi8s:bi8s-image-dev-latest}
+    pull_policy: ${API_PULL_POLICY:-never}
     container_name: bi8s_api_nsfw
     env_file:
       - .env.bi8s
@@ -71,17 +66,17 @@ services:
       DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE:-bi8s-nsfw-person-table}
       DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE:-bi8s-nsfw-attributes-table}
       DYNAMODB_ATTRIBUTE_NAME_INDEX: ${DYNAMODB_ATTRIBUTE_NAME_INDEX:-name-index}
-      DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE:-bi8s-nsfw-video-table}
-      DYNAMODB_ENCODER_CONTENT_ID_INDEX: ${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}
       DYNAMODB_CONTENT_CAST_TABLE: ${DYNAMODB_CONTENT_CAST_TABLE:-bi8s-nsfw-content-cast-table}
       DYNAMODB_CONTENT_ATTRIBUTE_TABLE: ${DYNAMODB_CONTENT_ATTRIBUTE_TABLE:-bi8s-nsfw-content-attribute-table}
       DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX:-visibility-createdAt-index}
       DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX:-visibility-releaseDate-index}
+      DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE:-bi8s-nsfw-video-table}
+      DYNAMODB_ENCODER_CONTENT_ID_INDEX: ${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}
       B2_KEY_ID: ${B2_KEY_ID:-}
       B2_APPLICATION_KEY: ${B2_APPLICATION_KEY:-}
       B2_BUCKET: ${B2_BUCKET:-}
       B2_ENDPOINT: ${B2_ENDPOINT:-}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://ui.${APP_DOMAIN:-localhost},https://ops.${APP_DOMAIN:-localhost},https://api.${APP_DOMAIN:-localhost},http://localhost:3000,http://localhost:8080,http://localhost:8443,http://localhost}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://ui.${APP_DOMAIN:-emm4bi8s.dev},https://ops.${APP_DOMAIN:-emm4bi8s.dev},https://api.${APP_DOMAIN:-emm4bi8s.dev},http://localhost:3000,http://localhost:8080,http://localhost:8443,http://localhost}
       CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api-nsfw}
       OTEL_ENABLED: ${OTEL_ENABLED:-true}
@@ -114,6 +109,12 @@ services:
         condition: service_healthy
       opensearch:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 8g
+        reservations:
+          memory: 512m
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/v1/livez"]
       interval: 30s
@@ -123,7 +124,7 @@ services:
     labels:
       traefik.enable: "true"
       traefik.constraint: "bi8s-nsfw"
-      traefik.http.routers.api.rule: "Host(`api.localhost`) || Host(`api.${APP_DOMAIN:-localhost}`)"
+      traefik.http.routers.api.rule: "Host(`api.localhost`) || Host(`api.${APP_DOMAIN:-emm4bi8s.dev}`)"
       traefik.http.routers.api.entrypoints: "web"
       traefik.http.services.api.loadbalancer.server.port: "8080"
     networks:
@@ -165,7 +166,7 @@ services:
     labels:
       traefik.enable: "true"
       traefik.constraint: "bi8s-nsfw"
-      traefik.http.routers.ui.rule: "Host(`localhost`) || Host(`ui.${APP_DOMAIN:-localhost}`)"
+      traefik.http.routers.ui.rule: "Host(`localhost`) || Host(`ui.${APP_DOMAIN:-emm4bi8s.dev}`)"
       traefik.http.routers.ui.entrypoints: "web"
       traefik.http.services.ui.loadbalancer.server.port: "3000"
       com.centurylinklabs.watchtower.enable: "true"
@@ -336,7 +337,7 @@ services:
     labels:
       traefik.enable: "true"
       traefik.constraint: "bi8s-nsfw"
-      traefik.http.routers.grafana.rule: "Host(`ops.localhost`) || Host(`ops.${APP_DOMAIN:-localhost}`)"
+      traefik.http.routers.grafana.rule: "Host(`ops.localhost`) || Host(`ops.${APP_DOMAIN:-emm4bi8s.dev}`)"
       traefik.http.routers.grafana.entrypoints: "web"
       traefik.http.services.grafana.loadbalancer.server.port: "3000"
     networks:
