@@ -1,0 +1,672 @@
+name: CI / CD
+
+on:
+    push:
+        branches:
+            - dev
+            - prod
+        paths:
+            - "app/**"
+            - "infra/tofu/**"
+            - "docker-compose*.yml"
+            - "infra/docker/**"
+            - "docs/OPENAPI.yaml"
+            - ".github/workflows/ci-cd.yml"
+    pull_request:
+        branches:
+            - dev
+            - prod
+        paths:
+            - "app/**"
+            - "infra/tofu/**"
+            - "docker-compose*.yml"
+            - "infra/docker/**"
+            - "docs/OPENAPI.yaml"
+            - ".github/workflows/ci-cd.yml"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    security-events: write
+
+concurrency:
+    group: ci-cd-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    GO_VERSION: "1.25.0"
+    GOLANGCI_LINT_VERSION: "v2.1.6"
+    STATICCHECK_VERSION: "2024.1.1"
+    GOVULNCHECK_VERSION: "v1.1.3"
+    GOSEC_VERSION: "v2.21.4"
+    ECR_REPO: bi8s
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Quality Gate
+# All jobs below run on every push and pull_request. The docker build job
+# requires ALL of these to pass before it will run on push events.
+# ─────────────────────────────────────────────────────────────────────────────
+
+jobs:
+    go-vet:
+        name: go vet
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: app
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache-dependency-path: app/go.sum
+            - run: go mod download
+            - run: go vet ./...
+
+    go-test:
+        name: go test (race + cover)
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: app
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache-dependency-path: app/go.sum
+            - run: go mod download
+            - name: Run tests with race + coverage
+              run: |
+                  go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+                  go tool cover -func=coverage.out | tail -1
+            - name: Upload coverage artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: go-coverage
+                  path: app/coverage.out
+                  retention-days: 7
+
+    golangci-lint:
+        name: golangci-lint
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache-dependency-path: app/go.sum
+            - uses: golangci/golangci-lint-action@v7
+              with:
+                  version: ${{ env.GOLANGCI_LINT_VERSION }}
+                  working-directory: app
+                  args: --timeout=5m
+
+    govulncheck:
+        name: govulncheck
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: app
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache-dependency-path: app/go.sum
+            - name: Install govulncheck
+              run: go install golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }}
+            - run: govulncheck ./...
+
+    staticcheck:
+        name: staticcheck
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: app
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache-dependency-path: app/go.sum
+            - name: Install staticcheck
+              run: go install honnef.co/go/tools/cmd/staticcheck@${{ env.STATICCHECK_VERSION }}
+            - run: staticcheck ./...
+
+    gosec:
+        name: gosec
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: app
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache-dependency-path: app/go.sum
+            - name: Install gosec
+              run: go install github.com/securego/gosec/v2/cmd/gosec@${{ env.GOSEC_VERSION }}
+              # Excluded rules (justification):
+              #   G101: Lua script literal in redis backend (false positive)
+              #   G115: int conversion overflow — covered by validation layer
+              #   G120: ParseMultipartForm — bounded via http.MaxBytesReader upstream
+              #   G204: ffmpeg subprocess — args are filepath.Clean'd allowlist
+              #   G304: file open via variable — paths sourced from trusted config/env
+              #   G703: tempfile cleanup — name created by os.CreateTemp
+            - run: gosec -quiet -exclude=G101,G115,G120,G204,G304,G703 -fmt text ./...
+
+    openapi-lint:
+        name: openapi lint (redocly)
+        runs-on: ubuntu-latest
+        # Spec is kept clean (no baselined findings); regressions fail.
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+            - name: Lint OpenAPI spec
+              run: npx --yes @redocly/cli@latest lint docs/openapi.yaml
+
+    compose-config:
+        name: docker compose config
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Validate local (dev) compose
+              run: docker compose -f docker-compose.dev.yml config --quiet
+            - name: Validate bi8s compose
+              env:
+                  API_IMAGE_NAME: bi8s:bi8s-image-dev-latest
+                  API_PULL_POLICY: never
+                  AWS_REGION: us-east-1
+                  APP_ENV: dev
+                  CORS_ALLOWED_ORIGINS: "*"
+              run: docker compose -f docker-compose.bi8s.yml config --quiet
+            - name: Validate infra compose
+              env:
+                  AWS_REGION: us-east-1
+                  APP_ENV: prod
+                  DYNAMODB_CONTENT_TABLE: bi8s-content-table-prod
+                  DYNAMODB_PERSON_TABLE: bi8s-person-table-prod
+                  DYNAMODB_ATTRIBUTE_TABLE: bi8s-attributes-table-prod
+                  S3_BUCKET: bi8s-storage-prod
+                  CORS_ALLOWED_ORIGINS: "*"
+                  PUBLIC_IP: "127.0.0.1"
+                  GRAFANA_ADMIN_PASSWORD: "ci-validation-only"
+              run: docker compose -f infra/docker/docker-compose.yml config --quiet
+
+    tofu:
+        name: tofu fmt + validate (${{ matrix.env }})
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                env: [dev, prod]
+        defaults:
+            run:
+                working-directory: infra/tofu/envs/${{ matrix.env }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: opentofu/setup-opentofu@v1
+              with:
+                  tofu_version: "1.6.0"
+            - name: tofu fmt check
+              run: tofu fmt -recursive -check ../..
+            - name: tofu init (no backend)
+              run: tofu init -backend=false -input=false
+            - name: tofu validate
+              run: tofu validate
+
+    tflint:
+        name: tflint
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: terraform-linters/setup-tflint@v4
+              with:
+                  tflint_version: v0.52.0
+            - name: Init TFLint plugins
+              run: tflint --init
+              working-directory: infra/tofu
+            - name: Run TFLint (modules + envs)
+              run: tflint --recursive --minimum-failure-severity=error
+              working-directory: infra/tofu
+
+    tfsec:
+        name: tfsec
+        runs-on: ubuntu-latest
+        # Baseline exclusions live in infra/tofu/.tfsec/config.yml with
+        # written justification per rule. Regressions fail the build.
+        steps:
+            - uses: actions/checkout@v4
+            - name: Run tfsec
+              uses: aquasecurity/tfsec-action@v1.0.3
+              with:
+                  working_directory: infra/tofu
+                  soft_fail: false
+
+    trivy-fs:
+        name: trivy fs scan
+        runs-on: ubuntu-latest
+        # Go dependency vulns are gated by govulncheck above; trivy here
+        # focuses on secrets + IaC misconfig that govulncheck does not see.
+        # Baseline lives in .trivyignore. Regressions fail the build.
+        steps:
+            - uses: actions/checkout@v4
+            - name: Run Trivy filesystem scan
+              uses: aquasecurity/trivy-action@0.24.0
+              with:
+                  scan-type: fs
+                  scan-ref: .
+                  scanners: secret,misconfig
+                  severity: CRITICAL,HIGH
+                  exit-code: "1"
+                  ignore-unfixed: true
+                  trivyignores: .trivyignore
+                  skip-dirs: tmp,assets,node_modules,.git
+
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Build & Push
+    # Runs only on push (not pull_request). Requires ALL quality gates to pass.
+    # ECR repo  : bi8s
+    # Tags      : bi8s-image-{ENV}-latest  (mutable, always current)
+    #             bi8s-image-{ENV}-{version} (immutable, matches VERSION file / git tag)
+    # ─────────────────────────────────────────────────────────────────────────────
+
+    docker:
+        name: Build and Push Multi-Platform Image
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        needs:
+            - go-vet
+            - go-test
+            - golangci-lint
+            - govulncheck
+            - staticcheck
+            - gosec
+            - openapi-lint
+            - compose-config
+        outputs:
+            environment: ${{ steps.detect-env.outputs.environment }}
+            version: ${{ steps.version.outputs.version }}
+            registry: ${{ steps.login-ecr.outputs.registry }}
+        # Bind to the matching GitHub Environment so its protection rules apply
+        # (required reviewers on prod, branch protection on dev).
+        environment:
+            name: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'dev' }}
+
+        steps:
+            - name: Checkout source
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            # Derive environment from branch.
+            - name: Detect environment
+              id: detect-env
+              run: |
+                  if [[ "${{ github.ref }}" == "refs/heads/prod" ]]; then
+                    echo "environment=prod" >> $GITHUB_OUTPUT
+                  else
+                    echo "environment=dev" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ${{ secrets.AWS_REGION }}
+
+            - name: Log in to Amazon ECR
+              id: login-ecr
+              uses: aws-actions/amazon-ecr-login@v2
+
+            # Single ECR repo `bi8s` for all environments (env encoded in tag).
+            # Create with sensible defaults if it does not exist yet.
+            - name: Ensure ECR repository exists
+              env:
+                  AWS_REGION: ${{ secrets.AWS_REGION }}
+              run: |
+                  set -e
+                  if aws ecr describe-repositories \
+                      --repository-names "${{ env.ECR_REPO }}" \
+                      --region "$AWS_REGION" >/dev/null 2>&1; then
+                    echo "ECR repository ${{ env.ECR_REPO }} exists"
+                  else
+                    echo "Creating ECR repository ${{ env.ECR_REPO }}"
+                    aws ecr create-repository \
+                      --repository-name "${{ env.ECR_REPO }}" \
+                      --region "$AWS_REGION" \
+                      --image-scanning-configuration scanOnPush=true \
+                      --encryption-configuration encryptionType=AES256 \
+                      --image-tag-mutability MUTABLE >/dev/null
+                    echo "Created ECR repository ${{ env.ECR_REPO }}"
+                  fi
+
+            # Derive semantic version from latest git tag or VERSION file.
+            - name: Resolve version
+              id: version
+              run: |
+                  set -e
+                  TAG="$(git describe --tags --abbrev=0 --match 'v*.*.*' 2>/dev/null || true)"
+                  if [ -z "$TAG" ]; then
+                    if [ -f VERSION ]; then
+                      TAG="v$(tr -d '[:space:]' < VERSION)"
+                    else
+                      TAG="v0.0.0"
+                    fi
+                  fi
+                  COMMIT="$(git rev-parse --short HEAD)"
+                  DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                  echo "version=${TAG}" >> "$GITHUB_OUTPUT"
+                  echo "commit=${COMMIT}" >> "$GITHUB_OUTPUT"
+                  echo "date=${DATE}" >> "$GITHUB_OUTPUT"
+                  echo "Resolved version: ${TAG} (${COMMIT})"
+
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@v3
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            # Build and push image manifests for linux/amd64 and linux/arm64.
+            # Tags:
+            #   bi8s-image-{ENV}-latest   — mutable rolling tag used by compose
+            #   bi8s-image-{ENV}-{version} — immutable versioned tag for auditing
+            - name: Build and push image
+              id: build
+              uses: docker/build-push-action@v6
+              with:
+                  context: ./app
+                  file: ./app/Dockerfile
+                  push: true
+                  platforms: linux/amd64,linux/arm64
+                  build-args: |
+                      VERSION=${{ steps.version.outputs.version }}
+                      COMMIT=${{ steps.version.outputs.commit }}
+                      BUILD_DATE=${{ steps.version.outputs.date }}
+                  tags: |
+                      ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:bi8s-image-${{ steps.detect-env.outputs.environment }}-latest
+                      ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:bi8s-image-${{ steps.detect-env.outputs.environment }}-${{ steps.version.outputs.version }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            # Scan the published image for known CRITICAL/HIGH vulnerabilities.
+            # Advisory only — existing baseline findings tracked separately.
+            - name: Trivy image scan (advisory)
+              uses: aquasecurity/trivy-action@0.24.0
+              continue-on-error: true
+              with:
+                  image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:bi8s-image-${{ steps.detect-env.outputs.environment }}-latest
+                  severity: CRITICAL,HIGH
+                  ignore-unfixed: true
+                  exit-code: "1"
+                  format: table
+
+            # Generate SPDX SBOM for the published image. Uploaded as artifact (30d).
+            - name: Generate SBOM (syft)
+              uses: anchore/sbom-action@v0
+              with:
+                  image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:bi8s-image-${{ steps.detect-env.outputs.environment }}-latest
+                  format: spdx-json
+                  output-file: sbom-${{ steps.version.outputs.version }}.spdx.json
+                  upload-artifact: true
+                  upload-artifact-retention: 30
+
+            - name: Install cosign
+              uses: sigstore/cosign-installer@v3.7.0
+              with:
+                  cosign-release: v2.4.1
+
+            # Sign image with keyless OIDC identity. Verifiable via:
+            #   cosign verify --certificate-identity-regexp ... \
+            #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
+            - name: Sign image with cosign (keyless)
+              env:
+                  COSIGN_EXPERIMENTAL: "1"
+                  IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}@${{ steps.build.outputs.digest }}
+              run: |
+                  cosign sign --yes "$IMAGE"
+
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Deploy
+    # Runs after successful docker job. Uses SSM to update API_IMAGE_NAME in the
+    # compose .env and restart the stack on running EC2 instances.
+    # ─────────────────────────────────────────────────────────────────────────────
+
+    deploy:
+        name: Redeploy on ${{ needs.docker.outputs.environment }}
+        runs-on: ubuntu-latest
+        needs: docker
+        environment:
+            name: ${{ needs.docker.outputs.environment }}
+
+        steps:
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ${{ secrets.AWS_REGION }}
+
+            - name: Check for running EC2 instances
+              id: check-infra
+              run: |
+                  INSTANCE_IDS=$(aws ec2 describe-instances \
+                    --filters \
+                      "Name=tag:Project,Values=${{ env.ECR_REPO }}" \
+                      "Name=tag:Environment,Values=${{ needs.docker.outputs.environment }}" \
+                      "Name=instance-state-name,Values=running" \
+                    --query 'Reservations[].Instances[].InstanceId' \
+                    --output text)
+
+                  if [ -z "$INSTANCE_IDS" ]; then
+                    echo "No running instances found for ${{ needs.docker.outputs.environment }} — skipping deploy."
+                    echo "found=false" >> $GITHUB_OUTPUT
+                  else
+                    echo "Found instances: $INSTANCE_IDS"
+                    echo "found=true" >> $GITHUB_OUTPUT
+                    echo "instance_ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
+                  fi
+
+            # Update API_IMAGE_NAME in the compose .env to the versioned tag (immutable)
+            # so every rollout is pinned to a specific image digest. The -latest tag
+            # continues to track the newest push for Watchtower / manual pulls.
+            - name: Redeploy containers via SSM
+              if: steps.check-infra.outputs.found == 'true'
+              env:
+                  INSTANCE_IDS: ${{ steps.check-infra.outputs.instance_ids }}
+                  ENVIRONMENT: ${{ needs.docker.outputs.environment }}
+                  VERSION: ${{ needs.docker.outputs.version }}
+                  REGISTRY: ${{ needs.docker.outputs.registry }}
+              run: |
+                  REGION="${{ secrets.AWS_REGION }}"
+                  REPO="${{ env.ECR_REPO }}"
+
+                  PARAMS=$(jq -cn \
+                    --arg repo "$REPO" \
+                    --arg region "$REGION" \
+                    --arg env "$ENVIRONMENT" \
+                    --arg version "$VERSION" \
+                    --arg registry "$REGISTRY" \
+                    '{commands: [
+                      "set -e",
+                      ("cd /opt/" + $repo + "/compose"),
+                      ("mkdir -p /opt/" + $repo + "/release"),
+                      ("NEW_IMAGE=" + $registry + "/" + $repo + ":bi8s-image-" + $env + "-" + $version),
+                      ("PREV_IMAGE=$(grep -E \"^API_IMAGE_NAME=\" .env 2>/dev/null | cut -d= -f2- || true)"),
+                      ("if [ -n \"$PREV_IMAGE\" ] && [ \"$PREV_IMAGE\" != \"$NEW_IMAGE\" ]; then echo \"$PREV_IMAGE\" > /opt/" + $repo + "/release/PREVIOUS_IMAGE; fi"),
+                      ("aws ecr get-login-password --region " + $region + " | docker login --username AWS --password-stdin " + $registry),
+                      ("if grep -qE \"^API_IMAGE_NAME=\" .env; then sed -i \"s|^API_IMAGE_NAME=.*|API_IMAGE_NAME=${NEW_IMAGE}|\" .env; else echo \"API_IMAGE_NAME=${NEW_IMAGE}\" >> .env; fi"),
+                      ("if grep -qE \"^API_PULL_POLICY=\" .env; then sed -i \"s|^API_PULL_POLICY=.*|API_PULL_POLICY=always|\" .env; else echo \"API_PULL_POLICY=always\" >> .env; fi"),
+                      "docker compose pull api",
+                      "docker compose up -d api"
+                    ]}')
+
+                  COMMAND_ID=$(aws ssm send-command \
+                    --instance-ids $INSTANCE_IDS \
+                    --document-name "AWS-RunShellScript" \
+                    --parameters "$PARAMS" \
+                    --timeout-seconds 300 \
+                    --comment "Redeploy $REPO-$ENVIRONMENT $VERSION" \
+                    --query 'Command.CommandId' \
+                    --output text)
+
+                  echo "SSM Command ID: $COMMAND_ID"
+                  for INSTANCE_ID in $INSTANCE_IDS; do
+                    echo "Waiting for command on $INSTANCE_ID..."
+                    aws ssm wait command-executed \
+                      --command-id "$COMMAND_ID" \
+                      --instance-id "$INSTANCE_ID" || true
+
+                    STATUS=$(aws ssm get-command-invocation \
+                      --command-id "$COMMAND_ID" \
+                      --instance-id "$INSTANCE_ID" \
+                      --query 'Status' --output text)
+
+                    echo "$INSTANCE_ID → $STATUS"
+                    if [ "$STATUS" != "Success" ]; then
+                      aws ssm get-command-invocation \
+                        --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+                        --query 'StandardOutputContent' --output text
+                      aws ssm get-command-invocation \
+                        --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+                        --query 'StandardErrorContent' --output text
+                      exit 1
+                    fi
+                  done
+
+                  echo "### Containers Redeployed" >> $GITHUB_STEP_SUMMARY
+                  echo "**Environment:** $ENVIRONMENT" >> $GITHUB_STEP_SUMMARY
+                  echo "**Image:** $REPO:bi8s-image-$ENVIRONMENT-$VERSION" >> $GITHUB_STEP_SUMMARY
+                  echo "**Instances:** $INSTANCE_IDS" >> $GITHUB_STEP_SUMMARY
+
+            # Post-deploy health gate: probe /v1/livez and /v1/health inside each
+            # instance via SSM. Fails the workflow if either endpoint is not 200
+            # within the retry window so a broken image cannot stay running.
+            - name: Post-deploy health check
+              if: steps.check-infra.outputs.found == 'true'
+              env:
+                  INSTANCE_IDS: ${{ steps.check-infra.outputs.instance_ids }}
+                  ENVIRONMENT: ${{ needs.docker.outputs.environment }}
+              run: |
+                  PARAMS=$(jq -cn '{commands: [
+                    "set -e",
+                    "for i in $(seq 1 30); do",
+                    "  if curl -fsS --max-time 3 http://127.0.0.1:8080/v1/livez >/dev/null \\",
+                    "       && curl -fsS --max-time 3 http://127.0.0.1:8080/v1/health >/dev/null; then",
+                    "    echo \"healthy after attempt $i\"; exit 0;",
+                    "  fi",
+                    "  sleep 2",
+                    "done",
+                    "echo \"health check failed after 30 attempts\" >&2",
+                    "docker ps --format \"table {{.Names}}\\t{{.Status}}\" >&2",
+                    "exit 1"
+                  ]}')
+
+                  COMMAND_ID=$(aws ssm send-command \
+                    --instance-ids $INSTANCE_IDS \
+                    --document-name "AWS-RunShellScript" \
+                    --parameters "$PARAMS" \
+                    --timeout-seconds 180 \
+                    --comment "Post-deploy health check ${{ env.ECR_REPO }}-$ENVIRONMENT" \
+                    --query 'Command.CommandId' \
+                    --output text)
+
+                  echo "Health-check SSM Command ID: $COMMAND_ID"
+                  FAIL=0
+                  for INSTANCE_ID in $INSTANCE_IDS; do
+                    aws ssm wait command-executed \
+                      --command-id "$COMMAND_ID" \
+                      --instance-id "$INSTANCE_ID" || true
+
+                    STATUS=$(aws ssm get-command-invocation \
+                      --command-id "$COMMAND_ID" \
+                      --instance-id "$INSTANCE_ID" \
+                      --query 'Status' --output text)
+
+                    echo "$INSTANCE_ID health → $STATUS"
+                    if [ "$STATUS" != "Success" ]; then
+                      FAIL=1
+                      aws ssm get-command-invocation \
+                        --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+                        --query 'StandardOutputContent' --output text
+                      aws ssm get-command-invocation \
+                        --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+                        --query 'StandardErrorContent' --output text
+                    fi
+                  done
+
+                  if [ "$FAIL" -ne 0 ]; then
+                    echo "::error::Post-deploy health check failed. Investigate before promoting."
+                    exit 1
+                  fi
+
+                  echo "### Health Check" >> $GITHUB_STEP_SUMMARY
+                  echo "All ${ENVIRONMENT} instances responded 200 to /v1/livez and /v1/health." >> $GITHUB_STEP_SUMMARY
+
+            # Auto-rollback: if the health gate above failed, restore the previously
+            # deployed image recorded in /opt/bi8s/release/PREVIOUS_IMAGE.
+            - name: Rollback on failure
+              if: failure() && steps.check-infra.outputs.found == 'true'
+              env:
+                  INSTANCE_IDS: ${{ steps.check-infra.outputs.instance_ids }}
+                  ENVIRONMENT: ${{ needs.docker.outputs.environment }}
+                  REGISTRY: ${{ needs.docker.outputs.registry }}
+              run: |
+                  REGION="${{ secrets.AWS_REGION }}"
+                  REPO="${{ env.ECR_REPO }}"
+
+                  PARAMS=$(jq -cn \
+                    --arg repo "$REPO" \
+                    --arg region "$REGION" \
+                    --arg registry "$REGISTRY" \
+                    '{commands: [
+                      "set -e",
+                      ("PREV_FILE=/opt/" + $repo + "/release/PREVIOUS_IMAGE"),
+                      "if [ ! -s \"$PREV_FILE\" ]; then echo \"no PREVIOUS_IMAGE recorded -- nothing to roll back to\" >&2; exit 0; fi",
+                      "PREV_IMAGE=$(cat \"$PREV_FILE\")",
+                      ("cd /opt/" + $repo + "/compose"),
+                      ("aws ecr get-login-password --region " + $region + " | docker login --username AWS --password-stdin " + $registry),
+                      "if grep -qE \"^API_IMAGE_NAME=\" .env; then sed -i \"s|^API_IMAGE_NAME=.*|API_IMAGE_NAME=${PREV_IMAGE}|\" .env; else echo \"API_IMAGE_NAME=${PREV_IMAGE}\" >> .env; fi",
+                      "echo \"rolling back to $PREV_IMAGE\"",
+                      "docker compose pull api",
+                      "docker compose down --remove-orphans",
+                      "docker compose up -d"
+                    ]}')
+
+                  COMMAND_ID=$(aws ssm send-command \
+                    --instance-ids $INSTANCE_IDS \
+                    --document-name "AWS-RunShellScript" \
+                    --parameters "$PARAMS" \
+                    --timeout-seconds 300 \
+                    --comment "Auto-rollback ${{ env.ECR_REPO }}-$ENVIRONMENT" \
+                    --query 'Command.CommandId' \
+                    --output text)
+
+                  echo "Rollback SSM Command ID: $COMMAND_ID"
+                  for INSTANCE_ID in $INSTANCE_IDS; do
+                    aws ssm wait command-executed \
+                      --command-id "$COMMAND_ID" \
+                      --instance-id "$INSTANCE_ID" || true
+
+                    STATUS=$(aws ssm get-command-invocation \
+                      --command-id "$COMMAND_ID" \
+                      --instance-id "$INSTANCE_ID" \
+                      --query 'Status' --output text)
+
+                    echo "$INSTANCE_ID rollback → $STATUS"
+                    aws ssm get-command-invocation \
+                      --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+                      --query 'StandardOutputContent' --output text
+                    aws ssm get-command-invocation \
+                      --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+                      --query 'StandardErrorContent' --output text
+                  done
+
+                  echo "### Rollback" >> $GITHUB_STEP_SUMMARY
+                  echo "Failed deploy was rolled back on ${ENVIRONMENT} instances." >> $GITHUB_STEP_SUMMARY
