@@ -10,7 +10,6 @@ import (
 
 	"github.com/xanderbilla/bi8s-go/internal/logger"
 	"github.com/xanderbilla/bi8s-go/internal/model"
-	"github.com/xanderbilla/bi8s-go/internal/utils"
 )
 
 var allowedUploadMIME = map[string]string{
@@ -84,7 +83,7 @@ func ExtractFileToTemp(r *http.Request, fieldName string, maxSize int64) (*model
 		}
 	}()
 
-	tmp, err := os.CreateTemp(utils.TmpDir(), fieldName+"-*."+trimmedExt(header.Filename))
+	tmp, err := os.CreateTemp("", fieldName+"-*."+trimmedExt(header.Filename))
 	if err != nil {
 		return nil, errors.New("failed to create temp file for " + fieldName)
 	}

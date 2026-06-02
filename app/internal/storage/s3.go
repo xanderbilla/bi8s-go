@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -23,6 +24,8 @@ type FileUploader interface {
 	UploadFile(ctx context.Context, prefix, resourceID, purpose, fileName, contentType string, data []byte) (string, error)
 	UploadFileStream(ctx context.Context, prefix, resourceID, purpose, fileName, contentType string, body io.Reader, size int64) (string, error)
 	GeneratePresignedGetURL(ctx context.Context, key string, expiry time.Duration) (string, error)
+	GeneratePresignedPutURL(ctx context.Context, key string, expiry time.Duration) (string, error)
+	DownloadToFile(ctx context.Context, key, localPath string) error
 
 	Delete(ctx context.Context, key string) error
 	DeletePrefix(ctx context.Context, prefix string) error
@@ -196,6 +199,61 @@ func (u *S3FileUploader) GeneratePresignedGetURL(ctx context.Context, key string
 	}
 
 	return out.URL, nil
+}
+
+func (u *S3FileUploader) GeneratePresignedPutURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
+	if u.bucket == "" {
+		return "", errors.New("s3 bucket is not configured")
+	}
+	if strings.TrimSpace(key) == "" {
+		return "", errors.New("key is required")
+	}
+	if expiry <= 0 {
+		expiry = time.Hour
+	}
+
+	presigner := s3.NewPresignClient(u.rawS3)
+	out, err := presigner.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(u.bucket),
+		Key:    aws.String(strings.TrimPrefix(key, "/")),
+	}, s3.WithPresignExpires(expiry))
+	if err != nil {
+		return "", fmt.Errorf("presign put object: %w", err)
+	}
+
+	return out.URL, nil
+}
+
+func (u *S3FileUploader) DownloadToFile(ctx context.Context, key, localPath string) error {
+	if u.bucket == "" {
+		return errors.New("s3 bucket is not configured")
+	}
+	if strings.TrimSpace(key) == "" {
+		return errors.New("key is required")
+	}
+	if strings.TrimSpace(localPath) == "" {
+		return errors.New("local path is required")
+	}
+
+	out, err := u.rawS3.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(u.bucket),
+		Key:    aws.String(strings.TrimPrefix(key, "/")),
+	})
+	if err != nil {
+		return fmt.Errorf("get object %q: %w", key, err)
+	}
+	defer out.Body.Close()
+
+	f, err := os.Create(localPath)
+	if err != nil {
+		return fmt.Errorf("create local file %q: %w", localPath, err)
+	}
+	defer f.Close()
+
+	if _, err = io.Copy(f, out.Body); err != nil {
+		return fmt.Errorf("write to %q: %w", localPath, err)
+	}
+	return nil
 }
 
 func sanitizeSegment(in string) string {

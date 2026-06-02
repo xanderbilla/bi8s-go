@@ -131,37 +131,37 @@ func TestVideoMetadata_DetermineQualities(t *testing.T) {
 		{
 			name:     "4K source",
 			metadata: VideoMetadata{Height: 2160},
-			want:     []string{"360p", "480p", "720p", "1080p", "1440p", "2160p"},
+			want:     []string{"480p", "720p", "1080p"},
 		},
 		{
 			name:     "1440p source",
 			metadata: VideoMetadata{Height: 1440},
-			want:     []string{"360p", "480p", "720p", "1080p", "1440p"},
+			want:     []string{"480p", "720p", "1080p"},
 		},
 		{
 			name:     "1080p source",
 			metadata: VideoMetadata{Height: 1080},
-			want:     []string{"360p", "480p", "720p", "1080p"},
+			want:     []string{"480p", "720p", "1080p"},
 		},
 		{
 			name:     "720p source",
 			metadata: VideoMetadata{Height: 720},
-			want:     []string{"360p", "480p", "720p"},
+			want:     []string{"480p", "720p"},
 		},
 		{
 			name:     "480p source",
 			metadata: VideoMetadata{Height: 480},
-			want:     []string{"360p", "480p"},
+			want:     []string{"480p"},
 		},
 		{
 			name:     "360p source",
 			metadata: VideoMetadata{Height: 360},
-			want:     []string{"360p", "480p"},
+			want:     []string{"480p"},
 		},
 		{
 			name:     "very low resolution",
 			metadata: VideoMetadata{Height: 240},
-			want:     []string{"360p", "480p"},
+			want:     []string{"480p"},
 		},
 	}
 
@@ -190,14 +190,14 @@ func TestVideoMetadata_DetermineQualities_AlwaysIncludesBaseline(t *testing.T) {
 
 	hasBaseline := false
 	for _, q := range qualities {
-		if q == "360p" || q == "480p" {
+		if q == "480p" {
 			hasBaseline = true
 			break
 		}
 	}
 
 	if !hasBaseline {
-		t.Error("DetermineQualities() should always include baseline qualities (360p, 480p)")
+		t.Error("DetermineQualities() should always include baseline quality (480p)")
 	}
 }
 

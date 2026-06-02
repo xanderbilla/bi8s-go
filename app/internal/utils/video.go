@@ -113,9 +113,7 @@ func (m *VideoMetadata) GetResolutionString() string {
 }
 
 func (m *VideoMetadata) DetermineQualities() []string {
-	qualities := []string{}
-
-	qualities = append(qualities, "360p", "480p")
+	qualities := []string{"480p"}
 
 	if m.Height >= 720 {
 		qualities = append(qualities, "720p")
@@ -123,14 +121,6 @@ func (m *VideoMetadata) DetermineQualities() []string {
 
 	if m.Height >= 1080 {
 		qualities = append(qualities, "1080p")
-	}
-
-	if m.Height >= 1440 {
-		qualities = append(qualities, "1440p")
-	}
-
-	if m.Height >= 2160 {
-		qualities = append(qualities, "2160p")
 	}
 
 	return qualities

@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -26,6 +26,9 @@ var (
 
 	tmpDirOnce sync.Once
 	tmpDirVal  string
+
+	ffmpegThreadsOnce sync.Once
+	ffmpegThreadsVal  int
 )
 
 func TmpDir() string {
@@ -41,6 +44,19 @@ func TmpDir() string {
 		tmpDirVal = v
 	})
 	return tmpDirVal
+}
+
+// ffmpegThreads returns the thread count to pass to ffmpeg via -threads.
+// Reads ENCODER_FFMPEG_THREADS once; 0 means "let ffmpeg choose" (default: 4).
+func ffmpegThreads() int {
+	ffmpegThreadsOnce.Do(func() {
+		v := env.GetInt("ENCODER_FFMPEG_THREADS", 4)
+		if v < 0 {
+			v = 0
+		}
+		ffmpegThreadsVal = v
+	})
+	return ffmpegThreadsVal
 }
 
 func runFFmpeg(cmd *exec.Cmd) ([]byte, error) {
@@ -116,6 +132,99 @@ func sanitizePath(path string) (string, error) {
 	}
 
 	return abs, nil
+}
+
+// MultiQualitySpec describes one HLS rendition for TranscodeToHLSMultiQuality.
+type MultiQualitySpec struct {
+	Quality      string // e.g. "1080p" — used only for error messages
+	Resolution   string // WxH
+	VideoBitrate string // e.g. "5000k"
+	OutputDir    string // absolute local directory for this rendition's segments
+}
+
+// TranscodeToHLSMultiQuality runs a single ffmpeg process that produces HLS
+// renditions for every spec in one decode pass, dramatically reducing peak RAM
+// usage compared to N separate TranscodeToHLS calls.
+func TranscodeToHLSMultiQuality(ctx context.Context, inputPath string, specs []MultiQualitySpec, hasAudio bool) error {
+	if len(specs) == 0 {
+		return fmt.Errorf("no quality specs provided")
+	}
+
+	safeInput, err := sanitizePath(inputPath)
+	if err != nil {
+		return fmt.Errorf("invalid input path: %w", err)
+	}
+
+	safeDirs := make([]string, len(specs))
+	for i, spec := range specs {
+		if !resolutionRe.MatchString(spec.Resolution) {
+			return fmt.Errorf("invalid resolution token %q for quality %s", spec.Resolution, spec.Quality)
+		}
+		if !bitrateRe.MatchString(spec.VideoBitrate) {
+			return fmt.Errorf("invalid bitrate token %q for quality %s", spec.VideoBitrate, spec.Quality)
+		}
+		sd, err := sanitizePath(spec.OutputDir)
+		if err != nil {
+			return fmt.Errorf("invalid output dir for quality %s: %w", spec.Quality, err)
+		}
+		if err := os.MkdirAll(sd, 0755); err != nil {
+			return fmt.Errorf("failed to create output dir for quality %s: %w", spec.Quality, err)
+		}
+		safeDirs[i] = sd
+	}
+
+	n := len(specs)
+
+	// Build filter_complex: split video (and audio if present) into N streams.
+	videoLabels := make([]string, n)
+	audioLabels := make([]string, n)
+	for i := range specs {
+		videoLabels[i] = fmt.Sprintf("[v%d]", i)
+		audioLabels[i] = fmt.Sprintf("[a%d]", i)
+	}
+
+	filterComplex := fmt.Sprintf("[0:v]split=%d%s", n, strings.Join(videoLabels, ""))
+	if hasAudio {
+		filterComplex += fmt.Sprintf(";[0:a]asplit=%d%s", n, strings.Join(audioLabels, ""))
+	}
+
+	args := []string{
+		"-nostdin",
+	}
+	if t := ffmpegThreads(); t > 0 {
+		args = append(args, "-threads", strconv.Itoa(t))
+	}
+	args = append(args,
+		"-i", safeInput,
+		"-filter_complex", filterComplex,
+	)
+
+	for i, spec := range specs {
+		args = append(args,
+			"-map", videoLabels[i],
+			"-c:v", "libx264",
+			"-b:v", spec.VideoBitrate,
+			"-s", spec.Resolution,
+		)
+		if hasAudio {
+			args = append(args, "-map", audioLabels[i], "-c:a", "aac", "-b:a", "128k")
+		} else {
+			args = append(args, "-an")
+		}
+		args = append(args,
+			"-hls_time", "6",
+			"-hls_playlist_type", "vod",
+			"-hls_segment_filename", filepath.Join(safeDirs[i], "segment_%03d.ts"),
+			filepath.Join(safeDirs[i], "index.m3u8"),
+		)
+	}
+
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	stderr, err := runFFmpeg(cmd)
+	if err != nil {
+		return fmt.Errorf("ffmpeg multi-quality transcode failed: %w, stderr: %s", err, string(stderr))
+	}
+	return nil
 }
 
 func TranscodeToHLS(ctx context.Context, inputPath, outputDir, quality, resolution, videoBitrate string) error {
@@ -208,6 +317,47 @@ func TranscodeAudioToHLS(ctx context.Context, inputPath, outputDir, bitrate stri
 	return nil
 }
 
+// GenerateThumbnailsMulti extracts count thumbnails from the video in a single
+// ffmpeg pass, evenly distributed across the video duration. Output files are
+// named thumbnail_1.jpg through thumbnail_N.jpg in outputDir.
+func GenerateThumbnailsMulti(ctx context.Context, inputPath, outputDir string, count int, duration float64) error {
+	if count < 1 {
+		return fmt.Errorf("count must be >= 1")
+	}
+
+	safeInput, err := sanitizePath(inputPath)
+	if err != nil {
+		return fmt.Errorf("invalid input path: %w", err)
+	}
+
+	safeDir, err := sanitizePath(outputDir)
+	if err != nil {
+		return fmt.Errorf("invalid output dir: %w", err)
+	}
+
+	if err := os.MkdirAll(safeDir, 0755); err != nil {
+		return fmt.Errorf("failed to create thumbnail directory: %w", err)
+	}
+
+	// fps=count/duration samples `count` frames evenly distributed.
+	// Output filenames: thumbnail_1.jpg … thumbnail_N.jpg (%d is 1-based in ffmpeg).
+	fpsExpr := fmt.Sprintf("%d/%.4f", count, duration)
+	cmd := exec.CommandContext(ctx, "ffmpeg",
+		"-nostdin",
+		"-i", safeInput,
+		"-vf", "fps="+fpsExpr,
+		"-frames:v", strconv.Itoa(count),
+		"-q:v", "2",
+		filepath.Join(safeDir, "thumbnail_%d.jpg"),
+	)
+
+	stderr, err := runFFmpeg(cmd)
+	if err != nil {
+		return fmt.Errorf("ffmpeg thumbnails generation failed: %w, stderr: %s", err, string(stderr))
+	}
+	return nil
+}
+
 func GenerateThumbnail(ctx context.Context, inputPath, outputPath string, timestamp float64) error {
 	safeInput, err := sanitizePath(inputPath)
 	if err != nil {
@@ -295,39 +445,17 @@ func GenerateSprite(ctx context.Context, inputPath, spriteImagePath, spriteVTTPa
 		return fmt.Errorf("failed to create sprite directory: %w", err)
 	}
 
-	frameCount := 10
+	const frameCount = 10
 	interval := duration / float64(frameCount)
 
-	framesDir := filepath.Join(outputDir, "frames")
-	if err := os.MkdirAll(framesDir, 0755); err != nil {
-		return fmt.Errorf("failed to create frames directory: %w", err)
-	}
-	defer func() {
-		if err := os.RemoveAll(framesDir); err != nil && !os.IsNotExist(err) {
-			slog.WarnContext(ctx, "failed to remove frames directory", "frames_dir", framesDir, "error", err.Error())
-		}
-	}()
-
-	for i := 0; i < frameCount; i++ {
-		timestamp := float64(i) * interval
-		framePath := filepath.Join(framesDir, fmt.Sprintf("frame_%03d.jpg", i))
-
-		cmd := exec.CommandContext(ctx, "ffmpeg",
-			"-i", safeInput,
-			"-ss", fmt.Sprintf("%.2f", timestamp),
-			"-vframes", "1",
-			"-s", "160x90",
-			framePath,
-		)
-
-		if stderr, err := runFFmpeg(cmd); err != nil {
-			return fmt.Errorf("failed to extract frame %d: %w, stderr: %s", i, err, string(stderr))
-		}
-	}
-
+	// Single ffmpeg pass: sample frameCount frames evenly, scale to 160x90, tile 5x2.
+	fpsExpr := fmt.Sprintf("%d/%.4f", frameCount, duration)
 	cmd := exec.CommandContext(ctx, "ffmpeg",
-		"-i", filepath.Join(framesDir, "frame_%03d.jpg"),
-		"-filter_complex", fmt.Sprintf("tile=%dx%d", 5, 2),
+		"-nostdin",
+		"-i", safeInput,
+		"-vf", fmt.Sprintf("fps=%s,scale=160:90,tile=5x2", fpsExpr),
+		"-frames:v", "1",
+		"-q:v", "2",
 		safeImagePath,
 	)
 
