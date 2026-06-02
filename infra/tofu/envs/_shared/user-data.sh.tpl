@@ -17,7 +17,7 @@ apt-get upgrade -y
 
 # Install required packages
 echo "Installing required packages..."
-apt-get install -y git wget tar curl unzip openssl jq ca-certificates gnupg lsb-release certbot
+apt-get install -y git wget tar curl unzip openssl jq ca-certificates gnupg lsb-release
 
 # Install Docker CE (official Docker repo)
 echo "Installing Docker CE..."
@@ -66,7 +66,7 @@ echo 'export GOPATH=/home/ubuntu/go' >> /etc/profile.d/go.sh
 
 # Create proper directory structure
 echo "Creating application directory structure..."
-mkdir -p /opt/${project_name}/{compose,nginx/{conf.d,snippets,ssl/{live,archive,renewal},certbot/www},scripts,prometheus-data}
+mkdir -p /opt/${project_name}/{compose,scripts,prometheus-data}
 cd /opt/${project_name}
 
 # Mount Prometheus EBS volume
@@ -93,202 +93,6 @@ IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-
 PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
 echo "Public IP: $PUBLIC_IP"
 
-# Generate self-signed SSL certificate (always created as a fallback)
-echo "Generating self-signed SSL certificate..."
-openssl req -x509 -nodes -days 365 \
-  -newkey rsa:2048 \
-  -keyout /opt/${project_name}/nginx/ssl/live/cert.key \
-  -out /opt/${project_name}/nginx/ssl/live/cert.crt \
-  -subj "/C=US/ST=State/L=City/O=${project_name}/CN=${project_name}-${environment}" \
-  -addext "subjectAltName=%{ if domain_name != "" }DNS:${domain_name},%{ endif }%{ if grafana_domain_name != "" }DNS:${grafana_domain_name},%{ endif }IP:$PUBLIC_IP"
-
-# Set proper permissions for certificates
-chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
-chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
-
-# Create certbot webroot
-mkdir -p /opt/${project_name}/nginx/certbot/www
-
-CERT_DIR="/opt/${project_name}/nginx/ssl/live"
-S3_CERT_PREFIX="s3://${s3_bucket}/ssl/certs"
-CERTBOT_SUCCESS=false
-
-%{ if enable_public_dns }
-# Restore a previously obtained Let's Encrypt cert from S3.
-# This prevents hitting LE rate limits (5 certs/7 days) on repeated destroy/recreate cycles.
-echo "Checking S3 for cached Let's Encrypt certificate..."
-if aws s3 cp "$S3_CERT_PREFIX/cert.crt" "$CERT_DIR/cert.crt" 2>/dev/null && \
-   aws s3 cp "$S3_CERT_PREFIX/cert.key" "$CERT_DIR/cert.key" 2>/dev/null; then
-  chmod 644 "$CERT_DIR/cert.crt"
-  chmod 600 "$CERT_DIR/cert.key"
-  # Only reuse if cert won't expire within 7 days
-  if openssl x509 -checkend 604800 -noout -in "$CERT_DIR/cert.crt" 2>/dev/null; then
-    echo "Valid Let's Encrypt cert restored from S3 — skipping certbot."
-    CERTBOT_SUCCESS=true
-  else
-    echo "Cached cert is expired or expires within 7 days — will request a fresh cert."
-  fi
-else
-  echo "No cached cert found in S3."
-fi
-
-# Attempt to obtain Let's Encrypt certificate via standalone mode.
-# Port 80 is free here — Docker hasn't started yet.
-if [ "$CERTBOT_SUCCESS" = "false" ]; then
-  echo "Attempting Let's Encrypt certificate for ${domain_name} and ${grafana_domain_name}..."
-  for attempt in 1 2 3; do
-    if certbot certonly --standalone --non-interactive --agree-tos \
-        --email "${admin_email}" \
-        -d "${domain_name}" \
-        -d "${grafana_domain_name}" \
-        --preferred-challenges http 2>&1; then
-      CERTBOT_SUCCESS=true
-      echo "Let's Encrypt certificate obtained on attempt $attempt!"
-      break
-    fi
-    echo "Certbot attempt $attempt/3 failed, waiting 30s before retry..."
-    sleep 30
-  done
-
-  if [ "$CERTBOT_SUCCESS" = "true" ]; then
-    cp /etc/letsencrypt/live/${domain_name}/fullchain.pem "$CERT_DIR/cert.crt"
-    cp /etc/letsencrypt/live/${domain_name}/privkey.pem "$CERT_DIR/cert.key"
-    chmod 644 "$CERT_DIR/cert.crt"
-    chmod 600 "$CERT_DIR/cert.key"
-    echo "Let's Encrypt certs installed."
-    # Cache to S3 so future instances skip the certbot request
-    aws s3 cp "$CERT_DIR/cert.crt" "$S3_CERT_PREFIX/cert.crt" && \
-      aws s3 cp "$CERT_DIR/cert.key" "$S3_CERT_PREFIX/cert.key" && \
-      echo "Cert cached to S3." || echo "WARNING: Failed to cache cert to S3."
-  else
-    echo "WARNING: Let's Encrypt failed after 3 attempts. Self-signed cert will be used."
-    echo "Run /opt/${project_name}/scripts/renew-ssl.sh later to install a trusted cert."
-  fi
-fi
-%{ else }
-echo "Public DNS disabled (enable_public_dns=false) — skipping Let's Encrypt; using self-signed cert."
-%{ endif }
-
-# Create nginx config
-cat > /opt/${project_name}/nginx/conf.d/api.conf <<'NGINXCONF'
-upstream api_backend {
-    server api:8080;
-}
-
-upstream grafana_backend {
-    server grafana:3000;
-}
-
-# HTTP Server - Redirect to HTTPS
-server {
-    listen 80;
-    server_name _;
-
-    # Certbot challenge
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    # Health check (no redirect)
-    location /health {
-        access_log off;
-        return 200 "healthy\n";
-        add_header Content-Type text/plain;
-    }
-
-    # Redirect to HTTPS
-    location / {
-        return 301 https://$host$request_uri;
-    }
-}
-
-%{ if grafana_domain_name != "" }
-# HTTPS Server - Grafana subdomain
-server {
-    listen 443 ssl;
-    http2 on;
-    server_name ${grafana_domain_name};
-
-    ssl_certificate /etc/nginx/ssl/live/cert.crt;
-    ssl_certificate_key /etc/nginx/ssl/live/cert.key;
-    # Mozilla "intermediate" profile (https://ssl-config.mozilla.org/)
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 1d;
-    ssl_session_tickets off;
-
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
-
-    location /${project_name} {
-        proxy_pass http://grafana_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-%{ endif }
-
-# HTTPS Server - API (default / catch-all)
-server {
-    listen 443 ssl default_server;
-    http2 on;
-    server_name %{ if domain_name != "" }${domain_name}%{ endif } _;
-
-    # SSL Configuration
-    ssl_certificate /etc/nginx/ssl/live/cert.crt;
-    ssl_certificate_key /etc/nginx/ssl/live/cert.key;
-
-    # SSL Security — Mozilla "intermediate" profile.
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 1d;
-    ssl_session_tickets off;
-
-    # Security Headers
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
-
-    # Client body size
-    client_max_body_size 100M;
-
-    # API Proxy
-    location / {
-        proxy_pass http://api_backend;
-        proxy_http_version 1.1;
-        
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-
-    location /health {
-        access_log off;
-        return 200 "healthy\n";
-        add_header Content-Type text/plain;
-    }
-}
-NGINXCONF
-
 # Set up environment variables
 echo "Setting up environment variables..."
 cat > /etc/profile.d/${project_name}.sh <<EOF
@@ -298,8 +102,6 @@ export DYNAMODB_CONTENT_TABLE="${dynamodb_movie_table}"
 export DYNAMODB_PERSON_TABLE="${dynamodb_person_table}"
 export DYNAMODB_ATTRIBUTE_TABLE="${dynamodb_attribute_table}"
 export DYNAMODB_ATTRIBUTE_NAME_INDEX="${dynamodb_attribute_name_index}"
-export DYNAMODB_ENCODER_TABLE="${dynamodb_encoder_table}"
-export DYNAMODB_ENCODER_CONTENT_ID_INDEX="contentId-index"
 export DYNAMODB_CONTENT_CAST_TABLE="${dynamodb_content_cast_table}"
 export DYNAMODB_CONTENT_ATTRIBUTE_TABLE="${dynamodb_content_attribute_table}"
 export DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX="visibility-createdAt-index"
@@ -323,8 +125,6 @@ DYNAMODB_CONTENT_TABLE=${dynamodb_movie_table}
 DYNAMODB_PERSON_TABLE=${dynamodb_person_table}
 DYNAMODB_ATTRIBUTE_TABLE=${dynamodb_attribute_table}
 DYNAMODB_ATTRIBUTE_NAME_INDEX=${dynamodb_attribute_name_index}
-DYNAMODB_ENCODER_TABLE=${dynamodb_encoder_table}
-DYNAMODB_ENCODER_CONTENT_ID_INDEX=contentId-index
 DYNAMODB_CONTENT_CAST_TABLE=${dynamodb_content_cast_table}
 DYNAMODB_CONTENT_ATTRIBUTE_TABLE=${dynamodb_content_attribute_table}
 DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX=visibility-createdAt-index
@@ -335,10 +135,6 @@ S3_BUCKET=${s3_bucket}
 CORS_ALLOWED_ORIGINS=%{ if domain_name != "" }https://${domain_name},http://${domain_name},%{ endif }%{ if grafana_domain_name != "" }https://${grafana_domain_name},%{ endif }%{ if amplify_url != "" }${amplify_url},%{ endif }http://localhost:3000,http://localhost:8080,http://$${PUBLIC_IP}
 CORS_ALLOW_PRIVATE_NETWORK=true
 TRUSTED_PROXIES=
-ENCODER_MAX_CONCURRENT=2
-ENCODER_FFMPEG_PARALLELISM=0
-ENCODER_JOB_TIMEOUT_SECONDS=1800
-BI8S_TMP_DIR=/tmp
 PUBLIC_IP=$${PUBLIC_IP}
 OTEL_SERVICE_NAME=${project_name}-api
 OTEL_ENABLED=true
@@ -392,42 +188,9 @@ EOF
 
 # Set permissions (do not dereference symlinks; keep prometheus-data writable by root container).
 echo "Setting permissions..."
-chown -RH ubuntu:ubuntu /opt/${project_name}/compose /opt/${project_name}/scripts /opt/${project_name}/nginx
+chown -RH ubuntu:ubuntu /opt/${project_name}/compose /opt/${project_name}/scripts
 chown -R ubuntu:ubuntu /opt/${project_name}/repo
 chmod 600 /opt/${project_name}/compose/.env
-
-%{ if enable_public_dns }
-# Set up certbot auto-renewal hooks and cron job
-mkdir -p /etc/letsencrypt/renewal-hooks/pre /etc/letsencrypt/renewal-hooks/post
-
-# Pre-hook: stop nginx so port 80 is free for standalone renewal
-cat > /etc/letsencrypt/renewal-hooks/pre/stop-nginx.sh <<'RENEW_PRE'
-#!/bin/bash
-cd /opt/${project_name}/compose
-docker-compose stop nginx
-RENEW_PRE
-chmod +x /etc/letsencrypt/renewal-hooks/pre/stop-nginx.sh
-
-# Post-hook: copy renewed certs, cache to S3, and restart nginx
-cat > /etc/letsencrypt/renewal-hooks/post/start-nginx.sh <<'RENEW_POST'
-#!/bin/bash
-DOMAIN="${domain_name}"
-CERT_DIR="/opt/${project_name}/nginx/ssl/live"
-cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem $CERT_DIR/cert.crt
-cp /etc/letsencrypt/live/$DOMAIN/privkey.pem $CERT_DIR/cert.key
-chmod 644 $CERT_DIR/cert.crt
-chmod 600 $CERT_DIR/cert.key
-# Cache renewed cert to S3 for future deploys
-aws s3 cp $CERT_DIR/cert.crt s3://${s3_bucket}/ssl/certs/cert.crt || true
-aws s3 cp $CERT_DIR/cert.key s3://${s3_bucket}/ssl/certs/cert.key || true
-cd /opt/${project_name}/compose
-docker-compose start nginx
-RENEW_POST
-chmod +x /etc/letsencrypt/renewal-hooks/post/start-nginx.sh
-
-# Cron: run certbot renew twice daily (Let's Encrypt recommendation)
-echo "0 0,12 * * * root certbot renew --quiet" > /etc/cron.d/certbot-renew
-%{ endif }
 
 # Create seed-on-boot script (runs seed.sh after Docker service is up)
 mkdir -p /opt/${project_name}/logs
@@ -496,22 +259,6 @@ if [ "$NEW_IP" != "$OLD_IP" ]; then
     # Update environment profile
     sed -i "s/^export PUBLIC_IP=.*/export PUBLIC_IP=\"$NEW_IP\"/" /etc/profile.d/${project_name}.sh
     
-    # Regenerate self-signed certificate ONLY if Let's Encrypt cert is not present
-    LE_CERT="%{ if domain_name != "" }/etc/letsencrypt/live/${domain_name}/fullchain.pem%{ else }/dev/null%{ endif }"
-    if [ ! -f "$LE_CERT" ]; then
-      openssl req -x509 -nodes -days 365 \
-        -newkey rsa:2048 \
-        -keyout /opt/${project_name}/nginx/ssl/live/cert.key \
-        -out /opt/${project_name}/nginx/ssl/live/cert.crt \
-        -subj "/C=US/ST=State/L=City/O=${project_name}/CN=${project_name}-${environment}" \
-        -addext "subjectAltName=%{ if domain_name != "" }DNS:${domain_name},%{ endif }%{ if grafana_domain_name != "" }DNS:${grafana_domain_name},%{ endif }IP:$NEW_IP"
-      chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
-      chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
-      echo "IP and self-signed certificate updated."
-    else
-      echo "Let's Encrypt cert present — skipping self-signed cert regen."
-    fi
-    
     echo "IP updated successfully!"
 else
     echo "IP unchanged: $NEW_IP"
@@ -531,56 +278,6 @@ aws ecr get-login-password --region ${aws_region} | \
 
 systemctl start ${project_name}-docker.service
 
-# Create helper script for SSL certificate renewal with Let's Encrypt
-cat > /opt/${project_name}/scripts/renew-ssl.sh <<'SCRIPT'
-#!/bin/bash
-# Script to renew SSL certificate with Let's Encrypt
-# Usage: ./renew-ssl.sh yourdomain.com
-
-DOMAIN=$1
-if [ -z "$DOMAIN" ]; then
-    echo "Usage: $0 <domain>"
-    exit 1
-fi
-
-# Install certbot if not present
-if ! command -v certbot; then
-    echo "Installing certbot..."
-    apt-get install -y certbot python3-certbot
-fi
-
-# Stop nginx container
-docker-compose stop nginx
-
-# Get certificate using webroot
-certbot certonly --webroot \
-    -w /opt/${project_name}/nginx/certbot/www \
-    -d $DOMAIN \
-    --non-interactive \
-    --agree-tos \
-    --email admin@$DOMAIN
-
-# Copy certificates
-cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem /opt/${project_name}/nginx/ssl/live/cert.crt
-cp /etc/letsencrypt/live/$DOMAIN/privkey.pem /opt/${project_name}/nginx/ssl/live/cert.key
-
-# Backup to archive
-mkdir -p /opt/${project_name}/nginx/ssl/archive/$DOMAIN
-cp /etc/letsencrypt/live/$DOMAIN/* /opt/${project_name}/nginx/ssl/archive/$DOMAIN/
-
-# Set permissions
-chmod 644 /opt/${project_name}/nginx/ssl/live/cert.crt
-chmod 600 /opt/${project_name}/nginx/ssl/live/cert.key
-
-# Restart nginx container
-cd /opt/${project_name}/compose
-docker-compose restart nginx
-
-echo "SSL certificate renewed successfully!"
-SCRIPT
-
-chmod +x /opt/${project_name}/scripts/renew-ssl.sh
-
 # Create backup script
 cat > /opt/${project_name}/scripts/backup-config.sh <<'SCRIPT'
 #!/bin/bash
@@ -593,12 +290,6 @@ echo "Creating backup in $BACKUP_DIR..."
 
 # Backup compose files
 cp -r /opt/${project_name}/compose $BACKUP_DIR/
-
-# Backup nginx config
-cp -r /opt/${project_name}/nginx/conf.d $BACKUP_DIR/
-
-# Backup SSL certificates
-cp -r /opt/${project_name}/nginx/ssl $BACKUP_DIR/
 
 echo "Backup completed!"
 ls -lh $BACKUP_DIR
@@ -699,8 +390,6 @@ echo ""
 echo "Application directory: /opt/${project_name}"
 echo "Directory structure:"
 echo "  /opt/${project_name}/compose/          - Docker Compose files"
-echo "  /opt/${project_name}/nginx/conf.d/     - Nginx configuration"
-echo "  /opt/${project_name}/nginx/ssl/        - SSL certificates"
 echo "  /opt/${project_name}/scripts/          - Helper scripts"
 echo ""
 echo "Current Public IP: $PUBLIC_IP"
@@ -708,15 +397,11 @@ echo ""
 echo "Helper scripts:"
 echo "  /opt/${project_name}/scripts/deploy.sh              - Deploy/update application"
 echo "  /opt/${project_name}/scripts/update-ip.sh           - Update IP (auto-runs on restart)"
-echo "  /opt/${project_name}/scripts/renew-ssl.sh <domain>  - Setup Let's Encrypt SSL"
 echo "  /opt/${project_name}/scripts/backup-config.sh       - Backup configuration"
 echo ""
 echo "To deploy application:"
 echo "  cd /opt/${project_name}/compose"
 echo "  docker-compose up -d"
-echo ""
-echo "To renew SSL with Let's Encrypt:"
-echo "  /opt/${project_name}/scripts/renew-ssl.sh yourdomain.com"
 echo ""
 echo "=========================================="
 

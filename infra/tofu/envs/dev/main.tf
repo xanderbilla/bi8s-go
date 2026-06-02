@@ -32,7 +32,6 @@ locals {
   dynamodb_movie_table             = "${var.project_name}-content-table-${var.environment}"
   dynamodb_person_table            = "${var.project_name}-person-table-${var.environment}"
   dynamodb_attribute_table         = "${var.project_name}-attributes-table-${var.environment}"
-  dynamodb_encoder_table           = "${var.project_name}-video-table-${var.environment}"
   dynamodb_content_cast_table      = "${var.project_name}-content-cast-table-${var.environment}"
   dynamodb_content_attribute_table = "${var.project_name}-content-attribute-table-${var.environment}"
   s3_bucket                        = "${var.project_name}-storage-${var.environment}"
@@ -162,30 +161,6 @@ module "dynamodb_attribute" {
     {
       name            = "name-index"
       hash_key        = "name"
-      projection_type = "ALL"
-    },
-  ]
-  read_capacity                 = var.dynamodb_read_capacity
-  write_capacity                = var.dynamodb_write_capacity
-  enable_point_in_time_recovery = true
-  enable_encryption             = true
-  tags                          = local.common_tags
-}
-
-module "dynamodb_encoder" {
-  source = "../../modules/dynamodb"
-
-  table_name   = local.dynamodb_encoder_table
-  billing_mode = var.dynamodb_billing_mode
-  hash_key     = "id"
-  attributes = [
-    { name = "id", type = "S" },
-    { name = "contentId", type = "S" },
-  ]
-  global_secondary_indexes = [
-    {
-      name            = "contentId-index"
-      hash_key        = "contentId"
       projection_type = "ALL"
     },
   ]
@@ -355,8 +330,7 @@ module "iam" {
   dynamodb_table_arns = [
     module.dynamodb_movie.table_arn,
     module.dynamodb_person.table_arn,
-    module.dynamodb_attribute.table_arn,
-    module.dynamodb_encoder.table_arn
+    module.dynamodb_attribute.table_arn
   ]
 
   s3_bucket_arns = [
@@ -415,7 +389,6 @@ module "ec2" {
     dynamodb_person_table            = local.dynamodb_person_table
     dynamodb_attribute_table         = local.dynamodb_attribute_table
     dynamodb_attribute_name_index    = "name-index"
-    dynamodb_encoder_table           = local.dynamodb_encoder_table
     dynamodb_content_cast_table      = local.dynamodb_content_cast_table
     dynamodb_content_attribute_table = local.dynamodb_content_attribute_table
     s3_bucket                        = local.s3_bucket

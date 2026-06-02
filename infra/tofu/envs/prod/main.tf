@@ -28,7 +28,6 @@ locals {
   dynamodb_movie_table             = "${var.project_name}-content-table-${var.environment}"
   dynamodb_person_table            = "${var.project_name}-person-table-${var.environment}"
   dynamodb_attribute_table         = "${var.project_name}-attributes-table-${var.environment}"
-  dynamodb_encoder_table           = "${var.project_name}-video-table-${var.environment}"
   dynamodb_content_cast_table      = "${var.project_name}-content-cast-table-${var.environment}"
   dynamodb_content_attribute_table = "${var.project_name}-content-attribute-table-${var.environment}"
   s3_bucket                        = "${var.project_name}-storage-${var.environment}"
@@ -70,18 +69,18 @@ module "security_group" {
   # NOTE: SSH (22) is intentionally NOT exposed. Use AWS SSM Session Manager:
   #   aws ssm start-session --target <instance-id>
   # The EC2 IAM role already has AmazonSSMManagedInstanceCore attached.
-  # The application port (8080) is NOT exposed publicly: nginx terminates TLS
-  # and proxies to the api container over the internal docker network.
+  # The application port (8080) is NOT exposed publicly: Cloudflare Tunnel
+  # routes traffic to Traefik (port 80) which proxies to the api container.
   ingress_rules = [
     {
-      description = "HTTP (redirected to HTTPS by nginx)"
+      description = "HTTP (Cloudflare Tunnel → Traefik entrypoint)"
       from_port   = 80
       to_port     = 80
       protocol    = "tcp"
       cidr_ipv4   = "0.0.0.0/0"
     },
     {
-      description = "HTTPS (nginx)"
+      description = "HTTPS (Cloudflare TLS termination)"
       from_port   = 443
       to_port     = 443
       protocol    = "tcp"
@@ -164,31 +163,6 @@ module "dynamodb_attribute" {
     {
       name            = "name-index"
       hash_key        = "name"
-      projection_type = "ALL"
-    },
-  ]
-  read_capacity                 = var.dynamodb_read_capacity
-  write_capacity                = var.dynamodb_write_capacity
-  enable_point_in_time_recovery = true
-  enable_encryption             = true
-  deletion_protection_enabled   = var.dynamodb_deletion_protection
-  tags                          = local.common_tags
-}
-
-module "dynamodb_encoder" {
-  source = "../../modules/dynamodb"
-
-  table_name   = local.dynamodb_encoder_table
-  billing_mode = var.dynamodb_billing_mode
-  hash_key     = "id"
-  attributes = [
-    { name = "id", type = "S" },
-    { name = "contentId", type = "S" },
-  ]
-  global_secondary_indexes = [
-    {
-      name            = "contentId-index"
-      hash_key        = "contentId"
       projection_type = "ALL"
     },
   ]
@@ -310,8 +284,7 @@ module "iam" {
   dynamodb_table_arns = [
     module.dynamodb_movie.table_arn,
     module.dynamodb_person.table_arn,
-    module.dynamodb_attribute.table_arn,
-    module.dynamodb_encoder.table_arn
+    module.dynamodb_attribute.table_arn
   ]
 
   s3_bucket_arns = [module.s3.bucket_arn]
@@ -369,7 +342,6 @@ module "ec2" {
     dynamodb_person_table            = local.dynamodb_person_table
     dynamodb_attribute_table         = local.dynamodb_attribute_table
     dynamodb_attribute_name_index    = "name-index"
-    dynamodb_encoder_table           = local.dynamodb_encoder_table
     dynamodb_content_cast_table      = local.dynamodb_content_cast_table
     dynamodb_content_attribute_table = local.dynamodb_content_attribute_table
     s3_bucket                        = local.s3_bucket
@@ -383,8 +355,6 @@ module "ec2" {
     grafana_domain_name              = var.grafana_domain_name
     storage_domain_name              = var.storage_domain_name
     domain_name                      = var.domain_name
-    admin_email                      = var.admin_email
-    enable_public_dns                = var.enable_public_dns
   }))
 
   tags = local.common_tags

@@ -111,13 +111,13 @@ variable "repo_branch" {
 }
 
 variable "route53_zone_id" {
-  description = "Route53 hosted zone ID. Only used when enable_public_dns=true."
+  description = "Route53 hosted zone ID for DNS records."
   type        = string
   default     = ""
 }
 
 variable "domain_name" {
-  description = "Public domain for the API. Empty + enable_public_dns=false means access via raw IP only."
+  description = "Public domain for the API (used for CORS and env var generation)."
   type        = string
   default     = ""
 }
@@ -144,18 +144,6 @@ variable "storage_domain_name" {
   description = "CDN/storage domain (empty falls back to public IP for STORAGE_BASE_URL)"
   type        = string
   default     = ""
-}
-
-variable "admin_email" {
-  description = "Admin email used for Let's Encrypt registration"
-  type        = string
-  default     = ""
-}
-
-variable "enable_public_dns" {
-  description = "When true, request Let's Encrypt certs and create Route53 records. Default false for personal-project prod (raw-IP access acceptable)."
-  type        = bool
-  default     = false
 }
 
 variable "log_retention_days" {

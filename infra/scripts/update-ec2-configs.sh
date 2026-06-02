@@ -38,18 +38,12 @@ ssh -o StrictHostKeyChecking=no ec2-user@${EC2_IP} << 'EOF'
     echo "Updating docker-compose..."
     sudo cp infra/docker/docker-compose.yml /opt/bi8s/compose/
     
-    echo "Updating nginx config..."
-    sudo cp infra/docker/nginx/conf.d/api.conf /opt/bi8s/nginx/conf.d/api.conf
-    sudo cp infra/docker/nginx/conf.d/ui.conf /opt/bi8s/nginx/conf.d/ui.conf
-    sudo mkdir -p /opt/bi8s/nginx/snippets
-    sudo cp infra/docker/nginx/snippets/*.conf /opt/bi8s/nginx/snippets/
-    
     echo "Setting permissions..."
     sudo chown -R ec2-user:ec2-user /opt/bi8s
     
     echo "Restarting services..."
     cd /opt/bi8s/compose
-    docker-compose restart nginx
+    docker-compose restart api
     
     echo "Checking service status..."
     docker-compose ps
@@ -67,6 +61,5 @@ echo ""
 echo "Updated:"
 echo "  - Helper scripts"
 echo "  - Docker Compose config"
-echo "  - Nginx config"
 echo ""
 echo "Services restarted and running!"
