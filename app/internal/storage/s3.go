@@ -242,13 +242,13 @@ func (u *S3FileUploader) DownloadToFile(ctx context.Context, key, localPath stri
 	if err != nil {
 		return fmt.Errorf("get object %q: %w", key, err)
 	}
-	defer out.Body.Close()
+	defer func() { _ = out.Body.Close() }()
 
 	f, err := os.Create(localPath)
 	if err != nil {
 		return fmt.Errorf("create local file %q: %w", localPath, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if _, err = io.Copy(f, out.Body); err != nil {
 		return fmt.Errorf("write to %q: %w", localPath, err)

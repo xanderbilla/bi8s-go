@@ -16,7 +16,6 @@ var (
 	maxMultipartBodySize = int64(12_582_912)
 	maxMultipartFileSize = int64(10_485_760)
 	maxVideoBodySize     = int64(10_737_418_240)
-	maxVideoFileSize     = int64(10_737_418_240)
 )
 
 type Limits struct {
@@ -35,9 +34,6 @@ func ConfigureLimits(l Limits) {
 	}
 	if l.VideoBodyBytes > 0 {
 		maxVideoBodySize = l.VideoBodyBytes
-	}
-	if l.VideoFileBytes > 0 {
-		maxVideoFileSize = l.VideoFileBytes
 	}
 }
 

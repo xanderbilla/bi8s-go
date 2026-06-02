@@ -167,7 +167,7 @@ func TranscodeToHLSMultiQuality(ctx context.Context, inputPath string, specs []M
 		if err != nil {
 			return fmt.Errorf("invalid output dir for quality %s: %w", spec.Quality, err)
 		}
-		if err := os.MkdirAll(sd, 0755); err != nil {
+		if err := os.MkdirAll(sd, 0750); err != nil {
 			return fmt.Errorf("failed to create output dir for quality %s: %w", spec.Quality, err)
 		}
 		safeDirs[i] = sd
@@ -248,7 +248,7 @@ func TranscodeToHLS(ctx context.Context, inputPath, outputDir, quality, resoluti
 		return fmt.Errorf("invalid output path: %w", err)
 	}
 
-	if err := os.MkdirAll(safeOutput, 0755); err != nil {
+	if err := os.MkdirAll(safeOutput, 0750); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -291,7 +291,7 @@ func TranscodeAudioToHLS(ctx context.Context, inputPath, outputDir, bitrate stri
 		return fmt.Errorf("invalid output path: %w", err)
 	}
 
-	if err := os.MkdirAll(safeOutput, 0755); err != nil {
+	if err := os.MkdirAll(safeOutput, 0750); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -335,7 +335,7 @@ func GenerateThumbnailsMulti(ctx context.Context, inputPath, outputDir string, c
 		return fmt.Errorf("invalid output dir: %w", err)
 	}
 
-	if err := os.MkdirAll(safeDir, 0755); err != nil {
+	if err := os.MkdirAll(safeDir, 0750); err != nil {
 		return fmt.Errorf("failed to create thumbnail directory: %w", err)
 	}
 
@@ -370,7 +370,7 @@ func GenerateThumbnail(ctx context.Context, inputPath, outputPath string, timest
 	}
 
 	outputDir := filepath.Dir(safeOutput)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		return fmt.Errorf("failed to create thumbnail directory: %w", err)
 	}
 
@@ -402,7 +402,7 @@ func GeneratePreview(ctx context.Context, inputPath, outputPath string, duration
 	}
 
 	outputDir := filepath.Dir(safeOutput)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		return fmt.Errorf("failed to create preview directory: %w", err)
 	}
 
@@ -441,7 +441,7 @@ func GenerateSprite(ctx context.Context, inputPath, spriteImagePath, spriteVTTPa
 	}
 
 	outputDir := filepath.Dir(safeImagePath)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		return fmt.Errorf("failed to create sprite directory: %w", err)
 	}
 
@@ -491,7 +491,7 @@ func GenerateMasterPlaylist(outputPath string, qualities []QualityPlaylist, audi
 	}
 
 	outputDir := filepath.Dir(safeOutput)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		return fmt.Errorf("failed to create playlist directory: %w", err)
 	}
 

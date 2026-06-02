@@ -32,7 +32,7 @@ concurrency:
     cancel-in-progress: true
 
 env:
-    GO_VERSION: "1.25.0"
+    GO_VERSION: "1.25.10"
     GOLANGCI_LINT_VERSION: "v2.12.2"
     STATICCHECK_VERSION: "v0.7.0"
     GOVULNCHECK_VERSION: "v1.1.4"
@@ -174,7 +174,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - name: Create stub .env.dev for CI validation
-              run: touch .env.dev
+              run: touch .env.dev .env.bi8s
             - name: Validate local (dev) compose
               run: docker compose -f docker-compose.dev.yml config --quiet
             - name: Validate bi8s compose
@@ -207,7 +207,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - name: Run Trivy filesystem scan
-              uses: aquasecurity/trivy-action@0.36.0
+              uses: aquasecurity/trivy-action@v0.36.0
               with:
                   scan-type: fs
                   scan-ref: .
@@ -348,7 +348,7 @@ jobs:
             # Scan the published image for known CRITICAL/HIGH vulnerabilities.
             # Advisory only — existing baseline findings tracked separately.
             - name: Trivy image scan (advisory)
-              uses: aquasecurity/trivy-action@0.36.0
+              uses: aquasecurity/trivy-action@v0.36.0
               continue-on-error: true
               with:
                   image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:bi8s-image-${{ steps.detect-env.outputs.environment }}-latest

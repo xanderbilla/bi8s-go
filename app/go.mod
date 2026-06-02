@@ -1,6 +1,6 @@
 module github.com/xanderbilla/bi8s-go
 
-go 1.25.0
+go 1.25.10
 
 require (
 	github.com/alicebob/miniredis/v2 v2.37.0
