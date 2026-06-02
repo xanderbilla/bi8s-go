@@ -11,14 +11,13 @@ export BUILD_VERSION="dev"
 export AWS_REGION="us-east-1"
 export AWS_ACCESS_KEY_ID=""
 export AWS_SECRET_ACCESS_KEY=""
+# export AWS_SESSION_TOKEN=""  # Only needed for temporary/STS/SSO credentials
 
 # --- DynamoDB tables --------------------------------------------------------
 export DYNAMODB_CONTENT_TABLE="bi8s-content-table-dev"
 export DYNAMODB_PERSON_TABLE="bi8s-person-table-dev"
 export DYNAMODB_ATTRIBUTE_TABLE="bi8s-attributes-table-dev"
 export DYNAMODB_ATTRIBUTE_NAME_INDEX="name-index"
-export DYNAMODB_ENCODER_TABLE="bi8s-video-table-dev"
-export DYNAMODB_ENCODER_CONTENT_ID_INDEX="contentId-index"
 
 # --- S3 ---------------------------------------------------------------------
 # export S3_BUCKET="bi8s-storage-dev"  # disabled — using B2 Blaze; uncomment to switch back to AWS S3
@@ -27,6 +26,8 @@ export STORAGE_BASE_URL="http://localhost:8080"
 # --- CORS -------------------------------------------------------------------
 export CORS_ALLOWED_ORIGINS="http://localhost:3000,http://localhost:8443,https://localhost:8443,http://127.0.0.1:8443,https://127.0.0.1:8443"
 export CORS_ALLOW_PRIVATE_NETWORK="true"
+export HTTP_READ_TIMEOUT_SECONDS="30"
+export HTTP_WRITE_TIMEOUT_SECONDS="60"
 
 # --- Networking / Proxies ---------------------------------------------------
 export TRUSTED_PROXIES=""
@@ -40,14 +41,7 @@ export RATE_LIMIT_REDIS_TIMEOUT_MS="50"
 # --- DynamoDB/Context tuning ------------------------------------------------
 export DYNAMODB_MAX_SCAN_PAGES="1000"
 export CTX_DB_TIMEOUT_MS="30000"
-
-# --- Encoder ----------------------------------------------------------------
-export ENCODER_MAX_CONCURRENT="2"
-export ENCODER_FFMPEG_PARALLELISM="0"
-export ENCODER_JOB_TIMEOUT_SECONDS="1800"
-
-# --- Filesystem -------------------------------------------------------------
-export BI8S_TMP_DIR="/tmp"
+export ROUTER_TIMEOUT_SECONDS="120"
 
 # --- OpenTelemetry ----------------------------------------------------------
 export OTEL_SERVICE_NAME="bi8s-api"
@@ -73,6 +67,29 @@ export LOKI_PORT="3100"
 export GRAFANA_PORT="4000"
 export CADVISOR_PORT="8090"
 export NODE_EXPORTER_PORT="9100"
+export OPENSEARCH_PORT="9200"
+
+# --- Docker image control ---------------------------------------------------
+export API_IMAGE_NAME="bi8s:bi8s-image-dev-latest"
+export API_PULL_POLICY="never"
+
+# --- Cloudflare Tunnel ------------------------------------------------------
+# export TUNNEL_TOKEN=""         # Zero Trust → Networks → Tunnels
+export CLOUDFLARED_METRICS_PORT="2100"
+
+# --- UI / Next.js -----------------------------------------------------------
+# export UI_IMAGE_NAME=""
+# export UI_PULL_POLICY="never"
+# export UI_NODE_ENV="development"
+# export UI_CONTAINER_PORT="3000"
+# export NEXT_PUBLIC_LOG_LEVEL="debug"
+# export NEXT_PUBLIC_SITE_URL="http://localhost:3300"
+# export NEXT_PUBLIC_HTTP_TIMEOUT_MS="10000"
+# export NEXT_PUBLIC_CUSTOM_API_URL="http://localhost:8080/v1"
+# export NEXT_PUBLIC_CUSTOM_IMAGE_BASE_URL="http://localhost:8080"
+# export NEXT_PUBLIC_IMAGE_HOSTS="localhost"
+# export NEXT_PUBLIC_APP_VERSION="dev"
+# export NEXT_PUBLIC_APP_ENV="dev"
 
 # --- Observability defaults -------------------------------------------------
 export PROMETHEUS_RETENTION="72h"
