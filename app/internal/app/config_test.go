@@ -17,6 +17,7 @@ func baseConfig() Config {
 		AttributeTableName:                "attrs",
 		ContentCastTableName:              "content-cast",
 		ContentAttributeTableName:         "content-attribute",
+		EncoderTableName:                  "encoder",
 		ContentVisibilityCreatedAtIndex:   "visibility-createdAt-index",
 		ContentVisibilityContentTypeIndex: "visibility-contentType-index",
 		ContentVisibilityReleaseDateIndex: "visibility-releaseDate-index",

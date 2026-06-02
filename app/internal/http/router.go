@@ -123,7 +123,7 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 		"content.GetDiscover":         contentHandler.GetDiscoverContent,
 		"content.GetPlayback":         contentHandler.GetPlayback,
 		"content.UploadAssets":        contentHandler.UploadAssets,
-		"content.DeleteAssetKey":       contentHandler.DeleteAssetKey,
+		"content.DeleteAssetKey":      contentHandler.DeleteAssetKey,
 		"content.ListAdmin":           contentHandler.GetAllContentAdmin,
 		"content.GetAdmin":            contentHandler.GetContentAdmin,
 		"content.Create":              contentHandler.CreateContent,

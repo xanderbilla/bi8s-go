@@ -585,6 +585,7 @@ func videoContentTypeForFile(fh *multipart.FileHeader) string {
 		return "video/mp4"
 	}
 }
+
 // GetPlayback fetches the finished encoder job for contentID, validates the
 // contentType, and returns the raw playback block. Paths are S3 keys served
 // via the Cloudflare Worker CDN — no presigning needed.

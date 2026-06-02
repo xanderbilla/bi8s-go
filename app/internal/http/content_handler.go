@@ -453,6 +453,7 @@ func (h *ContentHandler) DeleteAssetKey(w http.ResponseWriter, r *http.Request) 
 		"keyId":     keyID,
 	})
 }
+
 // GetPlayback returns presigned playback URLs for a finished encoder job.
 func (h *ContentHandler) GetPlayback(w http.ResponseWriter, r *http.Request) {
 	contentType := chi.URLParam(r, "contentType")

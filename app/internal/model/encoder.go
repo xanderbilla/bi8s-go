@@ -14,13 +14,13 @@ type EncoderJob struct {
 // replaced by presigned URLs before leaving the service layer.
 type PlaybackInfo struct {
 	DurationSec float64            `json:"durationSec"   dynamodbav:"durationSec"`
-	Streaming   PlaybackStreaming   `json:"streaming"     dynamodbav:"streaming"`
-	Video       PlaybackVideo       `json:"video"         dynamodbav:"video"`
-	Audio       PlaybackAudio       `json:"audio"         dynamodbav:"audio"`
-	Subtitles   PlaybackSubtitles   `json:"subtitles"     dynamodbav:"subtitles"`
-	Thumbnails  PlaybackThumbnails  `json:"thumbnails"    dynamodbav:"thumbnails"`
-	Preview     PlaybackPreview     `json:"preview"       dynamodbav:"preview"`
-	Sprite      PlaybackSprite      `json:"sprite"        dynamodbav:"sprite"`
+	Streaming   PlaybackStreaming  `json:"streaming"     dynamodbav:"streaming"`
+	Video       PlaybackVideo      `json:"video"         dynamodbav:"video"`
+	Audio       PlaybackAudio      `json:"audio"         dynamodbav:"audio"`
+	Subtitles   PlaybackSubtitles  `json:"subtitles"     dynamodbav:"subtitles"`
+	Thumbnails  PlaybackThumbnails `json:"thumbnails"    dynamodbav:"thumbnails"`
+	Preview     PlaybackPreview    `json:"preview"       dynamodbav:"preview"`
+	Sprite      PlaybackSprite     `json:"sprite"        dynamodbav:"sprite"`
 }
 
 // PlaybackStreaming holds the HLS master playlist URL.

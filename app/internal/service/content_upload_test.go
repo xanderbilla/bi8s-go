@@ -213,8 +213,8 @@ func (m *mockFileUploader) UploadFileStream(_ context.Context, prefix, resourceI
 	return prefix + "/" + resourceID + "/" + fileName, nil
 }
 
-func (m *mockFileUploader) Delete(_ context.Context, _ string) error            { return nil }
-func (m *mockFileUploader) DeletePrefix(_ context.Context, _ string) error      { return nil }
+func (m *mockFileUploader) Delete(_ context.Context, _ string) error       { return nil }
+func (m *mockFileUploader) DeletePrefix(_ context.Context, _ string) error { return nil }
 func (m *mockFileUploader) GeneratePresignedGetURL(_ context.Context, key string, _ time.Duration) (string, error) {
 	return "https://example.com/signed/" + key, nil
 }

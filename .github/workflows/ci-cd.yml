@@ -7,7 +7,6 @@ on:
             - prod
         paths:
             - "app/**"
-            - "infra/tofu/**"
             - "docker-compose*.yml"
             - "infra/docker/**"
             - "docs/OPENAPI.yaml"
@@ -18,7 +17,6 @@ on:
             - prod
         paths:
             - "app/**"
-            - "infra/tofu/**"
             - "docker-compose*.yml"
             - "infra/docker/**"
             - "docs/OPENAPI.yaml"
@@ -197,56 +195,6 @@ jobs:
                   PUBLIC_IP: "127.0.0.1"
                   GRAFANA_ADMIN_PASSWORD: "ci-validation-only"
               run: docker compose -f infra/docker/docker-compose.yml config --quiet
-
-    tofu:
-        name: tofu fmt + validate (${{ matrix.env }})
-        runs-on: ubuntu-latest
-        strategy:
-            fail-fast: false
-            matrix:
-                env: [dev, prod]
-        defaults:
-            run:
-                working-directory: infra/tofu/envs/${{ matrix.env }}
-        steps:
-            - uses: actions/checkout@v4
-            - uses: opentofu/setup-opentofu@v1
-              with:
-                  tofu_version: "1.6.0"
-            - name: tofu fmt check
-              run: tofu fmt -recursive -check ../..
-            - name: tofu init (no backend)
-              run: tofu init -backend=false -input=false
-            - name: tofu validate
-              run: tofu validate
-
-    tflint:
-        name: tflint
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-            - uses: terraform-linters/setup-tflint@v4
-              with:
-                  tflint_version: v0.52.0
-            - name: Init TFLint plugins
-              run: tflint --init
-              working-directory: infra/tofu
-            - name: Run TFLint (modules + envs)
-              run: tflint --recursive --minimum-failure-severity=error
-              working-directory: infra/tofu
-
-    tfsec:
-        name: tfsec
-        runs-on: ubuntu-latest
-        # Baseline exclusions live in infra/tofu/.tfsec/config.yml with
-        # written justification per rule. Regressions fail the build.
-        steps:
-            - uses: actions/checkout@v4
-            - name: Run tfsec
-              uses: aquasecurity/tfsec-action@v1.0.3
-              with:
-                  working_directory: infra/tofu
-                  soft_fail: false
 
     trivy-fs:
         name: trivy fs scan

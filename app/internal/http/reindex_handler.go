@@ -31,8 +31,8 @@ func NewReindexHandler(
 }
 
 type reindexResult struct {
-	People          int `json:"people"`
-	Content         int `json:"content"`
+	People           int `json:"people"`
+	Content          int `json:"content"`
 	JoinTableEntries int `json:"joinTableEntries"`
 }
 
