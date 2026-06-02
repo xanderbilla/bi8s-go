@@ -26,7 +26,6 @@ on:
 permissions:
     contents: read
     security-events: write
-  id-token: write
 
 concurrency:
     group: ci-cd-${{ github.ref }}
@@ -367,35 +366,6 @@ jobs:
                   output-file: sbom-${{ steps.version.outputs.version }}.spdx.json
                   upload-artifact: true
                   upload-artifact-retention: 30
-
-            - name: Install cosign
-              uses: sigstore/cosign-installer@v3.7.0
-              with:
-                  cosign-release: v2.4.1
-
-            # Sign image with keyless OIDC identity. Verifiable via:
-            #   cosign verify --certificate-identity-regexp ... \
-            #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
-            - name: Sign image with cosign (keyless)
-              env:
-                  COSIGN_EXPERIMENTAL: "1"
-                  IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}@${{ steps.build.outputs.digest }}
-              run: |
-                  OIDC_TOKEN="$(curl -sSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sigstore" | jq -r '.value')"
-                  if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
-                    echo "Failed to retrieve GitHub OIDC token for cosign signing" >&2
-                    exit 1
-                  fi
-
-                  for attempt in 1 2 3; do
-                    if cosign sign --yes --identity-token "$OIDC_TOKEN" "$IMAGE"; then
-                      exit 0
-                    fi
-                    echo "cosign sign failed on attempt $attempt"
-                  done
-
-                  echo "cosign signing failed after 3 attempts" >&2
-                  exit 1
 
     # ─────────────────────────────────────────────────────────────────────────────
     # Deploy
