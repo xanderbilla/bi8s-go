@@ -20,7 +20,6 @@ type Application struct {
 	PersonService    *service.PersonService
 	SearchService    *service.SearchService
 	AttributeService *service.AttributeService
-	EncoderService   *service.EncoderService
 	HealthChecks     map[string]HealthCheck
 	HTTPMetrics      *observability.HTTPMetrics
 

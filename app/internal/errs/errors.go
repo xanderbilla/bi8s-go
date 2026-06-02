@@ -30,12 +30,12 @@ var (
 
 	ErrResultTooLarge = errors.New("result set too large; add filters or pagination")
 
-	ErrContentNotFound      = errors.New("content not found")
-	ErrNoEncodingFound      = errors.New("no encoding found for this content")
-	ErrNoCompletedEncoding  = errors.New("no completed encoding for this content")
-	ErrPlaybackNotAvailable = errors.New("playback information not available")
+	ErrContentNotFound = errors.New("content not found")
 
 	ErrAttributeNameTaken = errors.New("attribute with this name already exists")
+
+	ErrDiskFull     = errors.New("disk quota exceeded")
+	ErrFileTooLarge = errors.New("file exceeds maximum allowed size")
 )
 
 func IsConditionalCheckFailed(err error) bool {
@@ -148,15 +148,16 @@ func classifyTyped(err error) (*APIError, bool) {
 		return NewBadRequest(err.Error()), true
 	}
 	switch {
-	case errors.Is(err, ErrContentNotFound),
-		errors.Is(err, ErrNoEncodingFound),
-		errors.Is(err, ErrNoCompletedEncoding),
-		errors.Is(err, ErrPlaybackNotAvailable):
+	case errors.Is(err, ErrContentNotFound):
 		return NewNotFound(err.Error()), true
 	case errors.Is(err, ErrAttributeNameTaken):
 		return NewConflict(err.Error()), true
 	case errors.Is(err, ErrFileEmpty), errors.Is(err, ErrResultTooLarge):
 		return NewBadRequest(err.Error()), true
+	case errors.Is(err, ErrFileTooLarge):
+		return newAPIError(http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE", err.Error(), nil, nil), true
+	case errors.Is(err, ErrDiskFull):
+		return newAPIError(http.StatusInsufficientStorage, "DISK_FULL", err.Error(), nil, nil), true
 	case errors.Is(err, ErrFileUploaderNotConfigured),
 		errors.Is(err, ErrAWSRegionRequired),
 		errors.Is(err, ErrS3BucketNotConfigured),

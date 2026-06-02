@@ -32,16 +32,17 @@ type Config struct {
 	TableName          string
 	PersonTableName    string
 	AttributeTableName string
-	EncoderTableName   string
 
-	EncoderContentIDIndex string
-	AttributeNameIndex    string
+	AttributeNameIndex string
 
 	ContentCastTableName              string
 	ContentAttributeTableName         string
 	ContentVisibilityCreatedAtIndex   string
 	ContentVisibilityContentTypeIndex string
 	ContentVisibilityReleaseDateIndex string
+
+	EncoderTableName      string
+	EncoderContentIDIndex string
 
 	S3Bucket string
 	B2       B2Credentials
@@ -54,8 +55,6 @@ type Config struct {
 	RateLimitRedisTimeoutMS int
 	RateLimitGlobalBurst    int
 	RateLimitGlobalPerMin   int
-	RateLimitEncoderBurst   int
-	RateLimitEncoderPerMin  int
 	RateLimitMovieBurst     int
 	RateLimitMoviePerMin    int
 	RateLimitPersonBurst    int
@@ -125,18 +124,17 @@ func (c Config) Validate() error {
 	}
 	if strings.TrimSpace(c.TableName) == "" ||
 		strings.TrimSpace(c.PersonTableName) == "" ||
-		strings.TrimSpace(c.AttributeTableName) == "" ||
-		strings.TrimSpace(c.EncoderTableName) == "" {
+		strings.TrimSpace(c.AttributeTableName) == "" {
 		return errors.New("all DYNAMODB_*_TABLE values are required")
-	}
-	if strings.TrimSpace(c.EncoderContentIDIndex) == "" {
-		return errors.New("DYNAMODB_ENCODER_CONTENT_ID_INDEX is required")
 	}
 	if strings.TrimSpace(c.ContentCastTableName) == "" {
 		return errors.New("DYNAMODB_CONTENT_CAST_TABLE is required")
 	}
 	if strings.TrimSpace(c.ContentAttributeTableName) == "" {
 		return errors.New("DYNAMODB_CONTENT_ATTRIBUTE_TABLE is required")
+	}
+	if strings.TrimSpace(c.EncoderTableName) == "" {
+		return errors.New("DYNAMODB_ENCODER_TABLE is required")
 	}
 	if strings.TrimSpace(c.ContentVisibilityCreatedAtIndex) == "" {
 		return errors.New("DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX is required")
@@ -189,7 +187,6 @@ func (c Config) Validate() error {
 		envName string
 	}{
 		{"global", c.RateLimitGlobalBurst, c.RateLimitGlobalPerMin, "RATELIMIT_GLOBAL"},
-		{"encoder", c.RateLimitEncoderBurst, c.RateLimitEncoderPerMin, "RATELIMIT_ENCODER_WRITE"},
 		{"movie", c.RateLimitMovieBurst, c.RateLimitMoviePerMin, "RATELIMIT_MOVIE_WRITE"},
 		{"person", c.RateLimitPersonBurst, c.RateLimitPersonPerMin, "RATELIMIT_PERSON_WRITE"},
 	}

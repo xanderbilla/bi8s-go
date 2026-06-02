@@ -69,20 +69,6 @@ func shutdown(srv *http.Server, application *app.Application) error {
 		slog.Error("http server shutdown error", "error", err)
 	}
 
-	encoderCtx, encoderCancel := context.WithTimeout(
-		context.Background(),
-		time.Duration(env.GetInt("ENCODER_DRAIN_TIMEOUT_SECONDS", 120))*time.Second,
-	)
-	defer encoderCancel()
-
-	slog.Info("draining encoding jobs...")
-	application.EncoderService.Shutdown()
-	if err := application.EncoderService.Wait(encoderCtx); err != nil {
-		slog.Warn("encoding jobs did not complete within timeout, forcing shutdown", "error", err)
-	} else {
-		slog.Info("all encoding jobs completed")
-	}
-
 	if application.RedisClient != nil {
 		if err := application.RedisClient.Close(); err != nil {
 			slog.Warn("redis client close error", "error", err)

@@ -14,8 +14,6 @@ func setRequiredEnv(t *testing.T) {
 	t.Setenv("DYNAMODB_CONTENT_TABLE", "content")
 	t.Setenv("DYNAMODB_PERSON_TABLE", "people")
 	t.Setenv("DYNAMODB_ATTRIBUTE_TABLE", "attrs")
-	t.Setenv("DYNAMODB_ENCODER_TABLE", "encoder")
-	t.Setenv("DYNAMODB_ENCODER_CONTENT_ID_INDEX", "content-id-index")
 	t.Setenv("DYNAMODB_CONTENT_CAST_TABLE", "cast")
 	t.Setenv("DYNAMODB_CONTENT_ATTRIBUTE_TABLE", "content-attribute")
 	t.Setenv("DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX", "visibility-createdAt-index")

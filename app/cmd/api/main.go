@@ -54,7 +54,6 @@ func run() error {
 		"movie_table", cfg.TableName,
 		"person_table", cfg.PersonTableName,
 		"attribute_table", cfg.AttributeTableName,
-		"encoder_table", cfg.EncoderTableName,
 		"cors_origins", cfg.CORSAllowedOrigins,
 	)
 

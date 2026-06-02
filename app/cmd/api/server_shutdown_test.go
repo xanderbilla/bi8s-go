@@ -14,12 +14,10 @@ import (
 
 	"github.com/xanderbilla/bi8s-go/internal/app"
 	transport "github.com/xanderbilla/bi8s-go/internal/http"
-	"github.com/xanderbilla/bi8s-go/internal/service"
 )
 
 func TestShutdown_OrderingAndBounds(t *testing.T) {
 	t.Setenv("SHUTDOWN_TIMEOUT_SECONDS", "5")
-	t.Setenv("ENCODER_DRAIN_TIMEOUT_SECONDS", "5")
 
 	const handlerDelay = 80 * time.Millisecond
 	var (
@@ -61,11 +59,8 @@ func TestShutdown_OrderingAndBounds(t *testing.T) {
 		t.Fatalf("redis ping: %v", err)
 	}
 
-	encoder := service.NewEncoderService(nil, nil)
-
 	application := &app.Application{
-		EncoderService: encoder,
-		RedisClient:    rdb,
+		RedisClient: rdb,
 	}
 
 	respDone := make(chan struct{})
@@ -156,7 +151,6 @@ func TestShutdown_OrderingAndBounds(t *testing.T) {
 
 func TestShutdown_NilRedisIsSafe(t *testing.T) {
 	t.Setenv("SHUTDOWN_TIMEOUT_SECONDS", "2")
-	t.Setenv("ENCODER_DRAIN_TIMEOUT_SECONDS", "2")
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -171,8 +165,7 @@ func TestShutdown_NilRedisIsSafe(t *testing.T) {
 	}()
 
 	application := &app.Application{
-		EncoderService: service.NewEncoderService(nil, nil),
-		RedisClient:    nil,
+		RedisClient: nil,
 	}
 
 	if err := shutdown(srv, application); err != nil {

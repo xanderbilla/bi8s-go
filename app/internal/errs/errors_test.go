@@ -122,9 +122,6 @@ func TestFrom_Mapping(t *testing.T) {
 	}{
 		{"nil", nil, ""},
 		{"content not found", ErrContentNotFound, CodeNotFound},
-		{"no encoding", ErrNoEncodingFound, CodeNotFound},
-		{"no completed encoding", ErrNoCompletedEncoding, CodeNotFound},
-		{"playback not available", ErrPlaybackNotAvailable, CodeNotFound},
 		{"attribute name taken", ErrAttributeNameTaken, CodeConflict},
 		{"file empty", ErrFileEmpty, CodeBadRequest},
 		{"result too large", ErrResultTooLarge, CodeBadRequest},

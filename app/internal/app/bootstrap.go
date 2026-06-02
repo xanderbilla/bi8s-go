@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -69,8 +68,6 @@ func LoadConfigFromEnv() (Config, error) {
 	rateLimitRedisTimeoutMS := getInt("RATE_LIMIT_REDIS_TIMEOUT_MS", 50)
 	rateLimitGlobalBurst := getInt("RATELIMIT_GLOBAL_BURST", 100)
 	rateLimitGlobalPerMin := getInt("RATELIMIT_GLOBAL_PER_MIN", 100)
-	rateLimitEncoderBurst := getInt("RATELIMIT_ENCODER_WRITE_BURST", 5)
-	rateLimitEncoderPerMin := getInt("RATELIMIT_ENCODER_WRITE_PER_MIN", 5)
 	rateLimitMovieBurst := getInt("RATELIMIT_MOVIE_WRITE_BURST", 20)
 	rateLimitMoviePerMin := getInt("RATELIMIT_MOVIE_WRITE_PER_MIN", 20)
 	rateLimitPersonBurst := getInt("RATELIMIT_PERSON_WRITE_BURST", 20)
@@ -92,14 +89,14 @@ func LoadConfigFromEnv() (Config, error) {
 		TableName:                         env.GetString("DYNAMODB_CONTENT_TABLE", ""),
 		PersonTableName:                   env.GetString("DYNAMODB_PERSON_TABLE", ""),
 		AttributeTableName:                env.GetString("DYNAMODB_ATTRIBUTE_TABLE", ""),
-		EncoderTableName:                  env.GetString("DYNAMODB_ENCODER_TABLE", ""),
-		EncoderContentIDIndex:             env.GetString("DYNAMODB_ENCODER_CONTENT_ID_INDEX", ""),
 		AttributeNameIndex:                env.GetString("DYNAMODB_ATTRIBUTE_NAME_INDEX", "name-index"),
 		ContentCastTableName:              env.GetString("DYNAMODB_CONTENT_CAST_TABLE", ""),
 		ContentAttributeTableName:         env.GetString("DYNAMODB_CONTENT_ATTRIBUTE_TABLE", ""),
 		ContentVisibilityCreatedAtIndex:   env.GetString("DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX", ""),
 		ContentVisibilityContentTypeIndex: env.GetString("DYNAMODB_CONTENT_VISIBILITY_CONTENT_TYPE_INDEX", "visibility-contentType-index"),
 		ContentVisibilityReleaseDateIndex: env.GetString("DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX", ""),
+		EncoderTableName:                  env.GetString("DYNAMODB_ENCODER_TABLE", ""),
+		EncoderContentIDIndex:             env.GetString("DYNAMODB_ENCODER_CONTENT_ID_INDEX", "contentId-index"),
 		S3Bucket:                          env.GetSecret("S3_BUCKET"),
 		B2: B2Credentials{
 			KeyID:    env.GetSecret("B2_KEY_ID"),
@@ -114,8 +111,6 @@ func LoadConfigFromEnv() (Config, error) {
 		RateLimitRedisTimeoutMS: rateLimitRedisTimeoutMS,
 		RateLimitGlobalBurst:    rateLimitGlobalBurst,
 		RateLimitGlobalPerMin:   rateLimitGlobalPerMin,
-		RateLimitEncoderBurst:   rateLimitEncoderBurst,
-		RateLimitEncoderPerMin:  rateLimitEncoderPerMin,
 		RateLimitMovieBurst:     rateLimitMovieBurst,
 		RateLimitMoviePerMin:    rateLimitMoviePerMin,
 		RateLimitPersonBurst:    rateLimitPersonBurst,
@@ -235,11 +230,10 @@ func Build(ctx context.Context, cfg Config) (*Application, error) {
 
 	attributeService := service.NewAttributeService(attributeRepo)
 	personService := service.NewPersonService(personRepo, attributeRepo, uploader)
-	contentService := service.NewContentService(contentRepo, personRepo, attributeRepo, encoderRepo, uploader)
-	encoderService := service.NewEncoderService(encoderRepo, uploader)
+	contentService := service.NewContentService(contentRepo, personRepo, attributeRepo, uploader)
 	contentService.SetRedisClient(cacheRedisClient)
+	contentService.SetEncoderRepo(encoderRepo)
 	personService.SetRedisClient(cacheRedisClient)
-	contentService.SetPlaybackURLTTL(time.Duration(env.GetInt("PLAYBACK_URL_TTL_MINUTES", 20)) * time.Minute)
 
 	searchProvider, err := buildSearchProvider(ctx, cfg)
 	if err != nil {
@@ -262,7 +256,6 @@ func Build(ctx context.Context, cfg Config) (*Application, error) {
 		PersonService:    personService,
 		SearchService:    searchService,
 		AttributeService: attributeService,
-		EncoderService:   encoderService,
 		HealthChecks: map[string]HealthCheck{
 			"dynamodb": func(ctx context.Context) error {
 				_, err := clients.Dynamo.DescribeTable(ctx, &dynamodb.DescribeTableInput{TableName: awsSDK.String(cfg.TableName)})
@@ -275,19 +268,6 @@ func Build(ctx context.Context, cfg Config) (*Application, error) {
 				}
 				_, err := clients.S3.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: awsSDK.String(cfg.S3Bucket)})
 				return err
-			},
-
-			"ffmpeg": func(ctx context.Context) error {
-				if _, err := exec.LookPath("ffmpeg"); err != nil {
-					return err
-				}
-				return exec.CommandContext(ctx, "ffmpeg", "-version").Run()
-			},
-			"ffprobe": func(ctx context.Context) error {
-				if _, err := exec.LookPath("ffprobe"); err != nil {
-					return err
-				}
-				return exec.CommandContext(ctx, "ffprobe", "-version").Run()
 			},
 		},
 	}, nil
