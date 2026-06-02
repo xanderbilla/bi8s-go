@@ -476,7 +476,7 @@ func GenerateSprite(ctx context.Context, inputPath, spriteImagePath, spriteVTTPa
 		vttContent += fmt.Sprintf("%s#xywh=%d,%d,160,90\n\n", filepath.Base(safeImagePath), x, y)
 	}
 
-	if err := os.WriteFile(safeVTTPath, []byte(vttContent), 0644); err != nil {
+	if err := os.WriteFile(safeVTTPath, []byte(vttContent), 0600); err != nil {
 		return fmt.Errorf("failed to write VTT file: %w", err)
 	}
 
@@ -507,7 +507,7 @@ func GenerateMasterPlaylist(outputPath string, qualities []QualityPlaylist, audi
 			a.Label, boolToYesNo(a.Default), a.RelativePath)
 	}
 
-	if err := os.WriteFile(safeOutput, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(safeOutput, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write master playlist: %w", err)
 	}
 
