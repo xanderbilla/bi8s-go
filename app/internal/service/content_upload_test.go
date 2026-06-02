@@ -20,10 +20,9 @@ func TestContentService_UploadAssets_PartialSuccess(t *testing.T) {
 	contentRepo := newMockContentRepository()
 	personRepo := newMockPersonRepository()
 	attributeRepo := newMockAttributeRepository()
-	encoderRepo := newMockEncoderRepository()
 	fileUploader := &failingMockFileUploader{failAfter: 2}
 
-	service := NewContentService(contentRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
+	service := NewContentService(contentRepo, personRepo, attributeRepo, fileUploader)
 
 	movie := model.Movie{
 		ID:          "movie123",
@@ -69,10 +68,9 @@ func TestContentService_UploadAssets_AllSuccess(t *testing.T) {
 	contentRepo := newMockContentRepository()
 	personRepo := newMockPersonRepository()
 	attributeRepo := newMockAttributeRepository()
-	encoderRepo := newMockEncoderRepository()
 	fileUploader := newMockFileUploader()
 
-	service := NewContentService(contentRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
+	service := NewContentService(contentRepo, personRepo, attributeRepo, fileUploader)
 
 	movie := model.Movie{
 		ID:          "movie123",
@@ -115,10 +113,9 @@ func TestContentService_UploadAssets_FirstFileFails(t *testing.T) {
 	contentRepo := newMockContentRepository()
 	personRepo := newMockPersonRepository()
 	attributeRepo := newMockAttributeRepository()
-	encoderRepo := newMockEncoderRepository()
 	fileUploader := &failingMockFileUploader{failAfter: 0}
 
-	service := NewContentService(contentRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
+	service := NewContentService(contentRepo, personRepo, attributeRepo, fileUploader)
 
 	movie := model.Movie{
 		ID:          "movie123",
@@ -155,10 +152,9 @@ func TestContentService_UploadAssets_AppendToExisting(t *testing.T) {
 	contentRepo := newMockContentRepository()
 	personRepo := newMockPersonRepository()
 	attributeRepo := newMockAttributeRepository()
-	encoderRepo := newMockEncoderRepository()
 	fileUploader := newMockFileUploader()
 
-	service := NewContentService(contentRepo, personRepo, attributeRepo, encoderRepo, fileUploader)
+	service := NewContentService(contentRepo, personRepo, attributeRepo, fileUploader)
 
 	movie := model.Movie{
 		ID:          "movie123",
@@ -167,7 +163,10 @@ func TestContentService_UploadAssets_AppendToExisting(t *testing.T) {
 		Assets: []model.Asset{
 			{
 				Type: model.AssetTypeTrailer,
-				Keys: []string{"/existing/trailer1.mp4", "/existing/trailer2.mp4"},
+				Keys: []model.AssetKey{
+					{ID: "existing1", Value: "/existing/trailer1.mp4"},
+					{ID: "existing2", Value: "/existing/trailer2.mp4"},
+				},
 			},
 		},
 	}
@@ -202,6 +201,28 @@ func TestContentService_UploadAssets_AppendToExisting(t *testing.T) {
 	}
 }
 
+type mockFileUploader struct{}
+
+func newMockFileUploader() *mockFileUploader { return &mockFileUploader{} }
+
+func (m *mockFileUploader) UploadFile(_ context.Context, prefix, resourceID, _, fileName, _ string, _ []byte) (string, error) {
+	return prefix + "/" + resourceID + "/" + fileName, nil
+}
+
+func (m *mockFileUploader) UploadFileStream(_ context.Context, prefix, resourceID, _, fileName, _ string, _ io.Reader, _ int64) (string, error) {
+	return prefix + "/" + resourceID + "/" + fileName, nil
+}
+
+func (m *mockFileUploader) Delete(_ context.Context, _ string) error            { return nil }
+func (m *mockFileUploader) DeletePrefix(_ context.Context, _ string) error      { return nil }
+func (m *mockFileUploader) GeneratePresignedGetURL(_ context.Context, key string, _ time.Duration) (string, error) {
+	return "https://example.com/signed/" + key, nil
+}
+func (m *mockFileUploader) GeneratePresignedPutURL(_ context.Context, key string, _ time.Duration) (string, error) {
+	return "https://example.com/put-signed/" + key, nil
+}
+func (m *mockFileUploader) DownloadToFile(_ context.Context, _, _ string) error { return nil }
+
 type failingMockFileUploader struct {
 	failAfter int
 	count     int
@@ -233,6 +254,14 @@ func (m *failingMockFileUploader) DeletePrefix(ctx context.Context, prefix strin
 
 func (m *failingMockFileUploader) GeneratePresignedGetURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
 	return "https://example.com/signed/" + key, nil
+}
+
+func (m *failingMockFileUploader) GeneratePresignedPutURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
+	return "https://example.com/put-signed/" + key, nil
+}
+
+func (m *failingMockFileUploader) DownloadToFile(ctx context.Context, key, localPath string) error {
+	return nil
 }
 
 type mockContentRepository struct {
@@ -384,6 +413,10 @@ func (m *mockContentRepository) GetBannerCandidates(ctx context.Context, content
 
 func (m *mockContentRepository) GetDiscoverContent(ctx context.Context, discoverType string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error) {
 	return []model.Movie{}, nil, nil
+}
+
+func (m *mockContentRepository) ResyncJoinTables(ctx context.Context, movie model.Movie) error {
+	return nil
 }
 
 func buildMultipartFileHeaders(t *testing.T, field string, names []string) []*multipart.FileHeader {

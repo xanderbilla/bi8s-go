@@ -40,9 +40,14 @@ func (c *Content) EffectiveReleaseDate() string {
 	return ""
 }
 
+type AssetKey struct {
+	ID    string `json:"id" dynamodbav:"id"`
+	Value string `json:"value" dynamodbav:"value"`
+}
+
 type Asset struct {
-	Type AssetType `json:"type" dynamodbav:"type" validate:"required,oneof=TRAILER TEASER CLIP PROMO BTS"`
-	Keys []string  `json:"keys" dynamodbav:"keys" validate:"required,min=1,dive,min=1"`
+	Type AssetType  `json:"type" dynamodbav:"type" validate:"required,oneof=TRAILER TEASER CLIP PROMO BTS"`
+	Keys []AssetKey `json:"keys" dynamodbav:"keys" validate:"required,min=1,dive"`
 }
 
 type ContentStats struct {

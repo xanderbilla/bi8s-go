@@ -22,6 +22,7 @@ type ContentRepository interface {
 	Create(ctx context.Context, movie model.Movie) error
 	Update(ctx context.Context, movie model.Movie) error
 	Delete(ctx context.Context, id string) error
+	ResyncJoinTables(ctx context.Context, movie model.Movie) error
 
 	GetContentByPersonIdSimple(ctx context.Context, personId string) ([]model.Movie, error)
 	GetContentByPersonId(ctx context.Context, personId string, contentTypeFilter string, limit int32, startKey map[string]types.AttributeValue) ([]model.Movie, map[string]types.AttributeValue, error)
@@ -244,7 +245,11 @@ func (d *DynamoContentRepository) Update(ctx context.Context, movie model.Movie)
 		_, err = d.GetClient().PutItem(ctx, &dynamodb.PutItemInput{
 			TableName:           aws.String(d.GetTableName()),
 			Item:                item,
-			ConditionExpression: aws.String("attribute_exists(id) AND version = :expectedVersion"),
+			ConditionExpression: aws.String("attribute_exists(id) AND #audit.#version = :expectedVersion"),
+			ExpressionAttributeNames: map[string]string{
+				"#audit":   "audit",
+				"#version": "version",
+			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":expectedVersion": &types.AttributeValueMemberN{
 					Value: strconv.Itoa(oldVersion),
@@ -346,6 +351,13 @@ func (d *DynamoContentRepository) GetContentByPersonId(ctx context.Context, pers
 	}
 	sortByReleaseDateDesc(movies)
 	return movies, nextKey, nil
+}
+
+func (d *DynamoContentRepository) ResyncJoinTables(ctx context.Context, movie model.Movie) error {
+	if err := d.syncContentCastEntries(ctx, movie.ID, movie.ContentType, movie.Visibility, movie.CastIds); err != nil {
+		return err
+	}
+	return d.syncContentAttributeEntries(ctx, movie.ID, movie.ContentType, movie.Visibility, movie.AttributeIds)
 }
 
 func (d *DynamoContentRepository) syncContentCastEntries(ctx context.Context, contentID string, contentType model.ContentType, visibility model.Visibility, castIDs []string) error {

@@ -84,7 +84,7 @@ var (
 
 	UUIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
-	JobIDPattern = regexp.MustCompile(`^job_[a-zA-Z0-9-]+$`)
+	JobIDPattern = regexp.MustCompile(`^(job_|enc_)?[a-zA-Z0-9-]+$`)
 
 	SlugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
@@ -111,7 +111,7 @@ var AttributeIDValidator = alphanumericIDValidator("attributeId", "Invalid attri
 var ConsumerAttributeIDValidator = alphanumericIDValidator("id", "Invalid attribute ID format")
 
 var JobIDValidator = URLParamValidator{
-	ParamName: "jobId",
+	ParamName: "encodeId",
 	Required:  true,
 	MaxLength: 50,
 	MinLength: 5,

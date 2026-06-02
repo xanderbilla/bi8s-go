@@ -75,5 +75,7 @@ func ParseVideoMultipartForm(r *http.Request, w http.ResponseWriter) error {
 		return errors.New("body must be multipart/form-data")
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxVideoBodySize)
-	return r.ParseMultipartForm(32 << 20)
+	// Keep only 1 MB in RAM; everything larger spills to a temp file immediately.
+	// For video uploads this means the entire body lands on disk rather than heap.
+	return r.ParseMultipartForm(1 << 20)
 }

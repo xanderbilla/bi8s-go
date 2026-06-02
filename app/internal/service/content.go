@@ -27,26 +27,23 @@ type bannerCacheEntry struct {
 }
 
 type ContentService struct {
-	repo           repository.ContentRepository
-	personRepo     repository.PersonRepository
-	attributeRepo  repository.AttributeRepository
-	encoderRepo    repository.EncoderRepository
-	fileUploader   storage.FileUploader
-	searchService  *SearchService
-	bannerCache    sync.Map
-	redisClient    *goredis.Client
-	playbackURLTTL time.Duration
+	repo          repository.ContentRepository
+	personRepo    repository.PersonRepository
+	attributeRepo repository.AttributeRepository
+	fileUploader  storage.FileUploader
+	searchService *SearchService
+	bannerCache   sync.Map
+	redisClient   *goredis.Client
+	encoderRepo   repository.EncoderRepository
 }
 
-func NewContentService(repo repository.ContentRepository, personRepo repository.PersonRepository, attributeRepo repository.AttributeRepository, encoderRepo repository.EncoderRepository, fileUploader storage.FileUploader) *ContentService {
+func NewContentService(repo repository.ContentRepository, personRepo repository.PersonRepository, attributeRepo repository.AttributeRepository, fileUploader storage.FileUploader) *ContentService {
 	return &ContentService{
-		repo:           repo,
-		personRepo:     personRepo,
-		attributeRepo:  attributeRepo,
-		encoderRepo:    encoderRepo,
-		fileUploader:   fileUploader,
-		searchService:  NewSearchService(nil, false),
-		playbackURLTTL: 20 * time.Minute,
+		repo:          repo,
+		personRepo:    personRepo,
+		attributeRepo: attributeRepo,
+		fileUploader:  fileUploader,
+		searchService: NewSearchService(nil, false),
 	}
 }
 
@@ -62,10 +59,8 @@ func (s *ContentService) SetRedisClient(client *goredis.Client) {
 	s.redisClient = client
 }
 
-func (s *ContentService) SetPlaybackURLTTL(ttl time.Duration) {
-	if ttl > 0 {
-		s.playbackURLTTL = ttl
-	}
+func (s *ContentService) SetEncoderRepo(repo repository.EncoderRepository) {
+	s.encoderRepo = repo
 }
 
 func (s *ContentService) SetSearchService(searchService *SearchService) {
@@ -203,6 +198,30 @@ func (s *ContentService) Create(ctx context.Context, movie model.Movie, posterIn
 	return movie, nil
 }
 
+func (s *ContentService) ResyncAllJoinTables(ctx context.Context) (int, error) {
+	var (
+		startKey map[string]types.AttributeValue
+		total    int
+	)
+	for {
+		movies, nextKey, err := s.repo.GetAllAdmin(ctx, 100, startKey)
+		if err != nil {
+			return total, err
+		}
+		for _, movie := range movies {
+			if err := s.repo.ResyncJoinTables(ctx, movie); err != nil {
+				return total, fmt.Errorf("resync join tables for content %s: %w", movie.ID, err)
+			}
+			total++
+		}
+		if len(nextKey) == 0 {
+			break
+		}
+		startKey = nextKey
+	}
+	return total, nil
+}
+
 func (s *ContentService) cleanupUploadedKeys(ctx context.Context, keys []string) {
 	cleanupUploadedKeys(ctx, s.fileUploader, keys)
 }
@@ -237,10 +256,10 @@ func (s *ContentService) Delete(ctx context.Context, id string) error {
 	}
 	for _, asset := range movie.Assets {
 		for _, key := range asset.Keys {
-			if strings.TrimSpace(key) == "" {
+			if strings.TrimSpace(key.Value) == "" {
 				continue
 			}
-			cleanupKeys = append(cleanupKeys, key)
+			cleanupKeys = append(cleanupKeys, key.Value)
 		}
 	}
 
@@ -380,7 +399,7 @@ func (s *ContentService) GetDiscoverContent(ctx context.Context, discoverType st
 
 func (s *ContentService) UploadAssets(ctx context.Context, contentID string, assetType model.AssetType, files []*multipart.FileHeader) ([]string, error) {
 
-	content, err := s.repo.Get(ctx, contentID)
+	content, err := s.repo.GetAdmin(ctx, contentID)
 	if err != nil {
 		return nil, err
 	}
@@ -390,15 +409,8 @@ func (s *ContentService) UploadAssets(ctx context.Context, contentID string, ass
 
 	contentTypePath := content.ContentType.ToPath()
 
-	existingCount := 0
-	for _, asset := range content.Assets {
-		if asset.Type == assetType {
-			existingCount = len(asset.Keys)
-			break
-		}
-	}
-
 	uploadedPaths := make([]string, 0, len(files))
+	newAssetKeys := make([]model.AssetKey, 0, len(files))
 	assetTypeLower := strings.ToLower(string(assetType))
 	var uploadErr error
 
@@ -407,23 +419,28 @@ func (s *ContentService) UploadAssets(ctx context.Context, contentID string, ass
 		if ext == "" {
 			ext = ".mp4"
 		}
-		count := existingCount + i
-		fileName := fmt.Sprintf("%s_%d%s", assetTypeLower, count, ext)
-		s3Path := fmt.Sprintf("%s/%s/assets/%s", contentTypePath, contentID, fileName)
+		fileUUID := strings.ReplaceAll(utils.GenerateID(), "-", "")[:16]
+		fileName := fmt.Sprintf("%s%s", fileUUID, ext)
+		s3Path := fmt.Sprintf("%s/%s/assets/%s/%s", contentTypePath, contentID, assetTypeLower, fileName)
 
 		s3Key, err := s.uploadSingleAsset(ctx, fileHeader, s3Path, fileName)
 		if err != nil {
 			uploadErr = fmt.Errorf("upload file %d: %w", i+1, err)
 			break
 		}
-		uploadedPaths = append(uploadedPaths, "/"+s3Key)
+		path := "/" + s3Key
+		uploadedPaths = append(uploadedPaths, path)
+		newAssetKeys = append(newAssetKeys, model.AssetKey{
+			ID:    utils.GenerateID(),
+			Value: path,
+		})
 	}
 
-	if len(uploadedPaths) > 0 {
+	if len(newAssetKeys) > 0 {
 		assetFound := false
 		for i := range content.Assets {
 			if content.Assets[i].Type == assetType {
-				content.Assets[i].Keys = append(content.Assets[i].Keys, uploadedPaths...)
+				content.Assets[i].Keys = append(content.Assets[i].Keys, newAssetKeys...)
 				assetFound = true
 				break
 			}
@@ -432,7 +449,7 @@ func (s *ContentService) UploadAssets(ctx context.Context, contentID string, ass
 		if !assetFound {
 			content.Assets = append(content.Assets, model.Asset{
 				Type: assetType,
-				Keys: uploadedPaths,
+				Keys: newAssetKeys,
 			})
 		}
 
@@ -452,6 +469,63 @@ func (s *ContentService) UploadAssets(ctx context.Context, contentID string, ass
 	}
 
 	return uploadedPaths, nil
+}
+
+func (s *ContentService) DeleteAssetKey(ctx context.Context, contentID string, assetType model.AssetType, keyID string) error {
+	content, err := s.repo.GetAdmin(ctx, contentID)
+	if err != nil {
+		return err
+	}
+	if content == nil {
+		return errs.ErrContentNotFound
+	}
+
+	var keyValue string
+	assetIdx := -1
+	keyIdx := -1
+	for i, asset := range content.Assets {
+		if asset.Type == assetType {
+			for j, k := range asset.Keys {
+				if k.ID == keyID {
+					keyValue = k.Value
+					assetIdx = i
+					keyIdx = j
+					break
+				}
+			}
+			break
+		}
+	}
+	if assetIdx == -1 || keyIdx == -1 {
+		return errs.ErrContentNotFound
+	}
+
+	content.Assets[assetIdx].Keys = append(
+		content.Assets[assetIdx].Keys[:keyIdx],
+		content.Assets[assetIdx].Keys[keyIdx+1:]...,
+	)
+	if len(content.Assets[assetIdx].Keys) == 0 {
+		content.Assets = append(content.Assets[:assetIdx], content.Assets[assetIdx+1:]...)
+	}
+
+	if err := s.repo.Update(ctx, *content); err != nil {
+		return fmt.Errorf("failed to update content: %w", err)
+	}
+
+	if strings.TrimSpace(keyValue) != "" {
+		if err := s.fileUploader.Delete(ctx, strings.TrimPrefix(keyValue, "/")); err != nil {
+			logger.WarnContext(ctx, "failed to delete asset key from storage", "contentId", contentID, "keyId", keyID, "key", keyValue, "error", err.Error())
+		}
+	}
+
+	if s.redisClient != nil {
+		cacheSetJSON(ctx, s.redisClient, contentCacheKey(content.ID), content, contentRedisTTL, "content", "contentId", content.ID)
+	}
+	if err := s.searchService.IndexContent(ctx, *content); err != nil {
+		logger.WarnContext(ctx, "search content indexing failed after asset key deletion", "contentId", content.ID, "error", err.Error())
+	}
+
+	return nil
 }
 
 func contentCacheKey(id string) string {
@@ -510,4 +584,21 @@ func videoContentTypeForFile(fh *multipart.FileHeader) string {
 	default:
 		return "video/mp4"
 	}
+}
+// GetPlayback fetches the finished encoder job for contentID, validates the
+// contentType, and returns the raw playback block. Paths are S3 keys served
+// via the Cloudflare Worker CDN — no presigning needed.
+func (s *ContentService) GetPlayback(ctx context.Context, contentID, contentType string) (*model.PlaybackInfo, error) {
+	if s.encoderRepo == nil {
+		return nil, errs.NewNotFound("playback not available")
+	}
+	job, err := s.encoderRepo.GetFinishedByContentID(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.EqualFold(job.ContentType, contentType) {
+		return nil, errs.NewNotFound("playback not available for this content type")
+	}
+	pb := job.Playback
+	return &pb, nil
 }

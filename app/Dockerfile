@@ -62,7 +62,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     -X github.com/xanderbilla/bi8s-go/internal/buildinfo.Date=${BUILD_DATE}" \
     -o /out/api ./cmd/api
 
-# Runtime stage: minimal Debian image with ffmpeg/ffprobe for encoder health checks.
+# Runtime stage: minimal Debian image.
 FROM debian:bookworm-slim AS runtime
 
 ARG APP_UID=10001
@@ -82,7 +82,7 @@ LABEL org.opencontainers.image.title="bi8s-go" \
     org.opencontainers.image.created="${BUILD_DATE}"
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates ffmpeg wget \
+    && apt-get install -y --no-install-recommends ca-certificates wget \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid ${APP_GID} app \
     && useradd  --system --uid ${APP_UID} --gid ${APP_GID} --no-create-home --shell /usr/sbin/nologin app

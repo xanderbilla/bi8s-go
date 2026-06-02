@@ -387,20 +387,34 @@ func (h *ContentHandler) UploadAssets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	assetType := r.FormValue("assetType")
+	if bodyContentID := r.FormValue("contentid"); bodyContentID != "" {
+		contentID = bodyContentID
+	}
+
+	if r.FormValue("contenttype") == "" {
+		errs.BadRequestError(w, r, errors.New("contenttype is required"))
+		return
+	}
+
+	assetType := r.FormValue("assettype")
 	if assetType == "" {
-		errs.BadRequestError(w, r, errors.New("assetType is required"))
+		errs.BadRequestError(w, r, errors.New("assettype is required"))
 		return
 	}
 
 	if !model.AssetType(assetType).IsValid() {
-		errs.BadRequestError(w, r, errors.New("invalid assetType: must be TRAILER, TEASER, CLIP, PROMO, or BTS"))
+		errs.BadRequestError(w, r, errors.New("invalid assettype: must be TRAILER, TEASER, CLIP, PROMO, or BTS"))
 		return
 	}
 
-	files := r.MultipartForm.File["videos"]
+	files := r.MultipartForm.File["video"]
 	if len(files) == 0 {
-		errs.BadRequestError(w, r, errors.New("at least one video file is required"))
+		errs.BadRequestError(w, r, errors.New("video file is required"))
+		return
+	}
+
+	if len(files) > 1 {
+		errs.BadRequestError(w, r, errors.New("only one video file can be uploaded at a time"))
 		return
 	}
 
@@ -418,15 +432,35 @@ func (h *ContentHandler) UploadAssets(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *ContentHandler) GetPlayback(w http.ResponseWriter, r *http.Request) {
-
+func (h *ContentHandler) DeleteAssetKey(w http.ResponseWriter, r *http.Request) {
 	contentID := chi.URLParam(r, "contentId")
+	assetTypeStr := chi.URLParam(r, "assetType")
+	keyID := chi.URLParam(r, "keyId")
 
-	info, err := h.contentService.GetPlaybackInfo(r.Context(), contentID)
-	if err != nil {
+	if !model.AssetType(assetTypeStr).IsValid() {
+		errs.BadRequestError(w, r, errors.New("invalid assetType: must be TRAILER, TEASER, CLIP, PROMO, or BTS"))
+		return
+	}
+
+	if err := h.contentService.DeleteAssetKey(r.Context(), contentID, model.AssetType(assetTypeStr), keyID); err != nil {
 		errs.Write(w, r, err)
 		return
 	}
 
-	writeOK(w, r, http.StatusOK, "playback information fetched", info)
+	writeOK(w, r, http.StatusOK, "asset key deleted successfully", map[string]any{
+		"contentId": contentID,
+		"assetType": assetTypeStr,
+		"keyId":     keyID,
+	})
+}
+// GetPlayback returns presigned playback URLs for a finished encoder job.
+func (h *ContentHandler) GetPlayback(w http.ResponseWriter, r *http.Request) {
+	contentType := chi.URLParam(r, "contentType")
+	contentID := chi.URLParam(r, "contentId")
+	playback, err := h.contentService.GetPlayback(r.Context(), contentID, contentType)
+	if err != nil {
+		errs.Write(w, r, err)
+		return
+	}
+	writeOK(w, r, http.StatusOK, "playback fetched", playback)
 }

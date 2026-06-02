@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Bi8s API
   description: |
-    REST API for the Bi8s movie / person / encoder backend.
+    REST API for the Bi8s movie / person backend.
 
     All responses follow the standard envelope:
 
@@ -33,8 +33,6 @@ tags:
     description: Public, read-only endpoints under `/v1/c`.
   - name: Admin
     description: Write endpoints under `/v1/a`. Network-level access control only.
-  - name: Encoder
-    description: HLS encoder job submission and status under `/v1/a/encoder`.
 
 paths:
   /health:
@@ -222,39 +220,6 @@ paths:
           required: true
           schema: { type: string, enum: [movie, tv] }
         - $ref: "#/components/parameters/ContentId"
-      responses:
-        "200": { $ref: "#/components/responses/OK" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /a/encoder:
-    post:
-      tags: [Admin, Encoder]
-      summary: Submit a video for HLS encoding
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [contentId, contentType, video]
-              properties:
-                contentId: { type: string }
-                contentType: { type: string, enum: [MOVIE, TV] }
-                video: { type: string, format: binary }
-      responses:
-        "201": { $ref: "#/components/responses/OK" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "429": { $ref: "#/components/responses/RateLimited" }
-
-  /a/encoder/{jobId}:
-    get:
-      tags: [Admin, Encoder]
-      summary: Get encoder job status
-      parameters:
-        - in: path
-          name: jobId
-          required: true
-          schema: { type: string, pattern: "^job_[A-Za-z0-9-]+$" }
       responses:
         "200": { $ref: "#/components/responses/OK" }
         "404": { $ref: "#/components/responses/NotFound" }
