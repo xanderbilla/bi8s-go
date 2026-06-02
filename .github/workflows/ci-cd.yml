@@ -26,6 +26,7 @@ on:
 permissions:
     contents: read
     security-events: write
+  id-token: write
 
 concurrency:
     group: ci-cd-${{ github.ref }}
@@ -380,7 +381,21 @@ jobs:
                   COSIGN_EXPERIMENTAL: "1"
                   IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}@${{ steps.build.outputs.digest }}
               run: |
-                  cosign sign --yes "$IMAGE"
+                  OIDC_TOKEN="$(curl -sSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sigstore" | jq -r '.value')"
+                  if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
+                    echo "Failed to retrieve GitHub OIDC token for cosign signing" >&2
+                    exit 1
+                  fi
+
+                  for attempt in 1 2 3; do
+                    if cosign sign --yes --identity-token "$OIDC_TOKEN" "$IMAGE"; then
+                      exit 0
+                    fi
+                    echo "cosign sign failed on attempt $attempt"
+                  done
+
+                  echo "cosign signing failed after 3 attempts" >&2
+                  exit 1
 
     # ─────────────────────────────────────────────────────────────────────────────
     # Deploy
