@@ -171,6 +171,200 @@ func buildPeopleView(state *AppState) fyne.CanvasObject {
 			widget.NewLabel(fmt.Sprintf("Specialties: %s", strings.Join(specsStr, ", "))),
 		))
 
+		nameEdit := widget.NewEntry()
+		nameEdit.SetText(detail.Name)
+		legalEdit := widget.NewEntry()
+		legalEdit.SetText(detail.LegalName)
+		stageEdit := widget.NewEntry()
+		stageEdit.SetText(detail.StageName)
+		bioEdit := widget.NewMultiLineEntry()
+		bioEdit.SetText(detail.Bio)
+		birthDateEdit := widget.NewEntry()
+		birthDateEdit.SetText(detail.BirthDate)
+		birthPlaceEdit := widget.NewEntry()
+		birthPlaceEdit.SetText(detail.BirthPlace)
+		nationalityEdit := widget.NewEntry()
+		nationalityEdit.SetText(detail.Nationality)
+		heightEdit := widget.NewEntry()
+		heightEdit.SetText(strconv.Itoa(detail.Height))
+		weightEdit := widget.NewEntry()
+		weightEdit.SetText(strconv.Itoa(detail.Weight))
+		debutEdit := widget.NewEntry()
+		debutEdit.SetText(strconv.Itoa(detail.DebutYear))
+		aliasesEdit := widget.NewEntry()
+		aliasesEdit.SetText(strings.Join(detail.Aliases, ","))
+		rolesEdit := widget.NewEntry()
+		rolesEdit.SetText(strings.Join(detail.Roles, ","))
+		activeEdit := widget.NewCheck("Active", nil)
+		activeEdit.SetChecked(detail.Active)
+		verifiedEdit := widget.NewCheck("Verified", nil)
+		verifiedEdit.SetChecked(detail.Verified)
+		genderEdit := widget.NewSelect([]string{"MALE", "FEMALE", "TRANS"}, nil)
+		genderEdit.SetSelected(strings.ToUpper(detail.Gender))
+		careerEdit := widget.NewSelect([]string{"ACTIVE", "RETIRED", "HIATUS"}, nil)
+		careerEdit.SetSelected(strings.ToUpper(detail.CareerStatus))
+
+		coreUpdateBtn := widget.NewButtonWithIcon("Update Person Core", theme.DocumentSaveIcon(), func() {
+			height, err := strconv.Atoi(strings.TrimSpace(heightEdit.Text))
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("height must be a number"), state.Window)
+				return
+			}
+			weight, err := strconv.Atoi(strings.TrimSpace(weightEdit.Text))
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("weight must be a number"), state.Window)
+				return
+			}
+			debutYear := 0
+			if strings.TrimSpace(debutEdit.Text) != "" {
+				debutYear, err = strconv.Atoi(strings.TrimSpace(debutEdit.Text))
+				if err != nil {
+					dialog.ShowError(fmt.Errorf("debut year must be a number"), state.Window)
+					return
+				}
+			}
+
+			payload := map[string]any{
+				"name":           strings.TrimSpace(nameEdit.Text),
+				"legalName":      strings.TrimSpace(legalEdit.Text),
+				"roles":          splitCSV(rolesEdit.Text),
+				"stageName":      strings.TrimSpace(stageEdit.Text),
+				"bio":            strings.TrimSpace(bioEdit.Text),
+				"birthDate":      strings.TrimSpace(birthDateEdit.Text),
+				"birthPlace":     strings.TrimSpace(birthPlaceEdit.Text),
+				"nationality":    strings.TrimSpace(nationalityEdit.Text),
+				"gender":         strings.ToUpper(strings.TrimSpace(genderEdit.Selected)),
+				"height":         height,
+				"weight":         weight,
+				"verified":       verifiedEdit.Checked,
+				"active":         activeEdit.Checked,
+				"debutYear":      debutYear,
+				"careerStatus":   strings.ToUpper(strings.TrimSpace(careerEdit.Selected)),
+				"aliases":        splitCSV(aliasesEdit.Text),
+				"measurements":   detail.Measurements,
+				"sourceMetadata": map[string]any{},
+			}
+
+			if _, err := state.APIClient.updatePersonCore(detail.ID, payload); err != nil {
+				dialog.ShowError(err, state.Window)
+				return
+			}
+			dialog.ShowInformation("Updated", "Person core fields updated", state.Window)
+			list.Select(id)
+		})
+
+		coreUpdateCard := widget.NewCard("Update Person", "Updates only allowed core fields", container.NewVBox(
+			widget.NewForm(
+				widget.NewFormItem("Name", nameEdit),
+				widget.NewFormItem("Legal Name", legalEdit),
+				widget.NewFormItem("Stage Name", stageEdit),
+				widget.NewFormItem("Roles", rolesEdit),
+				widget.NewFormItem("Bio", bioEdit),
+				widget.NewFormItem("Birth Date", birthDateEdit),
+				widget.NewFormItem("Birth Place", birthPlaceEdit),
+				widget.NewFormItem("Nationality", nationalityEdit),
+				widget.NewFormItem("Gender", genderEdit),
+				widget.NewFormItem("Career Status", careerEdit),
+				widget.NewFormItem("Height", heightEdit),
+				widget.NewFormItem("Weight", weightEdit),
+				widget.NewFormItem("Debut Year", debutEdit),
+				widget.NewFormItem("Aliases", aliasesEdit),
+				widget.NewFormItem("Flags", container.NewHBox(activeEdit, verifiedEdit)),
+			),
+			coreUpdateBtn,
+		))
+
+		profileLabel := widget.NewLabel("No file selected")
+		var profileReader io.ReadCloser
+		var profileName string
+		profilePicker := showFilePickerButton(state.Window, "Select Profile", profileLabel, func(r io.ReadCloser, name string) {
+			profileReader = r
+			profileName = name
+		})
+		profileUpdateBtn := widget.NewButtonWithIcon("Update Profile", theme.UploadIcon(), func() {
+			if profileReader == nil {
+				dialog.ShowError(fmt.Errorf("select a profile image first"), state.Window)
+				return
+			}
+			_, err := state.APIClient.multipartRequest("PUT", fmt.Sprintf("/a/person/profile/%s", detail.ID), nil, []FormFile{{FieldName: "profile", FileName: profileName, Reader: profileReader}})
+			if err != nil {
+				dialog.ShowError(err, state.Window)
+				return
+			}
+			dialog.ShowInformation("Updated", "Profile image updated", state.Window)
+			list.Select(id)
+		})
+
+		backdropLabel := widget.NewLabel("No file selected")
+		var backdropReader io.ReadCloser
+		var backdropName string
+		backdropPicker := showFilePickerButton(state.Window, "Select Backdrop", backdropLabel, func(r io.ReadCloser, name string) {
+			backdropReader = r
+			backdropName = name
+		})
+		backdropUpdateBtn := widget.NewButtonWithIcon("Update Backdrop", theme.UploadIcon(), func() {
+			if backdropReader == nil {
+				dialog.ShowError(fmt.Errorf("select a backdrop image first"), state.Window)
+				return
+			}
+			_, err := state.APIClient.multipartRequest("PUT", fmt.Sprintf("/a/person/backdrop/%s", detail.ID), nil, []FormFile{{FieldName: "backdrop", FileName: backdropName, Reader: backdropReader}})
+			if err != nil {
+				dialog.ShowError(err, state.Window)
+				return
+			}
+			dialog.ShowInformation("Updated", "Backdrop image updated", state.Window)
+			list.Select(id)
+		})
+
+		imageUpdateCard := widget.NewCard("Update Images", "Profile and backdrop are updated via dedicated endpoints", container.NewVBox(
+			container.NewHBox(profilePicker, profileLabel),
+			profileUpdateBtn,
+			widget.NewSeparator(),
+			container.NewHBox(backdropPicker, backdropLabel),
+			backdropUpdateBtn,
+		))
+
+		attributeOptions := make([]string, 0, len(cachedAttributes))
+		attributeMap := map[string]string{}
+		for _, a := range cachedAttributes {
+			label := fmt.Sprintf("%s (%s)", a.Name, a.ID)
+			attributeOptions = append(attributeOptions, label)
+			attributeMap[label] = a.ID
+		}
+		attributeSelect := widget.NewSelect(attributeOptions, nil)
+
+		attributeMutationCard := widget.NewCard("Add / Remove Attributes", "TAG, CATEGORY, SPECIALITY, SOCIAL/PLATFORM", container.NewVBox(
+			widget.NewForm(widget.NewFormItem("Attribute", attributeSelect)),
+			container.NewHBox(
+				widget.NewButton("Add Attribute", func() {
+					attrID := attributeMap[attributeSelect.Selected]
+					if attrID == "" {
+						dialog.ShowError(fmt.Errorf("select an attribute first"), state.Window)
+						return
+					}
+					if _, err := state.APIClient.mutatePersonAttribute(attrID, detail.ID, true); err != nil {
+						dialog.ShowError(err, state.Window)
+						return
+					}
+					dialog.ShowInformation("Updated", "Attribute added", state.Window)
+					list.Select(id)
+				}),
+				widget.NewButton("Remove Attribute", func() {
+					attrID := attributeMap[attributeSelect.Selected]
+					if attrID == "" {
+						dialog.ShowError(fmt.Errorf("select an attribute first"), state.Window)
+						return
+					}
+					if _, err := state.APIClient.mutatePersonAttribute(attrID, detail.ID, false); err != nil {
+						dialog.ShowError(err, state.Window)
+						return
+					}
+					dialog.ShowInformation("Updated", "Attribute removed", state.Window)
+					list.Select(id)
+				}),
+			),
+		))
+
 		deleteBtn := widget.NewButtonWithIcon("Delete Person Profile", theme.DeleteIcon(), func() {
 			dialog.ShowConfirm("Confirm Profile Deletion", fmt.Sprintf("Are you sure you want to delete profile for '%s'?", detail.Name), func(ok bool) {
 				if ok {
@@ -187,13 +381,33 @@ func buildPeopleView(state *AppState) fyne.CanvasObject {
 			}, state.Window)
 		})
 
-		detailScroll := container.NewScroll(container.NewVBox(infoCard, relCard, deleteBtn))
+		detailScroll := container.NewScroll(container.NewVBox(
+			infoCard,
+			relCard,
+			coreUpdateCard,
+			imageUpdateCard,
+			attributeMutationCard,
+			deleteBtn,
+		))
 		detailContainer.Objects = []fyne.CanvasObject{detailScroll}
 		detailContainer.Refresh()
 	}
 
 	// Action to create person inline
 	showCreateForm := func() {
+		refreshStatus := widget.NewLabel("Reference data cache is current")
+		reloadLookupData := func() {
+			fetchCaches()
+			refreshStatus.SetText("Reference data reloaded")
+		}
+		newReloadButton := func() *widget.Button {
+			btn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+				reloadLookupData()
+			})
+			btn.Importance = widget.LowImportance
+			return btn
+		}
+
 		nameEntry := widget.NewEntry()
 		nameEntry.PlaceHolder = "e.g., Tim Robbins"
 
@@ -336,9 +550,9 @@ func buildPeopleView(state *AppState) fyne.CanvasObject {
 			widget.NewFormItem("Hips Size", hipsEntry),
 			widget.NewFormItem("Unit", unitSelect),
 			widget.NewFormItem("Body Details (Type/Eye/Hair)", container.NewVBox(bodyTypeEntry, eyeEntry, hairEntry)),
-			widget.NewFormItem("Tags (Search & Select)", tagsSelector.Container),
-			widget.NewFormItem("Categories (Search & Select)", catsSelector.Container),
-			widget.NewFormItem("Specialties (Search & Select)", specsSelector.Container),
+			widget.NewFormItem("Tags (Search & Select)", container.NewBorder(nil, nil, nil, newReloadButton(), tagsSelector.Container)),
+			widget.NewFormItem("Categories (Search & Select)", container.NewBorder(nil, nil, nil, newReloadButton(), catsSelector.Container)),
+			widget.NewFormItem("Specialties (Search & Select)", container.NewBorder(nil, nil, nil, newReloadButton(), specsSelector.Container)),
 			widget.NewFormItem("Profile Picture", container.NewHBox(profileBtn, profileLabel)),
 			widget.NewFormItem("Cover Backdrop Banner", container.NewHBox(backdropBtn, backdropLabel)),
 		)
@@ -427,6 +641,9 @@ func buildPeopleView(state *AppState) fyne.CanvasObject {
 		})
 
 		formCard := widget.NewCard("Create Person", "Relational fields are fully searchable from cached attributes.", container.NewVBox(
+			container.NewHBox(widget.NewButtonWithIcon("Refresh Reference Data", theme.ViewRefreshIcon(), func() {
+				reloadLookupData()
+			}), refreshStatus),
 			form,
 			container.NewHBox(submitBtn, cancelBtn),
 		))

@@ -104,3 +104,35 @@ func (c *Client) multipartRequest(method, path string, fields map[string]string,
 
 	return c.request(method, path, body, headers)
 }
+
+func (c *Client) jsonRequest(method, path string, payload any) ([]byte, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return c.request(method, path, bytes.NewReader(body), map[string]string{"Content-Type": "application/json"})
+}
+
+func (c *Client) updateContentCore(contentID string, payload map[string]any) ([]byte, error) {
+	return c.jsonRequest(http.MethodPatch, fmt.Sprintf("/a/content/%s", contentID), payload)
+}
+
+func (c *Client) updatePersonCore(personID string, payload map[string]any) ([]byte, error) {
+	return c.jsonRequest(http.MethodPatch, fmt.Sprintf("/a/people/%s", personID), payload)
+}
+
+func (c *Client) mutateContentRelation(attributeID, contentID string, add bool) ([]byte, error) {
+	action := "remove"
+	if add {
+		action = "add"
+	}
+	return c.jsonRequest(http.MethodPost, fmt.Sprintf("/a/content/attributes/%s/%s", attributeID, action), map[string]string{"contentId": contentID})
+}
+
+func (c *Client) mutatePersonAttribute(attributeID, personID string, add bool) ([]byte, error) {
+	action := "remove"
+	if add {
+		action = "add"
+	}
+	return c.jsonRequest(http.MethodPost, fmt.Sprintf("/a/person/attributes/%s/%s", attributeID, action), map[string]string{"personId": personID})
+}

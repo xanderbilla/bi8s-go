@@ -102,6 +102,7 @@ func NewMultiSelectChipSelector(
 			return
 		}
 		addSelection(resultItems[id])
+		resultsList.UnselectAll()
 		entry.SetText("")
 		resultItems = []EntityRef{}
 		resultsList.Refresh()

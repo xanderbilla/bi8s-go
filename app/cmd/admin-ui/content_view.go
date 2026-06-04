@@ -177,6 +177,208 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 			widget.NewLabel(fmt.Sprintf("Studios: %s", strings.Join(studiosStr, ", "))),
 		))
 
+		titleEdit := widget.NewEntry()
+		titleEdit.SetText(detail.Title)
+		overviewEdit := widget.NewMultiLineEntry()
+		overviewEdit.SetText(detail.Overview)
+		taglineEdit := widget.NewEntry()
+		taglineEdit.SetText(detail.Tagline)
+		runtimeEdit := widget.NewEntry()
+		runtimeEdit.SetText(strconv.Itoa(detail.Runtime))
+		dateEdit := widget.NewEntry()
+		dateEdit.SetText(detail.EffectiveReleaseDate())
+		adultEdit := widget.NewCheck("Adult", nil)
+		adultEdit.SetChecked(detail.Adult)
+
+		ratingEdit := widget.NewSelect([]string{"", "18_PLUS", "21_PLUS"}, nil)
+		ratingEdit.SetSelected(detail.ContentRating)
+		statusEdit := widget.NewSelect([]string{"RUMORED", "PLANNED", "IN_PRODUCTION", "POST_PRODUCTION", "RELEASED", "ENDED", "RETURNING_SERIES", "CANCELED", "PILOT"}, nil)
+		statusEdit.SetSelected(detail.Status)
+		visibilityEdit := widget.NewSelect([]string{"PUBLIC", "PRIVATE"}, nil)
+		visibilityEdit.SetSelected(detail.Visibility)
+		originCountryEdit := widget.NewEntry()
+		originCountryEdit.SetText(strings.Join(detail.OriginCountry, ","))
+
+		coreUpdateBtn := widget.NewButtonWithIcon("Update Core Fields", theme.DocumentSaveIcon(), func() {
+			runtime, err := strconv.Atoi(strings.TrimSpace(runtimeEdit.Text))
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("runtime must be a number"), state.Window)
+				return
+			}
+			payload := map[string]any{
+				"title":            strings.TrimSpace(titleEdit.Text),
+				"overview":         strings.TrimSpace(overviewEdit.Text),
+				"adult":            adultEdit.Checked,
+				"contentRating":    strings.TrimSpace(ratingEdit.Selected),
+				"originalLanguage": detail.OriginalLanguage,
+				"originCountry":    splitCSV(originCountryEdit.Text),
+				"runtime":          runtime,
+				"status":           strings.TrimSpace(statusEdit.Selected),
+				"tagline":          strings.TrimSpace(taglineEdit.Text),
+				"visibility":       strings.TrimSpace(visibilityEdit.Selected),
+				"assets":           detail.Assets,
+			}
+			if detail.ContentType == "TV" {
+				payload["firstAirDate"] = strings.TrimSpace(dateEdit.Text)
+			} else {
+				payload["releaseDate"] = strings.TrimSpace(dateEdit.Text)
+			}
+
+			if _, err := state.APIClient.updateContentCore(detail.ID, payload); err != nil {
+				dialog.ShowError(err, state.Window)
+				return
+			}
+			dialog.ShowInformation("Updated", "Content core fields updated", state.Window)
+			list.Select(id)
+		})
+
+		coreUpdateCard := widget.NewCard("Update Content", "Updates only allowed core fields", container.NewVBox(
+			widget.NewForm(
+				widget.NewFormItem("Title", titleEdit),
+				widget.NewFormItem("Overview", overviewEdit),
+				widget.NewFormItem("Tagline", taglineEdit),
+				widget.NewFormItem("Release/Air Date", dateEdit),
+				widget.NewFormItem("Runtime", runtimeEdit),
+				widget.NewFormItem("Content Rating", ratingEdit),
+				widget.NewFormItem("Status", statusEdit),
+				widget.NewFormItem("Visibility", visibilityEdit),
+				widget.NewFormItem("Origin Countries", originCountryEdit),
+				widget.NewFormItem("Adult", adultEdit),
+			),
+			coreUpdateBtn,
+		))
+
+		posterLabel := widget.NewLabel("No file selected")
+		var posterReader io.ReadCloser
+		var posterName string
+		posterPicker := showFilePickerButton(state.Window, "Select Poster", posterLabel, func(r io.ReadCloser, name string) {
+			posterReader = r
+			posterName = name
+		})
+		posterUpdateBtn := widget.NewButtonWithIcon("Update Poster", theme.UploadIcon(), func() {
+			if posterReader == nil {
+				dialog.ShowError(fmt.Errorf("select a poster file first"), state.Window)
+				return
+			}
+			_, err := state.APIClient.multipartRequest("PUT", fmt.Sprintf("/a/content/poster/%s", detail.ID), nil, []FormFile{{FieldName: "poster", FileName: posterName, Reader: posterReader}})
+			if err != nil {
+				dialog.ShowError(err, state.Window)
+				return
+			}
+			dialog.ShowInformation("Updated", "Poster image updated", state.Window)
+			list.Select(id)
+		})
+
+		backdropLabel := widget.NewLabel("No file selected")
+		var backdropReader io.ReadCloser
+		var backdropName string
+		backdropPicker := showFilePickerButton(state.Window, "Select Backdrop", backdropLabel, func(r io.ReadCloser, name string) {
+			backdropReader = r
+			backdropName = name
+		})
+		backdropUpdateBtn := widget.NewButtonWithIcon("Update Backdrop", theme.UploadIcon(), func() {
+			if backdropReader == nil {
+				dialog.ShowError(fmt.Errorf("select a backdrop file first"), state.Window)
+				return
+			}
+			_, err := state.APIClient.multipartRequest("PUT", fmt.Sprintf("/a/content/backdrop/%s", detail.ID), nil, []FormFile{{FieldName: "backdrop", FileName: backdropName, Reader: backdropReader}})
+			if err != nil {
+				dialog.ShowError(err, state.Window)
+				return
+			}
+			dialog.ShowInformation("Updated", "Backdrop image updated", state.Window)
+			list.Select(id)
+		})
+
+		imageUpdateCard := widget.NewCard("Update Images", "Poster and backdrop are updated via dedicated endpoints", container.NewVBox(
+			container.NewHBox(posterPicker, posterLabel),
+			posterUpdateBtn,
+			widget.NewSeparator(),
+			container.NewHBox(backdropPicker, backdropLabel),
+			backdropUpdateBtn,
+		))
+
+		attributeOptions := make([]string, 0, len(cachedAttributes))
+		attributeMap := map[string]string{}
+		for _, a := range cachedAttributes {
+			label := fmt.Sprintf("%s (%s)", a.Name, a.ID)
+			attributeOptions = append(attributeOptions, label)
+			attributeMap[label] = a.ID
+		}
+		attributeSelect := widget.NewSelect(attributeOptions, nil)
+
+		castOptions := make([]string, 0, len(cachedPeople))
+		castMap := map[string]string{}
+		for _, p := range cachedPeople {
+			label := fmt.Sprintf("%s (%s)", p.Name, p.ID)
+			castOptions = append(castOptions, label)
+			castMap[label] = p.ID
+		}
+		castSelect := widget.NewSelect(castOptions, nil)
+
+		relationCard := widget.NewCard("Add / Remove Relations", "Attribute and cast mutation endpoints", container.NewVBox(
+			widget.NewForm(
+				widget.NewFormItem("Attribute", attributeSelect),
+				widget.NewFormItem("Cast Person", castSelect),
+			),
+			container.NewHBox(
+				widget.NewButton("Add Attribute", func() {
+					attrID := attributeMap[attributeSelect.Selected]
+					if attrID == "" {
+						dialog.ShowError(fmt.Errorf("select an attribute first"), state.Window)
+						return
+					}
+					if _, err := state.APIClient.mutateContentRelation(attrID, detail.ID, true); err != nil {
+						dialog.ShowError(err, state.Window)
+						return
+					}
+					dialog.ShowInformation("Updated", "Attribute added", state.Window)
+					list.Select(id)
+				}),
+				widget.NewButton("Remove Attribute", func() {
+					attrID := attributeMap[attributeSelect.Selected]
+					if attrID == "" {
+						dialog.ShowError(fmt.Errorf("select an attribute first"), state.Window)
+						return
+					}
+					if _, err := state.APIClient.mutateContentRelation(attrID, detail.ID, false); err != nil {
+						dialog.ShowError(err, state.Window)
+						return
+					}
+					dialog.ShowInformation("Updated", "Attribute removed", state.Window)
+					list.Select(id)
+				}),
+			),
+			container.NewHBox(
+				widget.NewButton("Add Cast", func() {
+					personID := castMap[castSelect.Selected]
+					if personID == "" {
+						dialog.ShowError(fmt.Errorf("select a cast person first"), state.Window)
+						return
+					}
+					if _, err := state.APIClient.mutateContentRelation(personID, detail.ID, true); err != nil {
+						dialog.ShowError(err, state.Window)
+						return
+					}
+					dialog.ShowInformation("Updated", "Cast member added", state.Window)
+					list.Select(id)
+				}),
+				widget.NewButton("Remove Cast", func() {
+					personID := castMap[castSelect.Selected]
+					if personID == "" {
+						dialog.ShowError(fmt.Errorf("select a cast person first"), state.Window)
+						return
+					}
+					if _, err := state.APIClient.mutateContentRelation(personID, detail.ID, false); err != nil {
+						dialog.ShowError(err, state.Window)
+						return
+					}
+					dialog.ShowInformation("Updated", "Cast member removed", state.Window)
+					list.Select(id)
+				}),
+			),
+		))
+
 		// Video Assets Management
 		assetsBox := container.NewVBox(widget.NewLabelWithStyle("Video Assets", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
 		for _, asset := range detail.Assets {
@@ -266,6 +468,12 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 			widget.NewSeparator(),
 			relCard,
 			widget.NewSeparator(),
+			coreUpdateCard,
+			widget.NewSeparator(),
+			imageUpdateCard,
+			widget.NewSeparator(),
+			relationCard,
+			widget.NewSeparator(),
 			assetsBox,
 			widget.NewSeparator(),
 			uploadBox,
@@ -279,6 +487,19 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 
 	// Action to create content form directly in the detail pane
 	showCreateForm := func() {
+		refreshStatus := widget.NewLabel("Reference data cache is current")
+		reloadLookupData := func() {
+			fetchCaches()
+			refreshStatus.SetText("Reference data reloaded")
+		}
+		newReloadButton := func() *widget.Button {
+			btn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+				reloadLookupData()
+			})
+			btn.Importance = widget.LowImportance
+			return btn
+		}
+
 		// Elements
 		titleEntry := widget.NewEntry()
 		titleEntry.PlaceHolder = "e.g., Inception"
@@ -426,11 +647,11 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 			widget.NewFormItem("Visibility", visSelect),
 			widget.NewFormItem("Adult Content", adultCheck),
 			widget.NewFormItem("Origin Country (comma separated)", countryEntry),
-			widget.NewFormItem("Genres (Search & Select)", genresSelector.Container),
-			widget.NewFormItem("Tags (Search & Select)", tagsSelector.Container),
-			widget.NewFormItem("Mood Tags (Search & Select)", moodsSelector.Container),
-			widget.NewFormItem("Studios (Search & Select)", studiosSelector.Container),
-			widget.NewFormItem("Cast Credits (Search & Select)", castsSelector.Container),
+			widget.NewFormItem("Genres (Search & Select)", container.NewBorder(nil, nil, nil, newReloadButton(), genresSelector.Container)),
+			widget.NewFormItem("Tags (Search & Select)", container.NewBorder(nil, nil, nil, newReloadButton(), tagsSelector.Container)),
+			widget.NewFormItem("Mood Tags (Search & Select)", container.NewBorder(nil, nil, nil, newReloadButton(), moodsSelector.Container)),
+			widget.NewFormItem("Studios (Search & Select)", container.NewBorder(nil, nil, nil, newReloadButton(), studiosSelector.Container)),
+			widget.NewFormItem("Cast Credits (Search & Select)", container.NewBorder(nil, nil, nil, newReloadButton(), castsSelector.Container)),
 			widget.NewFormItem("Poster Image File", container.NewHBox(posterBtn, posterFileLabel)),
 			widget.NewFormItem("Backdrop Image File", container.NewHBox(coverBtn, coverFileLabel)),
 		)
@@ -508,6 +729,9 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 		})
 
 		formCard := widget.NewCard("Create Content", "Relational fields are fully searchable from cached attributes.", container.NewVBox(
+			container.NewHBox(widget.NewButtonWithIcon("Refresh Reference Data", theme.ViewRefreshIcon(), func() {
+				reloadLookupData()
+			}), refreshStatus),
 			form,
 			container.NewHBox(submitBtn, cancelBtn),
 		))
@@ -550,4 +774,16 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 	split := container.NewHSplit(leftPane, detailContainer)
 	split.Offset = 0.35
 	return split
+}
+
+func splitCSV(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		v := strings.TrimSpace(part)
+		if v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
