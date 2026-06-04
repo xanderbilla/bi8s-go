@@ -147,7 +147,7 @@ func (h *ContentHandler) GetContentAdmin(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *ContentHandler) CreateContent(w http.ResponseWriter, r *http.Request) {
-	formValues, files, err := ParseFormAndFiles(w, r, []string{"poster", "cover"})
+	formValues, files, err := ParseFormAndFiles(w, r, []string{"cover"})
 	if err != nil {
 		errs.BadRequestError(w, r, err)
 		return
@@ -159,7 +159,7 @@ func (h *ContentHandler) CreateContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newContent, err := h.contentService.Create(r.Context(), content, files["poster"], files["cover"])
+	newContent, err := h.contentService.Create(r.Context(), content, files["cover"])
 	if err != nil {
 		errs.Write(w, r, err)
 		return
@@ -216,10 +216,6 @@ func (h *ContentHandler) UpdateContent(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, r, http.StatusOK, "content updated", updated)
 }
 
-func (h *ContentHandler) UpdateContentPoster(w http.ResponseWriter, r *http.Request) {
-	h.updateContentImageByPurpose(w, r, "poster")
-}
-
 func (h *ContentHandler) UpdateContentBackdrop(w http.ResponseWriter, r *http.Request) {
 	h.updateContentImageByPurpose(w, r, "backdrop")
 }
@@ -250,9 +246,7 @@ func (h *ContentHandler) updateContentImageByPurpose(w http.ResponseWriter, r *h
 	}
 
 	var updated *model.Movie
-	if purpose == "poster" {
-		updated, err = h.contentService.UpdatePosterImage(r.Context(), id, input)
-	} else {
+	if purpose == "backdrop" {
 		updated, err = h.contentService.UpdateBackdropImage(r.Context(), id, input)
 	}
 	if err != nil {

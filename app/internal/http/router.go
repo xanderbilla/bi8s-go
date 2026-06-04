@@ -131,7 +131,6 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 		"content.Create":              contentHandler.CreateContent,
 		"content.Update":              contentHandler.UpdateContent,
 		"content.Delete":              contentHandler.DeleteContent,
-		"content.UpdatePoster":        contentHandler.UpdateContentPoster,
 		"content.UpdateBackdrop":      contentHandler.UpdateContentBackdrop,
 		"content.RelationAdd":         contentHandler.AddContentRelation,
 		"content.RelationRemove":      contentHandler.RemoveContentRelation,

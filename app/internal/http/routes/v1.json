@@ -168,18 +168,6 @@
       "middlewares": ["localonly", "timeout", "validate.movieId"]
     },
     {
-      "id": "admin.content.poster.update",
-      "method": "PUT",
-      "route": "/v1/a/content/poster/{contentId}",
-      "handler": "content.UpdatePoster",
-      "middlewares": [
-        "localonly",
-        "timeout",
-        "validate.movieId",
-        "ratelimit.movie"
-      ]
-    },
-    {
       "id": "admin.content.backdrop.update",
       "method": "PUT",
       "route": "/v1/a/content/backdrop/{contentId}",

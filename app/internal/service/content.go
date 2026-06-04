@@ -104,7 +104,7 @@ func (s *ContentService) GetAdmin(ctx context.Context, id string) (*model.Movie,
 	return m, nil
 }
 
-func (s *ContentService) Create(ctx context.Context, movie model.Movie, posterInput, coverInput *model.FileUploadInput) (model.Movie, error) {
+func (s *ContentService) Create(ctx context.Context, movie model.Movie, coverInput *model.FileUploadInput) (model.Movie, error) {
 	if movie.ID == "" {
 		movie.ID = utils.GenerateID()
 	}
@@ -163,16 +163,6 @@ func (s *ContentService) Create(ctx context.Context, movie model.Movie, posterIn
 	}
 
 	var uploadedKeys []string
-
-	if posterInput != nil {
-		posterKey, err := s.uploadFileToStorage(ctx, movie.ID, "poster", posterInput)
-		if err != nil {
-			s.cleanupUploadedKeys(ctx, uploadedKeys)
-			return model.Movie{}, err
-		}
-		movie.PosterPath = posterKey
-		uploadedKeys = append(uploadedKeys, posterKey)
-	}
 
 	if coverInput != nil {
 		coverKey, err := s.uploadFileToStorage(ctx, movie.ID, "cover", coverInput)
@@ -270,10 +260,6 @@ func (s *ContentService) UpdateCore(ctx context.Context, id string, patch model.
 	return existing, nil
 }
 
-func (s *ContentService) UpdatePosterImage(ctx context.Context, id string, posterInput *model.FileUploadInput) (*model.Movie, error) {
-	return s.updateContentImage(ctx, id, posterInput, "poster")
-}
-
 func (s *ContentService) UpdateBackdropImage(ctx context.Context, id string, backdropInput *model.FileUploadInput) (*model.Movie, error) {
 	return s.updateContentImage(ctx, id, backdropInput, "backdrop")
 }
@@ -293,8 +279,6 @@ func (s *ContentService) updateContentImage(ctx context.Context, id string, inpu
 
 	var oldKey string
 	switch purpose {
-	case "poster":
-		oldKey = strings.TrimSpace(existing.PosterPath)
 	case "backdrop":
 		oldKey = strings.TrimSpace(existing.BackdropPath)
 	}
@@ -308,9 +292,7 @@ func (s *ContentService) updateContentImage(ctx context.Context, id string, inpu
 		return nil, err
 	}
 
-	if purpose == "poster" {
-		existing.PosterPath = newKey
-	} else {
+	if purpose == "backdrop" {
 		existing.BackdropPath = newKey
 	}
 

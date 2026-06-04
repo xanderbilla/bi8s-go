@@ -51,7 +51,6 @@ func TestRouter_RouteSnapshot(t *testing.T) {
 		"POST   /v1/a/content/{contentId}",
 		"PATCH  /v1/a/content/{contentId}",
 		"DELETE /v1/a/content/{contentId}",
-		"PUT    /v1/a/content/poster/{contentId}",
 		"PUT    /v1/a/content/backdrop/{contentId}",
 		"POST   /v1/a/content/attributes/{attributeId}/add",
 		"POST   /v1/a/content/attributes/{attributeId}/remove",
