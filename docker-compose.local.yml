@@ -1,4 +1,4 @@
-name: bi8s-dev
+name: bi8s-local
 
 x-restart-policy: &restart-policy
   restart: unless-stopped
@@ -16,21 +16,21 @@ services:
       context: ./app
       dockerfile: Dockerfile
       target: quality
-    container_name: bi8s_quality_dev
+    container_name: bi8s_quality_local
     command: ["/bin/sh", "-c", "echo quality checks passed"]
     profiles: ["quality"]
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   traefik:
     <<: [*restart-policy, *default-logging]
     image: traefik:v3.7
-    container_name: bi8s_traefik_dev
+    container_name: bi8s_traefik_local
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=bi8s-dev-net"
-      - "--providers.docker.constraints=Label(`traefik.constraint`,`bi8s-dev`)"
+      - "--providers.docker.network=bi8s-local-net"
+      - "--providers.docker.constraints=Label(`traefik.constraint`,`bi8s-local`)"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.transport.respondingTimeouts.readTimeout=0"
       - "--api.insecure=true"
@@ -48,40 +48,40 @@ services:
       retries: 5
       start_period: 5s
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   api:
     <<: [*restart-policy, *default-logging]
     build:
       context: ./app
       dockerfile: Dockerfile
-    image: ${API_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/bi8s:dev-latest}
+    image: ${API_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/bi8s:local-latest}
     pull_policy: ${API_PULL_POLICY:-never}
-    container_name: bi8s_api_dev
+    container_name: bi8s_api_local
     env_file:
-      - .env.dev
+      - .env.bi8s
     environment:
       APP_ENV: ${APP_ENV:-dev}
       PORT: ${PORT:-:8080}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       STARTUP_HEALTH_CHECK: ${STARTUP_HEALTH_CHECK:-false}
-      DYNAMODB_CONTENT_TABLE: ${DYNAMODB_CONTENT_TABLE:-bi8s-dev-content-table}
-      DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE:-bi8s-dev-person-table}
-      DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE:-bi8s-dev-attributes-table}
+      DYNAMODB_CONTENT_TABLE: ${DYNAMODB_CONTENT_TABLE:-bi8s-nsfw-content-table}
+      DYNAMODB_PERSON_TABLE: ${DYNAMODB_PERSON_TABLE:-bi8s-nsfw-person-table}
+      DYNAMODB_ATTRIBUTE_TABLE: ${DYNAMODB_ATTRIBUTE_TABLE:-bi8s-nsfw-attributes-table}
       DYNAMODB_ATTRIBUTE_NAME_INDEX: ${DYNAMODB_ATTRIBUTE_NAME_INDEX:-name-index}
-      DYNAMODB_CONTENT_CAST_TABLE: ${DYNAMODB_CONTENT_CAST_TABLE:-bi8s-dev-content-cast-table}
-      DYNAMODB_CONTENT_ATTRIBUTE_TABLE: ${DYNAMODB_CONTENT_ATTRIBUTE_TABLE:-bi8s-dev-content-attribute-table}
+      DYNAMODB_CONTENT_CAST_TABLE: ${DYNAMODB_CONTENT_CAST_TABLE:-bi8s-nsfw-content-cast-table}
+      DYNAMODB_CONTENT_ATTRIBUTE_TABLE: ${DYNAMODB_CONTENT_ATTRIBUTE_TABLE:-bi8s-nsfw-content-attribute-table}
       DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_CREATED_AT_INDEX:-visibility-createdAt-index}
       DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX: ${DYNAMODB_CONTENT_VISIBILITY_RELEASE_DATE_INDEX:-visibility-releaseDate-index}
-      DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE:-bi8s-dev-video-table}
+      DYNAMODB_ENCODER_TABLE: ${DYNAMODB_ENCODER_TABLE:-bi8s-nsfw-video-table}
       DYNAMODB_ENCODER_CONTENT_ID_INDEX: ${DYNAMODB_ENCODER_CONTENT_ID_INDEX:-contentId-index}
       B2_KEY_ID: ${B2_KEY_ID:-}
       B2_APPLICATION_KEY: ${B2_APPLICATION_KEY:-}
       B2_BUCKET: ${B2_BUCKET:-}
       B2_ENDPOINT: ${B2_ENDPOINT:-}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://ui-dev.emm4bi8s.dev,https://ops-dev.emm4bi8s.dev,https://api-dev.emm4bi8s.dev,http://localhost:3000,http://localhost:8080,http://localhost:8443,http://localhost}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://ui.${APP_DOMAIN:-emm4bi8s.dev},https://ops.${APP_DOMAIN:-emm4bi8s.dev},https://api.${APP_DOMAIN:-emm4bi8s.dev},http://localhost:3000,http://localhost:8080,http://localhost:8443,http://localhost}
       CORS_ALLOW_PRIVATE_NETWORK: ${CORS_ALLOW_PRIVATE_NETWORK:-true}
-      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api-dev}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-bi8s-api-nsfw}
       OTEL_ENABLED: ${OTEL_ENABLED:-true}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-otel-collector:4317}
       OTEL_EXPORTER_OTLP_INSECURE: ${OTEL_EXPORTER_OTLP_INSECURE:-true}
@@ -100,11 +100,11 @@ services:
       SEARCH_ENDPOINT: ${SEARCH_ENDPOINT:-http://opensearch:9200}
       SEARCH_USERNAME: ${SEARCH_USERNAME:-}
       SEARCH_PASSWORD: ${SEARCH_PASSWORD:-}
-      SEARCH_CONTENT_INDEX: ${SEARCH_CONTENT_INDEX:-bi8s-dev-content-search}
-      SEARCH_PEOPLE_INDEX: ${SEARCH_PEOPLE_INDEX:-bi8s-dev-people-search}
+      SEARCH_CONTENT_INDEX: ${SEARCH_CONTENT_INDEX:-bi8s-nsfw-content-search}
+      SEARCH_PEOPLE_INDEX: ${SEARCH_PEOPLE_INDEX:-bi8s-nsfw-people-search}
       SEARCH_REQUEST_TIMEOUT_MS: ${SEARCH_REQUEST_TIMEOUT_MS:-3000}
     ports:
-      - "${API_PORT:-8181}:8080"
+      - "${API_PORT:-8180}:8080"
     depends_on:
       otel-collector:
         condition: service_started
@@ -126,28 +126,21 @@ services:
       start_period: 20s
     labels:
       traefik.enable: "true"
-      traefik.constraint: "bi8s-dev"
-      traefik.http.routers.api.rule: "Host(`api.localhost`) || Host(`api-dev.emm4bi8s.dev`)"
+      traefik.constraint: "bi8s-local"
+      traefik.http.routers.api.rule: "Host(`api.localhost`) || Host(`api.${APP_DOMAIN:-emm4bi8s.dev}`)"
       traefik.http.routers.api.entrypoints: "web"
       traefik.http.services.api.loadbalancer.server.port: "8080"
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   ui:
     <<: [*restart-policy, *default-logging]
     image: ${UI_IMAGE_NAME:-929910138721.dkr.ecr.us-east-1.amazonaws.com/enternflix:dev-latest}
-    container_name: bi8s_ui_dev
+    container_name: bi8s_ui_local
     pull_policy: ${UI_PULL_POLICY:-always}
-    # All NEXT_PUBLIC_* vars are delivered via env_file.
-    # URL vars (CUSTOM_API_URL, IMAGE_BASE_URL, SITE_URL) are runtime-injectable:
-    # entrypoint.sh sed-replaces placeholder URLs baked into the bundle at startup.
-    # Baked vars (ENABLE_LOGGING, HTTP_TIMEOUT_MS, APP_ENV, APP_VERSION) are
-    # compiled into the client bundle at image build time — they cannot be changed
-    # at runtime; rebuild the image with updated build args to change them.
     env_file:
-      - .env.dev
+      - .env.bi8s
     environment:
-      # Runtime server vars — not bundled by Next.js
       NODE_ENV: ${UI_NODE_ENV:-development}
       PORT: ${UI_CONTAINER_PORT:-3000}
       HOSTNAME: "0.0.0.0"
@@ -168,17 +161,17 @@ services:
         condition: service_started
     labels:
       traefik.enable: "true"
-      traefik.constraint: "bi8s-dev"
-      traefik.http.routers.ui.rule: "Host(`localhost`) || Host(`ui-dev.emm4bi8s.dev`)"
+      traefik.constraint: "bi8s-local"
+      traefik.http.routers.ui.rule: "Host(`localhost`) || Host(`ui.${APP_DOMAIN:-emm4bi8s.dev}`)"
       traefik.http.routers.ui.entrypoints: "web"
       traefik.http.services.ui.loadbalancer.server.port: "3000"
       com.centurylinklabs.watchtower.enable: "true"
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   redis:
     image: redis:7-alpine
-    container_name: bi8s_redis_dev
+    container_name: bi8s_redis_local
     command:
       [
         "redis-server",
@@ -199,12 +192,12 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   opensearch:
     <<: [*restart-policy, *default-logging]
     image: opensearchproject/opensearch:2.16.0
-    container_name: bi8s_opensearch_dev
+    container_name: bi8s_opensearch_local
     environment:
       discovery.type: single-node
       DISABLE_INSTALL_DEMO_CONFIG: "true"
@@ -216,7 +209,7 @@ services:
         soft: -1
         hard: -1
     volumes:
-      - opensearch-data-dev:/usr/share/opensearch/data
+      - opensearch-data-local:/usr/share/opensearch/data
     ports:
       - "${OPENSEARCH_PORT:-9201}:9200"
     healthcheck:
@@ -225,12 +218,12 @@ services:
       timeout: 5s
       retries: 20
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   otel-collector:
     <<: [*restart-policy, *default-logging]
     image: otel/opentelemetry-collector-contrib:0.111.0
-    container_name: bi8s_otel_collector_dev
+    container_name: bi8s_otel_collector_local
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
@@ -238,19 +231,19 @@ services:
       - "${OTEL_GRPC_PORT:-4417}:4317"
       - "${OTEL_HTTP_PORT:-4418}:4318"
       - "${OTEL_PROM_PORT:-8989}:8889"
-      - "${OTEL_HEALTH_PORT:-13135}:13133"
+      - "13134:13133"
     depends_on:
       tempo:
         condition: service_started
       loki:
         condition: service_started
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   prometheus:
     <<: [*restart-policy, *default-logging]
     image: prom/prometheus:v2.55.1
-    container_name: bi8s_prometheus_dev
+    container_name: bi8s_prometheus_local
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -260,47 +253,47 @@ services:
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./observability/prometheus-rules.yml:/etc/prometheus/rules/prometheus-rules.yml:ro
-      - prometheus-data-dev:/prometheus
+      - prometheus-data-local:/prometheus
     ports:
-      - "${PROMETHEUS_PORT:-9091}:9090"
+      - "${PROMETHEUS_PORT:-9190}:9090"
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   tempo:
     <<: [*restart-policy, *default-logging]
     image: grafana/tempo:2.6.1
-    container_name: bi8s_tempo_dev
+    container_name: bi8s_tempo_local
     command: ["-config.file=/etc/tempo/tempo.yaml", "-config.expand-env=true"]
     environment:
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      S3_BUCKET: ${S3_BUCKET:-bi8s-dev-storage}
+      S3_BUCKET: ${S3_BUCKET:-bi8s-nsfw-storage}
     volumes:
       - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
-      - tempo-data-dev:/var/tempo
+      - tempo-data-local:/var/tempo
     ports:
-      - "${TEMPO_HTTP_PORT:-3201}:3200"
+      - "${TEMPO_HTTP_PORT:-3500}:3200"
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   loki:
     <<: [*restart-policy, *default-logging]
     image: grafana/loki:3.2.1
-    container_name: bi8s_loki_dev
+    container_name: bi8s_loki_local
     command: ["-config.file=/etc/loki/loki-config.yaml"]
     volumes:
       - ./observability/loki-config-local.yaml:/etc/loki/loki-config.yaml:ro
-      - loki-data-dev:/loki
+      - loki-data-local:/loki
     ports:
-      - "${LOKI_PORT:-3101}:3100"
+      - "${LOKI_PORT:-3400}:3100"
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   promtail:
     <<: [*restart-policy, *default-logging]
     image: grafana/promtail:3.2.1
-    container_name: bi8s_promtail_dev
+    container_name: bi8s_promtail_local
     command: ["-config.file=/etc/promtail/config.yaml"]
     volumes:
       - ./observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
@@ -310,12 +303,12 @@ services:
       loki:
         condition: service_started
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   grafana:
     <<: [*restart-policy, *default-logging]
     image: grafana/grafana:11.3.0
-    container_name: bi8s_grafana_dev
+    container_name: bi8s_grafana_local
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
@@ -327,9 +320,9 @@ services:
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
-      - grafana-data-dev:/var/lib/grafana
+      - grafana-data-local:/var/lib/grafana
     ports:
-      - "${GRAFANA_PORT:-4001}:3000"
+      - "${GRAFANA_PORT:-4100}:3000"
     depends_on:
       prometheus:
         condition: service_started
@@ -339,19 +332,19 @@ services:
         condition: service_started
     labels:
       traefik.enable: "true"
-      traefik.constraint: "bi8s-dev"
-      traefik.http.routers.grafana.rule: "Host(`ops.localhost`) || Host(`ops-dev.emm4bi8s.dev`)"
+      traefik.constraint: "bi8s-local"
+      traefik.http.routers.grafana.rule: "Host(`ops.localhost`) || Host(`ops.${APP_DOMAIN:-emm4bi8s.dev}`)"
       traefik.http.routers.grafana.entrypoints: "web"
       traefik.http.services.grafana.loadbalancer.server.port: "3000"
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
   cloudflared:
     <<: [*restart-policy, *default-logging]
-    container_name: bi8s_cloudflared_dev
+    container_name: bi8s_cloudflared_local
     image: cloudflare/cloudflared:latest
     env_file:
-      - path: .env.dev
+      - path: .env.bi8s
     command:
       [
         "tunnel",
@@ -362,19 +355,18 @@ services:
       ]
     environment:
       TZ: UTC
-      # TUNNEL_TOKEN is supplied via env_file (.env.dev) — do not override here.
     depends_on:
       traefik:
         condition: service_healthy
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
     labels:
       logging: "alloy"
 
   watchtower:
     <<: [*restart-policy, *default-logging]
     image: containrrr/watchtower:1.7.1
-    container_name: bi8s_watchtower_dev
+    container_name: bi8s_watchtower_local
     command:
       - "--label-enable"
       - "--interval"
@@ -388,16 +380,16 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
-      - bi8s-dev-net
+      - bi8s-local-net
 
 networks:
-  bi8s-dev-net:
+  bi8s-local-net:
     driver: bridge
-    name: bi8s-dev-net
+    name: bi8s-local-net
 
 volumes:
-  prometheus-data-dev:
-  tempo-data-dev:
-  loki-data-dev:
-  grafana-data-dev:
-  opensearch-data-dev:
+  prometheus-data-local:
+  tempo-data-local:
+  loki-data-local:
+  grafana-data-local:
+  opensearch-data-local:
