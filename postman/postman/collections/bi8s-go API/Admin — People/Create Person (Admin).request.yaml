@@ -1,0 +1,119 @@
+$kind: http-request
+description: |-
+  Create a new person record. Body **must** be `multipart/form-data`.
+
+  **Required fields:** `name`, `roles`, `gender`, `career_status`
+
+  **EntityRef format** (`tags`, `categories`, `specialties`): `id:name,id2:name2` pairs.
+
+  **`roles`:** Comma-separated — `PERFORMER` and/or `CONTENT_CREATOR`
+
+  **File fields:** `profile` (headshot), `backdrop` (banner)
+
+  Returns `201 Created` with the full `Person` object.
+url: "{{baseUrl}}/a/people/"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: text
+      key: name
+      value: Jane Doe
+      description: REQUIRED. Full legal / screen name (1–128 chars).
+    - type: text
+      key: roles
+      value: PERFORMER
+      description: "REQUIRED. Comma-separated roles. Allowed: `PERFORMER`, `CONTENT_CREATOR`. At least one required."
+    - type: text
+      key: gender
+      value: Female
+      description: "REQUIRED. Allowed: `Male`, `Female`, `Trans`."
+    - type: text
+      key: career_status
+      value: Active
+      description: "REQUIRED. Career status. Allowed: `Active`, `Retired`, `Hiatus`."
+    - type: text
+      key: stage_name
+      value: Jane
+      description: Stage / screen name (max 128 chars, optional).
+    - type: text
+      key: bio
+      value: Award-winning performer known for bold and diverse roles.
+      description: Short biography (max 150 chars, auto-clamped, optional).
+    - type: text
+      key: birth_date
+      value: 1990-06-15
+      description: Date of birth in YYYY-MM-DD format. Must be at least 18 years ago.
+    - type: text
+      key: birth_place
+      value: Los Angeles, CA
+      description: City / region of birth (max 256 chars, optional).
+    - type: text
+      key: nationality
+      value: American
+      description: Nationality string (max 64 chars, optional).
+    - type: text
+      key: height
+      value: "165"
+      description: Height in centimetres (integer ≥ 0, optional).
+    - type: text
+      key: active
+      value: "true"
+      description: "Whether the person is currently active. Allowed: `true`, `false`."
+    - type: text
+      key: verified
+      value: "false"
+      description: "Whether the profile is verified. Allowed: `true`, `false`."
+    - type: text
+      key: debut_year
+      value: "2010"
+      description: Year of industry debut (integer, 1900–2100, optional).
+    - type: text
+      key: measurements_bust
+      value: "34"
+      description: Bust measurement (integer, optional).
+    - type: text
+      key: measurements_waist
+      value: "24"
+      description: Waist measurement (integer, optional).
+    - type: text
+      key: measurements_hips
+      value: "36"
+      description: Hip measurement (integer, optional).
+    - type: text
+      key: measurements_unit
+      value: inches
+      description: "Measurement unit. Allowed: `inches`, `cm`."
+    - type: text
+      key: measurements_body_type
+      value: Slim
+      description: Body type descriptor (free text, optional).
+    - type: text
+      key: measurements_eye_color
+      value: Brown
+      description: Eye color (free text, optional).
+    - type: text
+      key: measurements_hair_color
+      value: Black
+      description: Hair color (free text, optional).
+    - type: text
+      key: tags
+      value: tag-award:Award Winner
+      description: Comma-separated `id:name` pairs for tag attribute refs.
+    - type: text
+      key: categories
+      value: cat-mainstream:Mainstream
+      description: Comma-separated `id:name` pairs for category attribute refs.
+    - type: text
+      key: specialties
+      value: spec-action:Action
+      description: Comma-separated `id:name` pairs for speciality attribute refs.
+    - type: file
+      key: profile
+      src: []
+      description: Profile / headshot image file upload (JPEG/PNG, optional).
+    - type: file
+      key: backdrop
+      src: []
+      description: Backdrop / banner image file upload (JPEG/PNG, optional).
+order: 3000

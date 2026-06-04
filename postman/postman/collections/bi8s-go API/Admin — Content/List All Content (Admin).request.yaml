@@ -1,0 +1,12 @@
+$kind: http-request
+description: Returns a paginated list of ALL content including private items, with full `Movie` objects and audit fields (`createdAt`, `updatedAt`).
+url: "{{baseUrl}}/a/content/?limit=20&cursor="
+method: GET
+queryParams:
+  - key: limit
+    value: "20"
+    description: "Items per page (default: 20, max: 100)."
+  - key: cursor
+    value: ""
+    description: DynamoDB pagination cursor (base64). Empty for first page.
+order: 1000

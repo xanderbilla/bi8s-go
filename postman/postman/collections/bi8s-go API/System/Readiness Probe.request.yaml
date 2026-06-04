@@ -1,0 +1,5 @@
+$kind: http-request
+description: Kubernetes readiness probe. Returns `503 NOT_READY` until application bootstrap completes. After that behaves identically to `GET /health` — runs all dependency checks.
+url: "{{baseUrl}}/readyz"
+method: GET
+order: 3000

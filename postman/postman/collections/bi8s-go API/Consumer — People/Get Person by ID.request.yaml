@@ -1,0 +1,10 @@
+$kind: http-request
+description: |-
+  Returns the public profile of a person.
+
+  **Path param `peopleId`:** alphanumeric + `-_`, max 100 chars.
+
+  **Response fields:** id, contentType, name, roles[], stageName, bio, birthDate, birthPlace, nationality, gender, height, verified, active, debutYear, careerStatus, profilePath, backdropPath, measurements{bust,waist,hips,unit,bodyType,eyeColor,hairColor}, tags[], categories[], specialties[].
+url: "{{baseUrl}}/c/people/{{peopleId}}"
+method: GET
+order: 1000

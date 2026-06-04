@@ -1,0 +1,3 @@
+$kind: collection
+description: Admin CRUD endpoints for attributes (genres, tags, moods, studios, categories, specialities).
+order: 8000

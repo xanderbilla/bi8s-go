@@ -1,0 +1,8 @@
+$kind: http-request
+description: |-
+  Fetch full admin detail for a person including audit fields.
+
+  **Path param `peopleId`:** alphanumeric + `-_`, max 100 chars.
+url: "{{baseUrl}}/a/people/{{peopleId}}"
+method: GET
+order: 2000

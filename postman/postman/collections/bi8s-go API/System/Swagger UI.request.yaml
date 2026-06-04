@@ -1,0 +1,5 @@
+$kind: http-request
+description: Serves the embedded Swagger UI HTML page backed by `/v1/openapi.yaml`. Open in a browser for interactive API exploration.
+url: "{{baseUrl}}/docs"
+method: GET
+order: 5000

@@ -1,0 +1,10 @@
+$kind: http-request
+description: |-
+  Fetch full public detail for a single content item (movie or TV show).
+
+  **Path param `contentId`:** alphanumeric + `-_`, max 100 chars.
+
+  **Response fields include:** id, title, overview, backdropPath, posterPath, releaseDate, firstAirDate, adult, contentRating, originalLanguage, genres, casts, tags, moodTags, studios, contentType, originCountry, runtime, status, tagline, assets, stats.
+url: "{{baseUrl}}/c/content/{{contentId}}"
+method: GET
+order: 1000

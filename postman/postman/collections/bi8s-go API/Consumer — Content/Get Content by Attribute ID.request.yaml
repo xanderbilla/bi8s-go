@@ -1,0 +1,22 @@
+$kind: http-request
+description: |-
+  Fetch a paginated list of content associated with a specific attribute (e.g. a genre, tag, or mood).
+
+  **Path param `id`:** alphanumeric + `-_`, max 100 chars.
+url: "{{baseUrl}}/c/attributes/{{attributeId}}?content=movie&limit=20&cursor="
+method: GET
+queryParams:
+  - key: content
+    value: movie
+    description: "Filter by content type. Allowed: `movie`, `tv`. Omit for all."
+  - key: limit
+    value: "20"
+    description: "Items per page (default: 20, max: 100)."
+  - key: cursor
+    value: ""
+    description: DynamoDB pagination cursor (base64). Empty for first page. Becomes numeric offset when `sort` is active.
+  - key: sort
+    value: ""
+    disabled: true
+    description: "Alphabetical sort. Allowed: `alpha_asc`, `alpha_desc`. Switches pagination to full-scan offset mode."
+order: 4000

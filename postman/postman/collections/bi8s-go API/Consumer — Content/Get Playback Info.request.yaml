@@ -1,0 +1,12 @@
+$kind: http-request
+description: |-
+  Returns HLS playback URLs and quality manifest for the given content item.
+
+  **Path param `contentType`:** `movie` | `tv` (lowercase, validated)
+
+  **Path param `contentId`:** alphanumeric + `-_`, max 100 chars.
+
+  **Response includes:** master playlist URL, per-quality video tracks, audio tracks, subtitle tracks, thumbnails, preview clip, and sprite sheet.
+url: "{{baseUrl}}/c/play/movie/{{contentId}}"
+method: GET
+order: 5000

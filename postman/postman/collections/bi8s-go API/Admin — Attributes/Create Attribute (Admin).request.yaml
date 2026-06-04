@@ -1,0 +1,23 @@
+$kind: http-request
+description: |-
+  Create a new attribute. Body **must** be `multipart/form-data`.
+
+  **Required fields:** `name`, `attribute_type`
+
+  **`attribute_type`** (comma-separated): `TAG` | `MOOD` | `GENRE` | `CATEGORY` | `SPECIALITY` | `STUDIO`
+
+  Returns `201 Created` with the full `Attribute` object.
+url: "{{baseUrl}}/a/attributes/"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: text
+      key: name
+      value: Action
+      description: REQUIRED. Attribute display name (1–128 chars).
+    - type: text
+      key: attribute_type
+      value: GENRE
+      description: "REQUIRED. Comma-separated attribute types. Allowed: `TAG`, `MOOD`, `GENRE`, `CATEGORY`, `SPECIALITY`, `STUDIO`. At least one required."
+order: 3000

@@ -1,0 +1,5 @@
+$kind: http-request
+description: Returns the complete list of all attributes (active and inactive), including audit fields.
+url: "{{baseUrl}}/a/attributes/"
+method: GET
+order: 1000

@@ -1,0 +1,3 @@
+$kind: collection
+description: Full-text and semantic search powered by OpenSearch. No auth required.
+order: 2000

@@ -1,0 +1,29 @@
+$kind: http-request
+description: |-
+  Paginated discovery feed. Results are in-memory cached for 2 minutes.
+
+  **`type`:** `latest` | `popular`
+
+  **Pagination modes:**
+  - Default: DynamoDB key-cursor pagination
+  - When `sort` is set (`alpha_asc` / `alpha_desc`): full alphabetical scan with numeric offset cursor
+url: "{{baseUrl}}/c/discover?type=latest&content=movie&limit=20&cursor="
+method: GET
+queryParams:
+  - key: type
+    value: latest
+    description: "Discover category. Allowed: `latest` (default), `popular`."
+  - key: content
+    value: movie
+    description: "Filter by content type. Allowed: `movie`, `tv`. Omit for all."
+  - key: limit
+    value: "20"
+    description: "Items per page (default: 20, max: 100)."
+  - key: cursor
+    value: ""
+    description: "DynamoDB pagination cursor (base64 encoded). Empty for first page. NOTE: when `sort` is set, this becomes a numeric offset string instead."
+  - key: sort
+    value: ""
+    disabled: true
+    description: "Alphabetical sort. Allowed: `alpha_asc`, `alpha_desc`. When set, switches from DynamoDB key pagination to full-scan offset pagination."
+order: 3000

@@ -1,0 +1,10 @@
+$kind: http-request
+description: |-
+  Permanently delete a content item by ID.
+
+  **Path param `contentId`:** alphanumeric + `-_`, max 100 chars.
+
+  Returns `200` with `{data: null}` on success, `404` if not found.
+url: "{{baseUrl}}/a/content/{{contentId}}"
+method: DELETE
+order: 4000

@@ -1,0 +1,13 @@
+$kind: http-request
+description: |-
+  Delete one asset key from a content asset bucket.
+
+  **Path params:**
+  - `contentId`
+  - `assetType`: one of `TRAILER|TEASER|CLIP|PROMO|BTS`
+  - `assetKeyId`
+
+  Returns `200` with `{contentId, assetType, keyId}`.
+url: "{{baseUrl}}/a/content/{{contentId}}/assets/TRAILER/keys/{{assetKeyId}}"
+method: DELETE
+order: 6000

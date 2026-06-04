@@ -1,0 +1,12 @@
+$kind: http-request
+description: |-
+  Returns a single randomly selected featured/banner content item for the hero carousel.
+
+  **`type`:** `movie` | `tv` (optional)
+url: "{{baseUrl}}/c/banner?type=movie"
+method: GET
+queryParams:
+  - key: type
+    value: movie
+    description: "Filter by content type. Allowed: `movie`, `tv`. Omit for no filter."
+order: 2000

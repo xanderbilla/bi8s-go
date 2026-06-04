@@ -1,0 +1,8 @@
+$kind: http-request
+description: |-
+  Fetch full admin detail for a single content item including internal fields (audit, visibility, stats).
+
+  **Path param `contentId`:** alphanumeric + `-_`, max 100 chars.
+url: "{{baseUrl}}/a/content/{{contentId}}"
+method: GET
+order: 2000

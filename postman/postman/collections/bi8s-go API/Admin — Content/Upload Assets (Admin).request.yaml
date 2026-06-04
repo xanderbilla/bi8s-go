@@ -1,0 +1,31 @@
+$kind: http-request
+description: |-
+  Upload one video asset for an existing content item. Body **must** be `multipart/form-data`.
+
+  **Path param `contentId`:** existing content ID (alphanumeric + `-_`, max 100 chars).
+
+  **Form fields (exact keys):**
+  - `contenttype` (required): `movie` | `tv`
+  - `assettype` (required): `TRAILER` | `TEASER` | `CLIP` | `PROMO` | `BTS`
+  - `video` (required): single file
+  - `contentid` (optional): overrides path content id
+
+  Returns `201 Created` with `{contentId, assetType, uploadedCount, paths[]}`.
+url: "{{baseUrl}}/a/content/{{contentId}}"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: text
+      key: contenttype
+      value: movie
+      description: REQUIRED. Handler expects lowercase content type (`movie` or `tv`).
+    - type: text
+      key: assettype
+      value: TRAILER
+      description: "REQUIRED. Allowed: `TRAILER`, `TEASER`, `CLIP`, `PROMO`, `BTS`."
+    - type: file
+      key: video
+      src: []
+      description: REQUIRED. Exactly one file per request.
+order: 5000

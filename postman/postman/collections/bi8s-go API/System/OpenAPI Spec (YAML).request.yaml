@@ -1,0 +1,5 @@
+$kind: http-request
+description: Returns the raw OpenAPI 3.x specification in YAML format. Served from the embedded `docs/OPENAPI.yaml`.
+url: "{{baseUrl}}/openapi.yaml"
+method: GET
+order: 4000

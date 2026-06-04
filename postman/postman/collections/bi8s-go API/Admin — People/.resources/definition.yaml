@@ -1,0 +1,3 @@
+$kind: collection
+description: Admin CRUD endpoints for people (performers, content creators).
+order: 7000

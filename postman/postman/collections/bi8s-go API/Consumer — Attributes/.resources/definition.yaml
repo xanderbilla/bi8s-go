@@ -1,0 +1,3 @@
+$kind: collection
+description: Public attribute listing (genres, tags, moods, studios, categories, specialities). Results cached in memory for 10 minutes.
+order: 5000

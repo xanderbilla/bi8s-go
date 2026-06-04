@@ -1,0 +1,8 @@
+$kind: http-request
+description: |-
+  Full health check. Runs concurrent checks against DynamoDB, OpenSearch, Redis, S3/B2, ffmpeg, ffprobe (2 s timeout each).
+
+  Returns `200` with `{checks: {dep: "up"|"down"}, version, commit, built}`, or `503 SERVICE_UNAVAILABLE` if any dependency is down.
+url: "{{baseUrl}}/health"
+method: GET
+order: 1000

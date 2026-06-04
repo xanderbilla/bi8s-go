@@ -1,0 +1,5 @@
+$kind: http-request
+description: Kubernetes liveness probe. Always returns `200` with `{version}` if the process is alive. No dependency checks performed.
+url: "{{baseUrl}}/livez"
+method: GET
+order: 2000

@@ -1,0 +1,17 @@
+$kind: http-request
+description: |-
+  Returns all active attributes visible to consumers, optionally filtered by type and sorted alphabetically.
+
+  **`type` allowed values:** `GENRE` | `TAG` | `MOOD` | `STUDIO` | `CATEGORY` | `SPECIALITY`
+
+  **Response per item:** id, name, attributeType[], contentType, active.
+url: "{{baseUrl}}/c/attributes?type=GENRE&sort=alpha_asc"
+method: GET
+queryParams:
+  - key: type
+    value: GENRE
+    description: "Filter by attribute type. Allowed: `GENRE`, `TAG`, `MOOD`, `STUDIO`, `CATEGORY`, `SPECIALITY` (case-insensitive, plurals accepted e.g. `genres`). Omit for all active attributes."
+  - key: sort
+    value: alpha_asc
+    description: "Alphabetical sort order. Allowed: `alpha_asc`, `alpha_desc`. Omit for default insertion order."
+order: 1000

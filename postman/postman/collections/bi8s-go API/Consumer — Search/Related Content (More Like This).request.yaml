@@ -1,0 +1,15 @@
+$kind: http-request
+description: |-
+  OpenSearch More-Like-This query — returns content similar to the specified item.
+
+  **Path param `contentId`:** alphanumeric + `-_`, max 100 chars.
+url: "{{baseUrl}}/c/content/{{contentId}}/related?page=1&pageSize=20"
+method: GET
+queryParams:
+  - key: page
+    value: "1"
+    description: "Page number (default: 1)."
+  - key: pageSize
+    value: "20"
+    description: "Number of results per page (default: 20, max: 100)."
+order: 2000

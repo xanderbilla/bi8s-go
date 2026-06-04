@@ -1,0 +1,12 @@
+$kind: http-request
+description: Returns a paginated list of all person records, including internal fields (audit, stats).
+url: "{{baseUrl}}/a/people/?limit=20&cursor="
+method: GET
+queryParams:
+  - key: limit
+    value: "20"
+    description: "Items per page (default: 20, max: 100)."
+  - key: cursor
+    value: ""
+    description: DynamoDB pagination cursor (base64). Empty for first page.
+order: 1000

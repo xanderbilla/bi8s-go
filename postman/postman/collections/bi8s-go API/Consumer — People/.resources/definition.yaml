@@ -1,0 +1,3 @@
+$kind: collection
+description: Public-facing people (performers / content creators) endpoints under `/v1/c/`. No auth required.
+order: 4000

@@ -1,0 +1,41 @@
+$kind: http-request
+description: |-
+  Full-text search across content and/or people using OpenSearch.
+
+  **Required:** `query`
+
+  **`in` values:** `content` | `people` (omit for both)
+
+  **Pagination** is per-result-type: use independent `contentPage`/`contentPageSize` and `peoplePage`/`peoplePageSize`, or fall back to the shared `page`/`pageSize`.
+url: "{{baseUrl}}/c/search?query=action&in=content&page=1&pageSize=20&contentPage=1&contentPageSize=20&peoplePage=1&peoplePageSize=20"
+method: GET
+queryParams:
+  - key: query
+    value: action
+    description: REQUIRED. Search term (non-empty string).
+  - key: in
+    value: content
+    description: "Scope filter. Allowed: `content`, `people`. Omit to search both simultaneously."
+  - key: page
+    value: "1"
+    description: "Global page number fallback for both content and people (default: 1)."
+  - key: pageSize
+    value: "20"
+    description: "Global page size fallback (default: 20, max: 100)."
+  - key: contentPage
+    value: "1"
+    description: Page number for the content results slice. Overrides `page`.
+  - key: contentPageSize
+    value: "20"
+    description: "Page size for content results. Overrides `pageSize`. Max: 100."
+  - key: peoplePage
+    value: "1"
+    description: Page number for the people results slice. Overrides `page`.
+  - key: peoplePageSize
+    value: "20"
+    description: "Page size for people results. Overrides `pageSize`. Max: 100."
+  - key: sort
+    value: ""
+    disabled: true
+    description: Sort mode (e.g. `relevance`). See search service docs for allowed values.
+order: 1000

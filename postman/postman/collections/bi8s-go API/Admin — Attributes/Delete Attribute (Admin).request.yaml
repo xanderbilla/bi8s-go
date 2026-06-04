@@ -1,0 +1,10 @@
+$kind: http-request
+description: |-
+  Permanently delete an attribute by ID.
+
+  **Path param `attributeId`:** alphanumeric + `-_`, max 100 chars.
+
+  Returns `200` with `{data: null}` on success, `404` if not found.
+url: "{{baseUrl}}/a/attributes/{{attributeId}}"
+method: DELETE
+order: 4000

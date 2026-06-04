@@ -1,0 +1,11 @@
+# Use this workspace to collaborate
+workspace:
+  id: 0f66491c-b1c6-4b6e-88c1-1a0fe22296d2
+
+localResources:
+  collections:
+    - ../bi8s-go.collection.json
+
+cloudResources:
+  collections:
+    ../postman/collections/bi8s-go API: b438ed97-810e-4e9d-8318-c73b1f407f7b

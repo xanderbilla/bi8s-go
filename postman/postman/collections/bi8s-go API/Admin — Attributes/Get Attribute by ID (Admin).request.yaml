@@ -1,0 +1,8 @@
+$kind: http-request
+description: |-
+  Fetch a single attribute by ID.
+
+  **Path param `attributeId`:** alphanumeric + `-_`, max 100 chars.
+url: "{{baseUrl}}/a/attributes/{{attributeId}}"
+method: GET
+order: 2000

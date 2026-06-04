@@ -1,0 +1,102 @@
+$kind: http-request
+description: |-
+  Create a new content item. Body **must** be `multipart/form-data`.
+
+  **Required fields:** `overview`, `original_language`
+
+  **EntityRef format** (`genres`, `casts`, `tags`, `mood_tags`, `studios`): `id:name,id2:name2` — the `:name` part is optional but recommended.
+
+  **File fields:** `poster` (portrait poster), `cover` (landscape backdrop)
+
+  Returns `201 Created` with the full `Movie` object.
+url: "{{baseUrl}}/a/content/"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: text
+      key: id
+      value: tt0111161
+      description: Optional custom ID (alphanumeric + -_, 1–64 chars). Omit to auto-generate a UUID.
+    - type: text
+      key: title
+      value: The Shawshank Redemption
+      description: Content title (1–128 chars).
+    - type: text
+      key: overview
+      value: Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.
+      description: REQUIRED. Synopsis / description (1–150 chars, auto-clamped to 150).
+    - type: text
+      key: content_type
+      value: MOVIE
+      description: "Content type. Allowed: `MOVIE`, `TV`."
+    - type: text
+      key: original_language
+      value: en
+      description: "REQUIRED. ISO 639-1 code. Allowed: `en`, `hi`, `ja`, `ko`, `fr`, `es`."
+    - type: text
+      key: content_rating
+      value: 18_PLUS
+      description: "Age rating. Allowed: `18_PLUS`, `21_PLUS`."
+    - type: text
+      key: release_date
+      value: 1994-09-23
+      description: Release date in YYYY-MM-DD format (use for MOVIE).
+    - type: text
+      key: first_air_date
+      value: ""
+      description: First air date in YYYY-MM-DD format (use for TV). Mutually exclusive with release_date.
+      disabled: true
+    - type: text
+      key: runtime
+      value: "142"
+      description: Runtime in minutes (integer ≥ 0).
+    - type: text
+      key: status
+      value: RELEASED
+      description: "Production status. Allowed: `RUMORED`, `PLANNED`, `IN_PRODUCTION`, `POST_PRODUCTION`, `RELEASED`, `ENDED`, `RETURNING_SERIES`, `CANCELED`, `PILOT`."
+    - type: text
+      key: tagline
+      value: Fear can hold you prisoner. Hope can set you free.
+      description: Tagline (max 255 chars).
+    - type: text
+      key: visibility
+      value: PUBLIC
+      description: "Visibility. Allowed: `PUBLIC`, `PRIVATE`."
+    - type: text
+      key: adult
+      value: "true"
+      description: "Adult content flag. Allowed: `true`, `false`."
+    - type: text
+      key: origin_country
+      value: US
+      description: Comma-separated ISO country codes (e.g. `US,JP`). Each code 2–8 chars.
+    - type: text
+      key: genres
+      value: genre-drama:Drama,genre-crime:Crime
+      description: Comma-separated `id:name` pairs for genre attribute refs (e.g. `genre-action:Action,genre-drama:Drama`). The `:name` suffix is optional.
+    - type: text
+      key: casts
+      value: person-001:Tim Robbins,person-002:Morgan Freeman
+      description: Comma-separated `id:name` pairs for cast person refs.
+    - type: text
+      key: tags
+      value: tag-prison:Prison,tag-hope:Hope
+      description: Comma-separated `id:name` pairs for tag attribute refs.
+    - type: text
+      key: mood_tags
+      value: mood-inspiring:Inspiring
+      description: Comma-separated `id:name` pairs for mood attribute refs.
+    - type: text
+      key: studios
+      value: studio-castle:Castle Rock Entertainment
+      description: Comma-separated `id:name` pairs for studio attribute refs.
+    - type: file
+      key: poster
+      src: []
+      description: Poster image file upload (JPEG/PNG, optional).
+    - type: file
+      key: cover
+      src: []
+      description: Cover/backdrop image file upload (JPEG/PNG, optional).
+order: 3000

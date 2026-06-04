@@ -1,0 +1,8 @@
+$kind: http-request
+description: |-
+  Re-creates OpenSearch indexes (if missing), re-indexes all people and content documents, and resyncs all DynamoDB join-table entries.
+
+  This is a synchronous long-running operation. Returns `200` with `{people, content, joinTableEntries}` on success.
+url: "{{baseUrl}}/a/reindex"
+method: POST
+order: 1000

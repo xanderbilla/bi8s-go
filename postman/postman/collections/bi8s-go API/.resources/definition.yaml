@@ -1,0 +1,34 @@
+$kind: collection
+description: |-
+  Complete Postman collection for bi8s-go API.
+
+  **Environments (set `{{baseUrl}}` to one of):**
+  - `prod`  → https://api.emm4bi8s.dev/v1
+  - `dev`   → https://api-dev.emm4bi8s.dev/v1
+  - `local` → http://localhost:8080/v1
+
+  **Body format:** CREATE endpoints and asset upload endpoints use `multipart/form-data`.
+
+  **EntityRef format** for relationship fields (`genres`, `casts`, `tags`, etc.): comma-separated `id:name` pairs, e.g. `genre-action:Action,genre-drama:Drama`.
+
+  All responses use the standard envelope with `success`, `status`, `message`, `data`, `error`, `path`, `requestId`, `timestamp`.
+variables:
+  baseUrl: http://localhost:8080/v1
+  baseUrl_prod: https://api.emm4bi8s.dev/v1
+  baseUrl_dev: https://api-dev.emm4bi8s.dev/v1
+  baseUrl_local: http://localhost:8080/v1
+  contentId: tt0111161
+  peopleId: person-001
+  attributeId: genre-action
+  assetKeyId: trailer-1080p
+scripts:
+  - type: http:afterResponse
+    code: |-
+      pm.test("Status is not 5xx", function () {
+          pm.expect(pm.response.code).to.be.below(500);
+      });
+
+      pm.test("Response has JSON body", function () {
+          pm.response.to.be.json;
+      });
+    language: text/javascript
