@@ -143,7 +143,6 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 			widget.NewLabel(fmt.Sprintf("Status: %s", detail.Status)),
 			widget.NewLabel(fmt.Sprintf("Visibility: %s", detail.Visibility)),
 			widget.NewLabel(fmt.Sprintf("Adult: %v", detail.Adult)),
-			widget.NewLabel(fmt.Sprintf("Poster Path: %s", detail.PosterPath)),
 			widget.NewLabel(fmt.Sprintf("Backdrop Path: %s", detail.BackdropPath)),
 		))
 
@@ -248,27 +247,6 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 			coreUpdateBtn,
 		))
 
-		posterLabel := widget.NewLabel("No file selected")
-		var posterReader io.ReadCloser
-		var posterName string
-		posterPicker := showFilePickerButton(state.Window, "Select Poster", posterLabel, func(r io.ReadCloser, name string) {
-			posterReader = r
-			posterName = name
-		})
-		posterUpdateBtn := widget.NewButtonWithIcon("Update Poster", theme.UploadIcon(), func() {
-			if posterReader == nil {
-				dialog.ShowError(fmt.Errorf("select a poster file first"), state.Window)
-				return
-			}
-			_, err := state.APIClient.multipartRequest("PUT", fmt.Sprintf("/a/content/poster/%s", detail.ID), nil, []FormFile{{FieldName: "poster", FileName: posterName, Reader: posterReader}})
-			if err != nil {
-				dialog.ShowError(err, state.Window)
-				return
-			}
-			dialog.ShowInformation("Updated", "Poster image updated", state.Window)
-			list.Select(id)
-		})
-
 		backdropLabel := widget.NewLabel("No file selected")
 		var backdropReader io.ReadCloser
 		var backdropName string
@@ -290,22 +268,45 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 			list.Select(id)
 		})
 
-		imageUpdateCard := widget.NewCard("Update Images", "Poster and backdrop are updated via dedicated endpoints", container.NewVBox(
-			container.NewHBox(posterPicker, posterLabel),
-			posterUpdateBtn,
-			widget.NewSeparator(),
+		imageUpdateCard := widget.NewCard("Update Images", "Backdrop is updated via a dedicated endpoint", container.NewVBox(
 			container.NewHBox(backdropPicker, backdropLabel),
 			backdropUpdateBtn,
 		))
 
-		attributeOptions := make([]string, 0, len(cachedAttributes))
-		attributeMap := map[string]string{}
-		for _, a := range cachedAttributes {
-			label := fmt.Sprintf("%s (%s)", a.Name, a.ID)
-			attributeOptions = append(attributeOptions, label)
-			attributeMap[label] = a.ID
+		buildAttributeOptions := func(attributeType string) ([]string, map[string]string) {
+			options := make([]string, 0)
+			mapping := map[string]string{}
+			for _, attribute := range cachedAttributes {
+				matchesType := false
+				for _, t := range attribute.AttributeType {
+					if t == attributeType {
+						matchesType = true
+						break
+					}
+				}
+				if !matchesType {
+					continue
+				}
+				label := fmt.Sprintf("%s (%s)", attribute.Name, attribute.ID)
+				options = append(options, label)
+				mapping[label] = attribute.ID
+			}
+			return options, mapping
 		}
-		attributeSelect := widget.NewSelect(attributeOptions, nil)
+
+		newAttributeSelector := func(attributeType, placeholder string) (*widget.SelectEntry, func() string) {
+			options, mapping := buildAttributeOptions(attributeType)
+			selector := widget.NewSelectEntry(options)
+			selector.PlaceHolder = placeholder
+			return selector, func() string {
+				return mapping[strings.TrimSpace(selector.Text)]
+			}
+		}
+
+		studioSelect, selectedStudioID := newAttributeSelector("STUDIO", "Select and search studio")
+		genreSelect, selectedGenreID := newAttributeSelector("GENRE", "Select and search genre")
+		tagSelect, selectedTagID := newAttributeSelector("TAG", "Select and search tag")
+		moodSelect, selectedMoodID := newAttributeSelector("MOOD", "Select and search mood tag")
 
 		castOptions := make([]string, 0, len(cachedPeople))
 		castMap := map[string]string{}
@@ -316,39 +317,46 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 		}
 		castSelect := widget.NewSelect(castOptions, nil)
 
-		relationCard := widget.NewCard("Add / Remove Relations", "Attribute and cast mutation endpoints", container.NewVBox(
-			widget.NewForm(
-				widget.NewFormItem("Attribute", attributeSelect),
-				widget.NewFormItem("Cast Person", castSelect),
-			),
-			container.NewHBox(
-				widget.NewButton("Add Attribute", func() {
-					attrID := attributeMap[attributeSelect.Selected]
-					if attrID == "" {
-						dialog.ShowError(fmt.Errorf("select an attribute first"), state.Window)
-						return
-					}
-					if _, err := state.APIClient.mutateContentRelation(attrID, detail.ID, true); err != nil {
-						dialog.ShowError(err, state.Window)
-						return
-					}
-					dialog.ShowInformation("Updated", "Attribute added", state.Window)
-					list.Select(id)
-				}),
-				widget.NewButton("Remove Attribute", func() {
-					attrID := attributeMap[attributeSelect.Selected]
-					if attrID == "" {
-						dialog.ShowError(fmt.Errorf("select an attribute first"), state.Window)
-						return
-					}
-					if _, err := state.APIClient.mutateContentRelation(attrID, detail.ID, false); err != nil {
-						dialog.ShowError(err, state.Window)
-						return
-					}
-					dialog.ShowInformation("Updated", "Attribute removed", state.Window)
-					list.Select(id)
-				}),
-			),
+		mutateAttribute := func(attributeID string, add bool, label string) {
+			if attributeID == "" {
+				dialog.ShowError(fmt.Errorf("select a %s first", label), state.Window)
+				return
+			}
+			if _, err := state.APIClient.mutateContentRelation(attributeID, detail.ID, add); err != nil {
+				dialog.ShowError(err, state.Window)
+				return
+			}
+			action := "removed"
+			if add {
+				action = "added"
+			}
+			dialog.ShowInformation("Updated", fmt.Sprintf("%s %s", label, action), state.Window)
+			list.Select(id)
+		}
+
+		attributeRow := func(label string, selector *widget.SelectEntry, selectedID func() string) fyne.CanvasObject {
+			return container.NewVBox(
+				widget.NewLabel(label),
+				selector,
+				container.NewHBox(
+					widget.NewButton("Add", func() {
+						mutateAttribute(selectedID(), true, label)
+					}),
+					widget.NewButton("Remove", func() {
+						mutateAttribute(selectedID(), false, label)
+					}),
+				),
+			)
+		}
+
+		relationCard := widget.NewCard("Update Relations", "Search and select each content attribute type directly", container.NewVBox(
+			attributeRow("Studio", studioSelect, selectedStudioID),
+			attributeRow("Genre", genreSelect, selectedGenreID),
+			attributeRow("Tag", tagSelect, selectedTagID),
+			attributeRow("Mood Tag", moodSelect, selectedMoodID),
+			widget.NewSeparator(),
+			widget.NewLabel("Cast Person"),
+			castSelect,
 			container.NewHBox(
 				widget.NewButton("Add Cast", func() {
 					personID := castMap[castSelect.Selected]
@@ -617,14 +625,6 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 		})
 
 		// File Upload components
-		var posterReader io.ReadCloser
-		var posterName string
-		posterFileLabel := widget.NewLabel("No file selected")
-		posterBtn := showFilePickerButton(state.Window, "Upload Poster File", posterFileLabel, func(r io.ReadCloser, name string) {
-			posterReader = r
-			posterName = name
-		})
-
 		var coverReader io.ReadCloser
 		var coverName string
 		coverFileLabel := widget.NewLabel("No file selected")
@@ -652,7 +652,6 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 			widget.NewFormItem("Mood Tags (Search & Select)", container.NewBorder(nil, nil, nil, newReloadButton(), moodsSelector.Container)),
 			widget.NewFormItem("Studios (Search & Select)", container.NewBorder(nil, nil, nil, newReloadButton(), studiosSelector.Container)),
 			widget.NewFormItem("Cast Credits (Search & Select)", container.NewBorder(nil, nil, nil, newReloadButton(), castsSelector.Container)),
-			widget.NewFormItem("Poster Image File", container.NewHBox(posterBtn, posterFileLabel)),
 			widget.NewFormItem("Backdrop Image File", container.NewHBox(coverBtn, coverFileLabel)),
 		)
 
@@ -705,9 +704,6 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 
 			// Add files
 			var files []FormFile
-			if posterReader != nil {
-				files = append(files, FormFile{FieldName: "poster", FileName: posterName, Reader: posterReader})
-			}
 			if coverReader != nil {
 				files = append(files, FormFile{FieldName: "cover", FileName: coverName, Reader: coverReader})
 			}
