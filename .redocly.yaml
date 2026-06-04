@@ -1,0 +1,11 @@
+# Redocly configuration file
+extends:
+  - recommended
+
+rules:
+  security-defined: off
+  info-license: off
+  operation-4xx-response: off
+  no-invalid-schema-examples: warn
+  no-path-trailing-slash: off
+  nullable-type-sibling: off

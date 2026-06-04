@@ -337,11 +337,11 @@ coverage:
 openapi-validate:
 	@printf "\n$(BOLD)$(BLUE)Validating docs/openapi.yaml...$(RESET)\n\n"
 	@if command -v redocly > /dev/null; then \
-		redocly lint docs/openapi.yaml; \
+		redocly lint docs/openapi.yaml --config .redocly.yaml; \
 	elif command -v swagger-cli > /dev/null; then \
 		swagger-cli validate docs/openapi.yaml; \
 	else \
-		docker run --rm -v $(PWD):/spec redocly/cli lint /spec/docs/openapi.yaml; \
+		docker run --rm -v $(PWD):/spec redocly/cli lint /spec/docs/openapi.yaml --config /spec/.redocly.yaml; \
 	fi
 	@printf "$(GREEN)✓ openapi-validate$(RESET)\n"
 
@@ -374,6 +374,28 @@ docker-down:
 docker-logs:
 	@./scripts/compose.sh -f docker-compose.dev.yml logs -f --tail=200
 
+docker-up-local:
+	@printf "\n$(BOLD)$(BLUE)Starting local bi8s stack (building API)...$(RESET)\n\n"
+	@docker compose --env-file .env.bi8s -f docker-compose.local.yml up -d --build
+	@printf "$(BLUE)Waiting for API readiness on port 8180...$(RESET)\n"
+	@for i in $$(seq 1 60); do \
+		if curl -fsS http://localhost:8180/v1/livez > /dev/null 2>&1; then \
+			printf "$(GREEN)✓ API is ready$(RESET)\n"; \
+			break; \
+		fi; \
+		if [ $$i -eq 60 ]; then \
+			printf "$(RED)Error: API did not become ready in time$(RESET)\n"; \
+			exit 1; \
+		fi; \
+		sleep 2; \
+	done
+	@printf "$(GREEN)✓ docker-up-local$(RESET)\n"
+
+docker-down-local:
+	@printf "\n$(BOLD)$(BLUE)Stopping local bi8s stack...$(RESET)\n\n"
+	@docker compose --env-file .env.bi8s -f docker-compose.local.yml down -v
+	@printf "$(GREEN)✓ docker-down-local$(RESET)\n"
+
 # Production-like bi8s stack (docker-compose.bi8s.yml).
 # --env-file .env.bi8s is required so that compose-level variable interpolation
 # (e.g. ${APP_DOMAIN} in Traefik labels) resolves to the real domain instead
@@ -397,6 +419,11 @@ tofu-plan: check-env validate-env
 
 tofu-apply: check-env validate-env
 	@./scripts/deploy.sh $(ENV) apply
+
+# Run the Fyne admin UI dashboard
+admin-ui:
+	@printf "\n$(BOLD)$(BLUE)Starting native Go Admin UI...$(RESET)\n\n"
+	@cd app && go run ./cmd/admin-ui
 
 # Utilities
 clean:
