@@ -440,6 +440,36 @@ paths:
                 $ref: "#/components/schemas/AdminContentEnvelope"
         "404":
           $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Admin]
+      summary: Update content core fields
+      description: |
+        Updates editable non-relational content fields only.
+
+        Excluded fields include id, contentType, tags, moodTags, genres, studios,
+        cast credits, stats, posterPath, and backdropPath.
+      operationId: updateAdminContent
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContentRequest"
+      responses:
+        "200":
+          description: Updated admin content detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminContentEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     delete:
       tags: [Admin]
       summary: Delete content
@@ -515,6 +545,118 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+  /a/content/poster/{contentId}:
+    put:
+      tags: [Admin]
+      summary: Update content poster image
+      description: Replaces poster image, deletes previous storage object, then persists new poster path.
+      operationId: updateAdminContentPoster
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UpdateContentPosterRequest"
+      responses:
+        "200":
+          description: Updated admin content detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminContentEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /a/content/backdrop/{contentId}:
+    put:
+      tags: [Admin]
+      summary: Update content backdrop image
+      description: Replaces backdrop image, deletes previous storage object, then persists new backdrop path.
+      operationId: updateAdminContentBackdrop
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UpdateContentBackdropRequest"
+      responses:
+        "200":
+          description: Updated admin content detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminContentEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /a/content/attributes/{attributeId}/add:
+    post:
+      tags: [Admin]
+      summary: Add content relation
+      description: |
+        Adds one relation to a content item by id.
+        The relation id path parameter can point to an attribute or a person (cast credit).
+      operationId: addAdminContentRelation
+      parameters:
+        - $ref: "#/components/parameters/AttributeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentRelationMutationRequest"
+      responses:
+        "200":
+          description: Updated admin content detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminContentEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /a/content/attributes/{attributeId}/remove:
+    post:
+      tags: [Admin]
+      summary: Remove content relation
+      description: |
+        Removes one relation from a content item by id.
+        The relation id path parameter can point to an attribute or a person (cast credit).
+      operationId: removeAdminContentRelation
+      parameters:
+        - $ref: "#/components/parameters/AttributeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentRelationMutationRequest"
+      responses:
+        "200":
+          description: Updated admin content detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminContentEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
   /a/people:
     get:
       tags: [Admin]
@@ -574,6 +716,36 @@ paths:
                 $ref: "#/components/schemas/AdminPersonEnvelope"
         "404":
           $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Admin]
+      summary: Update person core fields
+      description: |
+        Updates editable non-relational person fields only.
+
+        Excluded fields include id, tags, categories, specialties, social/platform
+        mappings, stats/audit, profilePath, and backdropPath.
+      operationId: updateAdminPerson
+      parameters:
+        - $ref: "#/components/parameters/PeopleId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePersonRequest"
+      responses:
+        "200":
+          description: Updated admin person detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPersonEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     delete:
       tags: [Admin]
       summary: Delete person
@@ -589,6 +761,114 @@ paths:
                 $ref: "#/components/schemas/NullDataEnvelope"
         "404":
           $ref: "#/components/responses/NotFound"
+  /a/person/profile/{peopleId}:
+    put:
+      tags: [Admin]
+      summary: Update person profile image
+      description: Replaces profile image, deletes previous storage object, then persists new profile path.
+      operationId: updateAdminPersonProfile
+      parameters:
+        - $ref: "#/components/parameters/PeopleId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UpdatePersonProfileRequest"
+      responses:
+        "200":
+          description: Updated admin person detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPersonEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /a/person/backdrop/{peopleId}:
+    put:
+      tags: [Admin]
+      summary: Update person backdrop image
+      description: Replaces backdrop image, deletes previous storage object, then persists new backdrop path.
+      operationId: updateAdminPersonBackdrop
+      parameters:
+        - $ref: "#/components/parameters/PeopleId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UpdatePersonBackdropRequest"
+      responses:
+        "200":
+          description: Updated admin person detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPersonEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /a/person/attributes/{attributeId}/add:
+    post:
+      tags: [Admin]
+      summary: Add person attribute
+      description: Adds one person relation for TAG, CATEGORY, SPECIALITY, SOCIAL, or PLATFORM attribute types.
+      operationId: addAdminPersonAttribute
+      parameters:
+        - $ref: "#/components/parameters/AttributeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonAttributeMutationRequest"
+      responses:
+        "200":
+          description: Updated admin person detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPersonEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /a/person/attributes/{attributeId}/remove:
+    post:
+      tags: [Admin]
+      summary: Remove person attribute
+      description: Removes one person relation for TAG, CATEGORY, SPECIALITY, SOCIAL, or PLATFORM attribute types.
+      operationId: removeAdminPersonAttribute
+      parameters:
+        - $ref: "#/components/parameters/AttributeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonAttributeMutationRequest"
+      responses:
+        "200":
+          description: Updated admin person detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPersonEnvelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
   /a/people/{peopleId}/content:
     get:
       tags: [Admin]
@@ -1779,6 +2059,171 @@ components:
           type: string
           format: binary
           description: Exactly one video file.
+    UpdateContentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        overview:
+          type: string
+          maxLength: 150
+        releaseDate:
+          type: string
+          description: "YYYY-MM-DD"
+        firstAirDate:
+          type: string
+          description: "YYYY-MM-DD"
+        adult:
+          type: boolean
+        contentRating:
+          type: string
+          enum: [18_PLUS, 21_PLUS]
+        originalLanguage:
+          type: string
+          enum: [en, hi, ja, ko, fr, es]
+        originCountry:
+          type: array
+          items:
+            type: string
+        runtime:
+          type: integer
+        status:
+          type: string
+          enum:
+            [
+              RUMORED,
+              PLANNED,
+              IN_PRODUCTION,
+              POST_PRODUCTION,
+              RELEASED,
+              ENDED,
+              RETURNING_SERIES,
+              CANCELED,
+              PILOT,
+            ]
+        tagline:
+          type: string
+        visibility:
+          type: string
+          enum: [PUBLIC, PRIVATE]
+        assets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Asset"
+    ContentRelationMutationRequest:
+      type: object
+      required: [contentId]
+      properties:
+        contentId:
+          type: string
+          maxLength: 100
+          pattern: "^[A-Za-z0-9_-]+$"
+    UpdateContentPosterRequest:
+      type: object
+      properties:
+        poster:
+          type: string
+          format: binary
+        image:
+          type: string
+          format: binary
+      anyOf:
+        - required: [poster]
+        - required: [image]
+    UpdateContentBackdropRequest:
+      type: object
+      properties:
+        backdrop:
+          type: string
+          format: binary
+        image:
+          type: string
+          format: binary
+      anyOf:
+        - required: [backdrop]
+        - required: [image]
+    UpdatePersonRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        legalName:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [PERFORMER, CONTENT_CREATOR]
+        stageName:
+          type: string
+        bio:
+          type: string
+          maxLength: 150
+        birthDate:
+          type: string
+          description: "YYYY-MM-DD"
+        birthPlace:
+          type: string
+        nationality:
+          type: string
+        gender:
+          type: string
+          enum: [Male, Female, Trans]
+        height:
+          type: integer
+        weight:
+          type: integer
+        verified:
+          type: boolean
+        active:
+          type: boolean
+        debutYear:
+          type: integer
+        careerStatus:
+          type: string
+          enum: [Active, Retired, Hiatus]
+        aliases:
+          type: array
+          items:
+            type: string
+        measurements:
+          $ref: "#/components/schemas/Measurements"
+        career:
+          $ref: "#/components/schemas/PersonCareer"
+        sourceMetadata:
+          $ref: "#/components/schemas/PersonSourceMetadata"
+    PersonAttributeMutationRequest:
+      type: object
+      required: [personId]
+      properties:
+        personId:
+          type: string
+          maxLength: 100
+          pattern: "^[A-Za-z0-9_-]+$"
+    UpdatePersonProfileRequest:
+      type: object
+      properties:
+        profile:
+          type: string
+          format: binary
+        image:
+          type: string
+          format: binary
+      anyOf:
+        - required: [profile]
+        - required: [image]
+    UpdatePersonBackdropRequest:
+      type: object
+      properties:
+        backdrop:
+          type: string
+          format: binary
+        image:
+          type: string
+          format: binary
+      anyOf:
+        - required: [backdrop]
+        - required: [image]
     HealthEnvelope:
       allOf:
         - $ref: "#/components/schemas/SuccessEnvelope"
