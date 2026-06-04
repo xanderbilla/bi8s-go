@@ -21,6 +21,26 @@ type ContentHandler struct {
 	contentService *service.ContentService
 }
 
+type contentUpdateRequest struct {
+	Title            string                 `json:"title"`
+	Overview         string                 `json:"overview"`
+	ReleaseDate      string                 `json:"releaseDate"`
+	FirstAirDate     string                 `json:"firstAirDate"`
+	Adult            bool                   `json:"adult"`
+	ContentRating    model.Rating           `json:"contentRating"`
+	OriginalLanguage model.OriginalLanguage `json:"originalLanguage"`
+	OriginCountry    []string               `json:"originCountry"`
+	Runtime          int                    `json:"runtime"`
+	Status           model.Status           `json:"status"`
+	Tagline          string                 `json:"tagline"`
+	Visibility       model.Visibility       `json:"visibility"`
+	Assets           []model.Asset          `json:"assets"`
+}
+
+type contentRelationMutationRequest struct {
+	ContentID string `json:"contentId"`
+}
+
 func NewContentHandler(svc *service.ContentService) *ContentHandler {
 	return &ContentHandler{contentService: svc}
 }
@@ -160,6 +180,129 @@ func (h *ContentHandler) DeleteContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeOK(w, r, http.StatusOK, "content deleted", nil)
+}
+
+func (h *ContentHandler) UpdateContent(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "contentId")
+
+	var req contentUpdateRequest
+	if err := Decode(w, r, &req); err != nil {
+		errs.BadRequestError(w, r, errs.NewBadRequest(err.Error()))
+		return
+	}
+
+	patch := model.Movie{
+		Title:            strings.TrimSpace(req.Title),
+		Overview:         clampMaxChars(req.Overview, 150),
+		ReleaseDate:      strings.TrimSpace(req.ReleaseDate),
+		FirstAirDate:     strings.TrimSpace(req.FirstAirDate),
+		Adult:            req.Adult,
+		ContentRating:    req.ContentRating,
+		OriginalLanguage: req.OriginalLanguage,
+		OriginCountry:    req.OriginCountry,
+		Runtime:          req.Runtime,
+		Status:           req.Status,
+		Tagline:          strings.TrimSpace(req.Tagline),
+		Visibility:       req.Visibility,
+		Assets:           req.Assets,
+	}
+
+	updated, err := h.contentService.UpdateCore(r.Context(), id, patch)
+	if err != nil {
+		errs.Write(w, r, err)
+		return
+	}
+
+	writeOK(w, r, http.StatusOK, "content updated", updated)
+}
+
+func (h *ContentHandler) UpdateContentPoster(w http.ResponseWriter, r *http.Request) {
+	h.updateContentImageByPurpose(w, r, "poster")
+}
+
+func (h *ContentHandler) UpdateContentBackdrop(w http.ResponseWriter, r *http.Request) {
+	h.updateContentImageByPurpose(w, r, "backdrop")
+}
+
+func (h *ContentHandler) updateContentImageByPurpose(w http.ResponseWriter, r *http.Request, purpose string) {
+	id := chi.URLParam(r, "contentId")
+
+	if _, err := ParseMultipartForm(r, w); err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+
+	input, err := ExtractFile(r, purpose)
+	if err != nil {
+		errs.BadRequestError(w, r, err)
+		return
+	}
+	if input == nil {
+		input, err = ExtractFile(r, "image")
+		if err != nil {
+			errs.BadRequestError(w, r, err)
+			return
+		}
+	}
+	if input == nil {
+		errs.BadRequestError(w, r, errs.NewBadRequest("image file is required"))
+		return
+	}
+
+	var updated *model.Movie
+	if purpose == "poster" {
+		updated, err = h.contentService.UpdatePosterImage(r.Context(), id, input)
+	} else {
+		updated, err = h.contentService.UpdateBackdropImage(r.Context(), id, input)
+	}
+	if err != nil {
+		errs.Write(w, r, err)
+		return
+	}
+
+	writeOK(w, r, http.StatusOK, "content image updated", updated)
+}
+
+func (h *ContentHandler) AddContentRelation(w http.ResponseWriter, r *http.Request) {
+	h.mutateContentRelation(w, r, true)
+}
+
+func (h *ContentHandler) RemoveContentRelation(w http.ResponseWriter, r *http.Request) {
+	h.mutateContentRelation(w, r, false)
+}
+
+func (h *ContentHandler) mutateContentRelation(w http.ResponseWriter, r *http.Request, add bool) {
+	relationID := chi.URLParam(r, "attributeId")
+
+	var req contentRelationMutationRequest
+	if err := Decode(w, r, &req); err != nil {
+		errs.BadRequestError(w, r, errs.NewBadRequest(err.Error()))
+		return
+	}
+	if strings.TrimSpace(req.ContentID) == "" {
+		errs.BadRequestError(w, r, errs.NewBadRequest("contentId is required"))
+		return
+	}
+
+	var (
+		updated *model.Movie
+		err     error
+	)
+	if add {
+		updated, err = h.contentService.AddRelation(r.Context(), req.ContentID, relationID)
+	} else {
+		updated, err = h.contentService.RemoveRelation(r.Context(), req.ContentID, relationID)
+	}
+	if err != nil {
+		errs.Write(w, r, err)
+		return
+	}
+
+	msg := "content relation removed"
+	if add {
+		msg = "content relation added"
+	}
+	writeOK(w, r, http.StatusOK, msg, updated)
 }
 
 func (h *ContentHandler) GetContentByPersonIdAdmin(w http.ResponseWriter, r *http.Request) {

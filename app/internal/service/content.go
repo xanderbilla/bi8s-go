@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -228,6 +229,233 @@ func (s *ContentService) cleanupUploadedKeys(ctx context.Context, keys []string)
 
 func (s *ContentService) uploadFileToStorage(ctx context.Context, movieID, purpose string, input *model.FileUploadInput) (string, error) {
 	return uploadInputToStorage(ctx, s.fileUploader, "movies", movieID, purpose, input)
+}
+
+func (s *ContentService) UpdateCore(ctx context.Context, id string, patch model.Movie) (*model.Movie, error) {
+	existing, err := s.repo.GetAdmin(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, errs.ErrContentNotFound
+	}
+
+	existing.Title = patch.Title
+	existing.Overview = patch.Overview
+	existing.ReleaseDate = patch.ReleaseDate
+	existing.FirstAirDate = patch.FirstAirDate
+	existing.Adult = patch.Adult
+	existing.ContentRating = patch.ContentRating
+	existing.OriginalLanguage = patch.OriginalLanguage
+	existing.OriginCountry = patch.OriginCountry
+	existing.Runtime = patch.Runtime
+	existing.Status = patch.Status
+	existing.Tagline = patch.Tagline
+	existing.Visibility = patch.Visibility
+	existing.Assets = patch.Assets
+
+	if existing.ContentType == model.ContentTypeTV && existing.ReleaseDate == "" {
+		existing.ReleaseDate = existing.FirstAirDate
+	}
+
+	if err := s.repo.Update(ctx, *existing); err != nil {
+		return nil, err
+	}
+	if err := s.searchService.IndexContent(ctx, *existing); err != nil {
+		logger.WarnContext(ctx, "search content indexing failed after content update", "contentId", existing.ID, "error", err.Error())
+	}
+	if s.redisClient != nil {
+		cacheSetJSON(ctx, s.redisClient, contentCacheKey(existing.ID), existing, contentRedisTTL, "content", "contentId", existing.ID)
+	}
+	return existing, nil
+}
+
+func (s *ContentService) UpdatePosterImage(ctx context.Context, id string, posterInput *model.FileUploadInput) (*model.Movie, error) {
+	return s.updateContentImage(ctx, id, posterInput, "poster")
+}
+
+func (s *ContentService) UpdateBackdropImage(ctx context.Context, id string, backdropInput *model.FileUploadInput) (*model.Movie, error) {
+	return s.updateContentImage(ctx, id, backdropInput, "backdrop")
+}
+
+func (s *ContentService) updateContentImage(ctx context.Context, id string, input *model.FileUploadInput, purpose string) (*model.Movie, error) {
+	if input == nil {
+		return nil, errs.NewBadRequest("image file is required")
+	}
+
+	existing, err := s.repo.GetAdmin(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, errs.ErrContentNotFound
+	}
+
+	var oldKey string
+	switch purpose {
+	case "poster":
+		oldKey = strings.TrimSpace(existing.PosterPath)
+	case "backdrop":
+		oldKey = strings.TrimSpace(existing.BackdropPath)
+	}
+
+	if oldKey != "" {
+		_ = s.fileUploader.Delete(ctx, strings.TrimPrefix(oldKey, "/"))
+	}
+
+	newKey, err := s.uploadFileToStorage(ctx, existing.ID, purpose, input)
+	if err != nil {
+		return nil, err
+	}
+
+	if purpose == "poster" {
+		existing.PosterPath = newKey
+	} else {
+		existing.BackdropPath = newKey
+	}
+
+	if err := s.repo.Update(ctx, *existing); err != nil {
+		_ = s.fileUploader.Delete(ctx, newKey)
+		return nil, err
+	}
+	if err := s.searchService.IndexContent(ctx, *existing); err != nil {
+		logger.WarnContext(ctx, "search content indexing failed after image update", "contentId", existing.ID, "error", err.Error())
+	}
+	if s.redisClient != nil {
+		cacheSetJSON(ctx, s.redisClient, contentCacheKey(existing.ID), existing, contentRedisTTL, "content", "contentId", existing.ID)
+	}
+
+	return existing, nil
+}
+
+func (s *ContentService) AddRelation(ctx context.Context, contentID string, relationID string) (*model.Movie, error) {
+	return s.mutateRelation(ctx, contentID, relationID, true)
+}
+
+func (s *ContentService) RemoveRelation(ctx context.Context, contentID string, relationID string) (*model.Movie, error) {
+	return s.mutateRelation(ctx, contentID, relationID, false)
+}
+
+func (s *ContentService) mutateRelation(ctx context.Context, contentID string, relationID string, add bool) (*model.Movie, error) {
+	existing, err := s.repo.GetAdmin(ctx, contentID)
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, errs.ErrContentNotFound
+	}
+
+	if attr, err := s.attributeRepo.Get(ctx, relationID); err == nil && attr != nil {
+		if add {
+			if err := addContentAttribute(existing, *attr); err != nil {
+				return nil, err
+			}
+		} else {
+			removeContentAttribute(existing, relationID)
+		}
+	} else {
+		person, pErr := s.personRepo.Get(ctx, relationID)
+		if pErr != nil || person == nil {
+			return nil, errs.NewBadRequest("relation id must reference an existing attribute or person")
+		}
+		if add {
+			if !containsEntity(existing.Casts, relationID) {
+				existing.Casts = append(existing.Casts, model.EntityRef{ID: person.ID, Name: person.Name})
+			}
+		} else {
+			existing.Casts = removeEntity(existing.Casts, relationID)
+		}
+	}
+
+	rebuildContentJoins(existing)
+	if err := s.repo.Update(ctx, *existing); err != nil {
+		return nil, err
+	}
+	if err := s.searchService.IndexContent(ctx, *existing); err != nil {
+		logger.WarnContext(ctx, "search content indexing failed after relation mutation", "contentId", existing.ID, "error", err.Error())
+	}
+	if s.redisClient != nil {
+		cacheSetJSON(ctx, s.redisClient, contentCacheKey(existing.ID), existing, contentRedisTTL, "content", "contentId", existing.ID)
+	}
+	return existing, nil
+}
+
+func containsEntity(items []model.EntityRef, id string) bool {
+	for _, it := range items {
+		if it.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func removeEntity(items []model.EntityRef, id string) []model.EntityRef {
+	filtered := make([]model.EntityRef, 0, len(items))
+	for _, it := range items {
+		if it.ID != id {
+			filtered = append(filtered, it)
+		}
+	}
+	return filtered
+}
+
+func addContentAttribute(movie *model.Movie, attr model.Attribute) error {
+	ref := model.EntityRef{ID: attr.ID, Name: attr.Name}
+	for _, t := range attr.AttributeType {
+		switch t {
+		case model.AttributeTypeTag:
+			if !containsEntity(movie.Tags, attr.ID) {
+				movie.Tags = append(movie.Tags, ref)
+			}
+			return nil
+		case model.AttributeTypeMood:
+			if !containsEntity(movie.MoodTags, attr.ID) {
+				movie.MoodTags = append(movie.MoodTags, ref)
+			}
+			return nil
+		case model.AttributeTypeGenre:
+			if !containsEntity(movie.Genres, attr.ID) {
+				movie.Genres = append(movie.Genres, ref)
+			}
+			return nil
+		case model.AttributeTypeStudio:
+			if !containsEntity(movie.Studios, attr.ID) {
+				movie.Studios = append(movie.Studios, ref)
+			}
+			return nil
+		}
+	}
+	return errs.NewBadRequest("attribute type is not assignable to content")
+}
+
+func removeContentAttribute(movie *model.Movie, attrID string) {
+	movie.Tags = removeEntity(movie.Tags, attrID)
+	movie.MoodTags = removeEntity(movie.MoodTags, attrID)
+	movie.Genres = removeEntity(movie.Genres, attrID)
+	movie.Studios = removeEntity(movie.Studios, attrID)
+}
+
+func rebuildContentJoins(movie *model.Movie) {
+	movie.CastIds = movie.CastIds[:0]
+	for _, cast := range movie.Casts {
+		if cast.ID != "" && !slices.Contains(movie.CastIds, cast.ID) {
+			movie.CastIds = append(movie.CastIds, cast.ID)
+		}
+	}
+
+	attributeIDs := make([]string, 0, len(movie.Genres)+len(movie.Tags)+len(movie.MoodTags)+len(movie.Studios))
+	appendUnique := func(items []model.EntityRef) {
+		for _, it := range items {
+			if it.ID != "" && !slices.Contains(attributeIDs, it.ID) {
+				attributeIDs = append(attributeIDs, it.ID)
+			}
+		}
+	}
+	appendUnique(movie.Genres)
+	appendUnique(movie.Tags)
+	appendUnique(movie.MoodTags)
+	appendUnique(movie.Studios)
+	movie.AttributeIds = attributeIDs
 }
 
 func (s *ContentService) Delete(ctx context.Context, id string) error {

@@ -149,11 +149,71 @@
       "middlewares": ["localonly", "timeout", "ratelimit.movie"]
     },
     {
+      "id": "admin.content.update",
+      "method": "PATCH",
+      "route": "/v1/a/content/{contentId}",
+      "handler": "content.Update",
+      "middlewares": [
+        "localonly",
+        "timeout",
+        "validate.movieId",
+        "ratelimit.movie"
+      ]
+    },
+    {
       "id": "admin.content.delete",
       "method": "DELETE",
       "route": "/v1/a/content/{contentId}",
       "handler": "content.Delete",
       "middlewares": ["localonly", "timeout", "validate.movieId"]
+    },
+    {
+      "id": "admin.content.poster.update",
+      "method": "PUT",
+      "route": "/v1/a/content/poster/{contentId}",
+      "handler": "content.UpdatePoster",
+      "middlewares": [
+        "localonly",
+        "timeout",
+        "validate.movieId",
+        "ratelimit.movie"
+      ]
+    },
+    {
+      "id": "admin.content.backdrop.update",
+      "method": "PUT",
+      "route": "/v1/a/content/backdrop/{contentId}",
+      "handler": "content.UpdateBackdrop",
+      "middlewares": [
+        "localonly",
+        "timeout",
+        "validate.movieId",
+        "ratelimit.movie"
+      ]
+    },
+    {
+      "id": "admin.content.attribute.add",
+      "method": "POST",
+      "route": "/v1/a/content/attributes/{attributeId}/add",
+      "handler": "content.RelationAdd",
+      "middlewares": [
+        "localonly",
+        "timeout",
+        "validate.attributeId",
+        "ratelimit.movie"
+      ]
+    },
+    {
+      "id": "admin.content.attribute.remove",
+      "method": "POST",
+      "route": "/v1/a/content/attributes/{attributeId}/remove",
+      "handler": "content.RelationRemove",
+      "middlewares": [
+        "localonly",
+        "timeout",
+        "validate.attributeId",
+        "ratelimit.movie"
+      ]
     },
 
     {
@@ -178,11 +238,71 @@
       "middlewares": ["localonly", "timeout", "ratelimit.person"]
     },
     {
+      "id": "admin.people.update",
+      "method": "PATCH",
+      "route": "/v1/a/people/{peopleId}",
+      "handler": "person.Update",
+      "middlewares": [
+        "localonly",
+        "timeout",
+        "validate.personId",
+        "ratelimit.person"
+      ]
+    },
+    {
       "id": "admin.people.delete",
       "method": "DELETE",
       "route": "/v1/a/people/{peopleId}",
       "handler": "person.Delete",
       "middlewares": ["localonly", "timeout", "validate.personId"]
+    },
+    {
+      "id": "admin.person.profile.update",
+      "method": "PUT",
+      "route": "/v1/a/person/profile/{peopleId}",
+      "handler": "person.UpdateProfile",
+      "middlewares": [
+        "localonly",
+        "timeout",
+        "validate.personId",
+        "ratelimit.person"
+      ]
+    },
+    {
+      "id": "admin.person.backdrop.update",
+      "method": "PUT",
+      "route": "/v1/a/person/backdrop/{peopleId}",
+      "handler": "person.UpdateBackdrop",
+      "middlewares": [
+        "localonly",
+        "timeout",
+        "validate.personId",
+        "ratelimit.person"
+      ]
+    },
+    {
+      "id": "admin.person.attribute.add",
+      "method": "POST",
+      "route": "/v1/a/person/attributes/{attributeId}/add",
+      "handler": "person.AttributeAdd",
+      "middlewares": [
+        "localonly",
+        "timeout",
+        "validate.attributeId",
+        "ratelimit.person"
+      ]
+    },
+    {
+      "id": "admin.person.attribute.remove",
+      "method": "POST",
+      "route": "/v1/a/person/attributes/{attributeId}/remove",
+      "handler": "person.AttributeRemove",
+      "middlewares": [
+        "localonly",
+        "timeout",
+        "validate.attributeId",
+        "ratelimit.person"
+      ]
     },
     {
       "id": "admin.people.content",

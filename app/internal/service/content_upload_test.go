@@ -297,6 +297,11 @@ func (m *mockPersonRepository) Create(ctx context.Context, person model.Person) 
 	return nil
 }
 
+func (m *mockPersonRepository) Update(ctx context.Context, person model.Person) error {
+	m.people[person.ID] = person
+	return nil
+}
+
 func (m *mockPersonRepository) Delete(ctx context.Context, id string) error {
 	delete(m.people, id)
 	return nil

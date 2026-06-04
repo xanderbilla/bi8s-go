@@ -141,6 +141,209 @@ func (s *PersonService) uploadFileToStorage(ctx context.Context, personID, purpo
 	return uploadInputToStorage(ctx, s.fileUploader, "person", personID, purpose, input)
 }
 
+func (s *PersonService) UpdateCore(ctx context.Context, id string, patch model.Person) (*model.Person, error) {
+	existing, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, errs.NewNotFound("person")
+	}
+
+	existing.Name = patch.Name
+	existing.LegalName = patch.LegalName
+	existing.Roles = patch.Roles
+	existing.StageName = patch.StageName
+	existing.Bio = patch.Bio
+	existing.BirthDate = patch.BirthDate
+	existing.BirthPlace = patch.BirthPlace
+	existing.Nationality = patch.Nationality
+	existing.Gender = patch.Gender
+	existing.Height = patch.Height
+	existing.Weight = patch.Weight
+	existing.Verified = patch.Verified
+	existing.Active = patch.Active
+	existing.DebutYear = patch.DebutYear
+	existing.CareerStatus = patch.CareerStatus
+	existing.Aliases = patch.Aliases
+	existing.Measurements = patch.Measurements
+	existing.Career = patch.Career
+	existing.SourceMetadata = patch.SourceMetadata
+
+	if err := s.repo.Update(ctx, *existing); err != nil {
+		return nil, err
+	}
+	cacheSetJSON(ctx, s.redisClient, personCacheKey(existing.ID), existing, personRedisTTL, "person", "personId", existing.ID)
+	if err := s.searchService.IndexPerson(ctx, *existing); err != nil {
+		logger.WarnContext(ctx, "search person indexing failed after person update", "personId", existing.ID, "error", err.Error())
+	}
+	return existing, nil
+}
+
+func (s *PersonService) UpdateProfileImage(ctx context.Context, id string, profileInput *model.FileUploadInput) (*model.Person, error) {
+	return s.updatePersonImage(ctx, id, profileInput, "profile")
+}
+
+func (s *PersonService) UpdateBackdropImage(ctx context.Context, id string, backdropInput *model.FileUploadInput) (*model.Person, error) {
+	return s.updatePersonImage(ctx, id, backdropInput, "backdrop")
+}
+
+func (s *PersonService) updatePersonImage(ctx context.Context, id string, input *model.FileUploadInput, purpose string) (*model.Person, error) {
+	if input == nil {
+		return nil, errs.NewBadRequest("image file is required")
+	}
+
+	existing, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, errs.NewNotFound("person")
+	}
+
+	var oldKey string
+	if purpose == "profile" {
+		oldKey = strings.TrimSpace(existing.ProfilePath)
+	} else {
+		oldKey = strings.TrimSpace(existing.BackdropPath)
+	}
+	if oldKey != "" {
+		_ = s.fileUploader.Delete(ctx, strings.TrimPrefix(oldKey, "/"))
+	}
+
+	newKey, err := s.uploadFileToStorage(ctx, existing.ID, purpose, input)
+	if err != nil {
+		return nil, err
+	}
+
+	if purpose == "profile" {
+		existing.ProfilePath = newKey
+	} else {
+		existing.BackdropPath = newKey
+	}
+
+	if err := s.repo.Update(ctx, *existing); err != nil {
+		_ = s.fileUploader.Delete(ctx, newKey)
+		return nil, err
+	}
+	cacheSetJSON(ctx, s.redisClient, personCacheKey(existing.ID), existing, personRedisTTL, "person", "personId", existing.ID)
+	if err := s.searchService.IndexPerson(ctx, *existing); err != nil {
+		logger.WarnContext(ctx, "search person indexing failed after image update", "personId", existing.ID, "error", err.Error())
+	}
+	return existing, nil
+}
+
+func (s *PersonService) AddAttribute(ctx context.Context, personID string, attributeID string) (*model.Person, error) {
+	return s.mutateAttribute(ctx, personID, attributeID, true)
+}
+
+func (s *PersonService) RemoveAttribute(ctx context.Context, personID string, attributeID string) (*model.Person, error) {
+	return s.mutateAttribute(ctx, personID, attributeID, false)
+}
+
+func (s *PersonService) mutateAttribute(ctx context.Context, personID string, attributeID string, add bool) (*model.Person, error) {
+	existing, err := s.repo.Get(ctx, personID)
+	if err != nil {
+		return nil, err
+	}
+	if existing == nil {
+		return nil, errs.NewNotFound("person")
+	}
+
+	attr, err := s.attributeRepo.Get(ctx, attributeID)
+	if err != nil || attr == nil {
+		return nil, errs.NewNotFound("attribute")
+	}
+
+	ref := model.EntityRef{ID: attr.ID, Name: attr.Name}
+	handled := false
+	for _, t := range attr.AttributeType {
+		switch t {
+		case model.AttributeTypeTag:
+			handled = true
+			if add {
+				if !containsPersonEntity(existing.Tags, attr.ID) {
+					existing.Tags = append(existing.Tags, ref)
+				}
+			} else {
+				existing.Tags = removePersonEntity(existing.Tags, attr.ID)
+			}
+		case model.AttributeTypeCategory:
+			handled = true
+			if add {
+				if !containsPersonEntity(existing.Categories, attr.ID) {
+					existing.Categories = append(existing.Categories, ref)
+				}
+			} else {
+				existing.Categories = removePersonEntity(existing.Categories, attr.ID)
+			}
+		case model.AttributeTypeSpeciality:
+			handled = true
+			if add {
+				if !containsPersonEntity(existing.Specialties, attr.ID) {
+					existing.Specialties = append(existing.Specialties, ref)
+				}
+			} else {
+				existing.Specialties = removePersonEntity(existing.Specialties, attr.ID)
+			}
+		case model.AttributeTypePlatform, model.AttributeTypeSocial:
+			handled = true
+			if add {
+				found := false
+				for _, sp := range existing.SocialPresence {
+					if sp.PlatformID == attr.ID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					existing.SocialPresence = append(existing.SocialPresence, model.SocialPresenceEntry{PlatformID: attr.ID, Platform: strings.ToLower(attr.Name), Available: true})
+				}
+			} else {
+				filtered := make([]model.SocialPresenceEntry, 0, len(existing.SocialPresence))
+				for _, sp := range existing.SocialPresence {
+					if sp.PlatformID != attr.ID {
+						filtered = append(filtered, sp)
+					}
+				}
+				existing.SocialPresence = filtered
+			}
+		}
+	}
+
+	if !handled {
+		return nil, errs.NewBadRequest("attribute type is not assignable to person")
+	}
+
+	if err := s.repo.Update(ctx, *existing); err != nil {
+		return nil, err
+	}
+	cacheSetJSON(ctx, s.redisClient, personCacheKey(existing.ID), existing, personRedisTTL, "person", "personId", existing.ID)
+	if err := s.searchService.IndexPerson(ctx, *existing); err != nil {
+		logger.WarnContext(ctx, "search person indexing failed after attribute mutation", "personId", existing.ID, "error", err.Error())
+	}
+	return existing, nil
+}
+
+func containsPersonEntity(items []model.EntityRef, id string) bool {
+	for _, it := range items {
+		if it.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func removePersonEntity(items []model.EntityRef, id string) []model.EntityRef {
+	filtered := make([]model.EntityRef, 0, len(items))
+	for _, it := range items {
+		if it.ID != id {
+			filtered = append(filtered, it)
+		}
+	}
+	return filtered
+}
+
 func (s *PersonService) Delete(ctx context.Context, id string) error {
 	if err := s.repo.Delete(ctx, id); err != nil {
 		if errs.IsConditionalCheckFailed(err) {
