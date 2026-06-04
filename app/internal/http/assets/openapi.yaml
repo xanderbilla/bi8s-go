@@ -447,7 +447,7 @@ paths:
         Updates editable non-relational content fields only.
 
         Excluded fields include id, contentType, tags, moodTags, genres, studios,
-        cast credits, stats, posterPath, and backdropPath.
+        cast credits, stats, and backdropPath.
       operationId: updateAdminContent
       parameters:
         - $ref: "#/components/parameters/ContentId"
@@ -545,33 +545,6 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
-  /a/content/poster/{contentId}:
-    put:
-      tags: [Admin]
-      summary: Update content poster image
-      description: Replaces poster image, deletes previous storage object, then persists new poster path.
-      operationId: updateAdminContentPoster
-      parameters:
-        - $ref: "#/components/parameters/ContentId"
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              $ref: "#/components/schemas/UpdateContentPosterRequest"
-      responses:
-        "200":
-          description: Updated admin content detail.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AdminContentEnvelope"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "429":
-          $ref: "#/components/responses/RateLimited"
   /a/content/backdrop/{contentId}:
     put:
       tags: [Admin]
@@ -1932,9 +1905,6 @@ components:
         origin_country:
           type: string
           description: Comma-separated country codes.
-        poster:
-          type: string
-          format: binary
         cover:
           type: string
           format: binary
@@ -2118,18 +2088,6 @@ components:
           type: string
           maxLength: 100
           pattern: "^[A-Za-z0-9_-]+$"
-    UpdateContentPosterRequest:
-      type: object
-      properties:
-        poster:
-          type: string
-          format: binary
-        image:
-          type: string
-          format: binary
-      anyOf:
-        - required: [poster]
-        - required: [image]
     UpdateContentBackdropRequest:
       type: object
       properties:
