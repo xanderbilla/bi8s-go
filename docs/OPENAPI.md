@@ -30,5 +30,5 @@ The spec documents:
 
 1. Edit `app/internal/http/assets/openapi.yaml`.
 2. Mirror it to `docs/OPENAPI.yaml`:
-  `cp app/internal/http/assets/openapi.yaml docs/OPENAPI.yaml`
+   `cp app/internal/http/assets/openapi.yaml docs/OPENAPI.yaml`
 3. `cd app && go test ./internal/http -run TestServeOpenAPISpec`.

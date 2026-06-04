@@ -28,22 +28,22 @@ func NewAdminSearchHandler(contentService *service.ContentService, personService
 }
 
 type adminSearchSection[T any] struct {
-	Items      []T   `json:"items"`
-	Count      int   `json:"count"`
-	Total      int   `json:"total"`
+	Items      []T    `json:"items"`
+	Count      int    `json:"count"`
+	Total      int    `json:"total"`
 	NextCursor string `json:"nextCursor,omitempty"`
 }
 
 type adminSearchData struct {
-	Query      string                                    `json:"query"`
-	Entity     string                                    `json:"entity"`
-	Sort       string                                    `json:"sort"`
-	Limit      int32                                     `json:"limit"`
-	Cursor     int                                       `json:"cursor"`
-	Content    *adminSearchSection[model.Movie]          `json:"content,omitempty"`
-	People     *adminSearchSection[model.Person]         `json:"people,omitempty"`
-	Attributes *adminSearchSection[model.Attribute]      `json:"attributes,omitempty"`
-	Detail     map[string]any                            `json:"detail,omitempty"`
+	Query      string                               `json:"query"`
+	Entity     string                               `json:"entity"`
+	Sort       string                               `json:"sort"`
+	Limit      int32                                `json:"limit"`
+	Cursor     int                                  `json:"cursor"`
+	Content    *adminSearchSection[model.Movie]     `json:"content,omitempty"`
+	People     *adminSearchSection[model.Person]    `json:"people,omitempty"`
+	Attributes *adminSearchSection[model.Attribute] `json:"attributes,omitempty"`
+	Detail     map[string]any                       `json:"detail,omitempty"`
 }
 
 func (h *AdminSearchHandler) SearchAdmin(w http.ResponseWriter, r *http.Request) {
