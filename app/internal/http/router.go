@@ -100,6 +100,7 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 	contentHandler := NewContentHandler(application.ContentService)
 	personHandler := NewPersonHandler(application.PersonService)
 	searchHandler := NewSearchHandler(application.SearchService)
+	adminSearchHandler := NewAdminSearchHandler(application.ContentService, application.PersonService, application.AttributeService)
 	attrHandler := NewAttributeHandler(application.AttributeService)
 	reindexHandler := NewReindexHandler(application.ContentService, application.PersonService, application.SearchService)
 
@@ -111,6 +112,7 @@ func buildRouter(application *app.Application) (*chi.Mux, func()) {
 		"docs.SwaggerUI":              ServeSwaggerUI,
 		"search.Search":               searchHandler.Search,
 		"search.MoreLikeThis":         searchHandler.MoreLikeThis,
+		"search.Admin":                adminSearchHandler.SearchAdmin,
 		"attribute.ListConsumer":      attrHandler.GetConsumerAttributes,
 		"attribute.ListAdmin":         attrHandler.GetAllAttributes,
 		"attribute.GetAdmin":          attrHandler.GetAttribute,

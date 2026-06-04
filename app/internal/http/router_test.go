@@ -43,6 +43,7 @@ func TestRouter_RouteSnapshot(t *testing.T) {
 		"GET    /v1/c/attributes/{id}",
 		"GET    /v1/c/discover",
 		"GET    /v1/c/play/{contentType}/{contentId}",
+		"GET    /v1/a/search",
 
 		"GET    /v1/a/content/",
 		"GET    /v1/a/content/{contentId}",

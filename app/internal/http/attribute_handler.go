@@ -30,6 +30,44 @@ func (h *AttributeHandler) GetAllAttributes(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	sortMode := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("sort")))
+	attributeType := strings.TrimSpace(r.URL.Query().Get("type"))
+	limitRaw := strings.TrimSpace(r.URL.Query().Get("limit"))
+	cursorRaw := strings.TrimSpace(r.URL.Query().Get("cursor"))
+
+	if query != "" || sortMode != "" || attributeType != "" || limitRaw != "" || cursorRaw != "" {
+		if sortMode == "" {
+			sortMode = search.SortAlphaAsc
+		}
+		if !isAdminSortValid(sortMode) {
+			errs.BadRequestError(w, r, errs.NewBadRequest("sort must be one of: recent, latest, alpha_asc, alpha_desc"))
+			return
+		}
+
+		limit, err := parseLimitParam(limitRaw)
+		if err != nil {
+			errs.BadRequestError(w, r, err)
+			return
+		}
+		offset, err := parseOffsetCursor(cursorRaw)
+		if err != nil {
+			errs.BadRequestError(w, r, err)
+			return
+		}
+
+		filtered := filterAdminAttributes(attributes, query, attributeType)
+		sortAdminAttributes(filtered, sortMode)
+		page, next := paginateAttributes(filtered, offset, int(limit))
+		writeOK(w, r, http.StatusOK, "attributes fetched", map[string]any{
+			"items":      page,
+			"count":      len(page),
+			"total":      len(filtered),
+			"nextCursor": next,
+		})
+		return
+	}
+
 	publicAttributes := make([]model.AttributePublicDetail, len(attributes))
 	for i, attr := range attributes {
 		publicAttributes[i] = toAttributePublicDetail(&attr)
