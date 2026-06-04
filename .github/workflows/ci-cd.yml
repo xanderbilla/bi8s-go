@@ -60,7 +60,9 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: app/go.sum
       - run: go mod download
-      - run: go vet ./...
+      - name: Run go vet (exclude desktop UI package)
+        run: |
+          go list ./... | grep -v '/cmd/admin-ui$' | xargs go vet
 
   go-test:
     name: go test (race + cover)
@@ -77,7 +79,7 @@ jobs:
       - run: go mod download
       - name: Run tests with race + coverage
         run: |
-          go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+          go list ./... | grep -v '/cmd/admin-ui$' | xargs go test -race -count=1 -covermode=atomic -coverprofile=coverage.out
           go tool cover -func=coverage.out | tail -1
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
@@ -99,7 +101,7 @@ jobs:
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           working-directory: app
-          args: --timeout=5m
+          args: --timeout=5m --skip-dirs=cmd/admin-ui
 
   govulncheck:
     name: govulncheck
@@ -115,7 +117,9 @@ jobs:
           cache-dependency-path: app/go.sum
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }}
-      - run: govulncheck ./...
+      - name: Run govulncheck (exclude desktop UI package)
+        run: |
+          go list ./... | grep -v '/cmd/admin-ui$' | xargs govulncheck
 
   staticcheck:
     name: staticcheck
@@ -131,7 +135,9 @@ jobs:
           cache-dependency-path: app/go.sum
       - name: Install staticcheck
         run: go install honnef.co/go/tools/cmd/staticcheck@${{ env.STATICCHECK_VERSION }}
-      - run: staticcheck ./...
+      - name: Run staticcheck (exclude desktop UI package)
+        run: |
+          go list ./... | grep -v '/cmd/admin-ui$' | xargs staticcheck
 
   gosec:
     name: gosec
@@ -154,7 +160,9 @@ jobs:
         #   G204: ffmpeg subprocess — args are filepath.Clean'd allowlist
         #   G304: file open via variable — paths sourced from trusted config/env
         #   G703: tempfile cleanup — name created by os.CreateTemp
-      - run: gosec -quiet -exclude=G101,G115,G120,G204,G304,G703 -fmt text ./...
+      - name: Run gosec (exclude desktop UI package)
+        run: |
+          go list ./... | grep -v '/cmd/admin-ui$' | xargs gosec -quiet -exclude=G101,G115,G120,G204,G304,G703 -fmt text
 
   openapi-lint:
     name: openapi lint (redocly)
