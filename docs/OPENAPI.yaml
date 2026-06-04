@@ -13,6 +13,7 @@ info:
 servers:
   - url: /v1
     description: Relative API base path
+security: []
 tags:
   - name: Health
     description: Operational health and documentation endpoints.
@@ -378,7 +379,7 @@ paths:
                 $ref: "#/components/schemas/PlaybackEnvelope"
         "404":
           $ref: "#/components/responses/NotFound"
-  /a/content/:
+  /a/content:
     get:
       tags: [Admin]
       summary: List content (admin)
@@ -514,7 +515,7 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
-  /a/people/:
+  /a/people:
     get:
       tags: [Admin]
       summary: List people (admin)
@@ -608,7 +609,7 @@ paths:
                 $ref: "#/components/schemas/PagedMinimalContentEnvelope"
         "400":
           $ref: "#/components/responses/BadRequest"
-  /a/attributes/:
+  /a/attributes:
     get:
       tags: [Admin]
       summary: List attributes (admin)
@@ -723,7 +724,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Envelope"
+                $ref: "#/components/schemas/SuccessEnvelope"
         "400":
           $ref: "#/components/responses/BadRequest"
 components:
@@ -791,7 +792,6 @@ components:
         type: string
         enum: [GENRE, TAG, MOOD, STUDIO, CATEGORY, SPECIALITY, SOCIAL, PLATFORM]
       description: Optional attribute type filter for attribute search/list.
-      description: Items per page.
     Limit:
       in: query
       name: limit
@@ -927,6 +927,7 @@ components:
             success:
               example: false
             data:
+              type: object
               nullable: true
             error:
               $ref: "#/components/schemas/ErrorPayload"

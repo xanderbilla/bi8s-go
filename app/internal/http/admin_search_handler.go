@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/xanderbilla/bi8s-go/internal/errs"
@@ -524,11 +523,4 @@ func paginateAttributes(items []model.Attribute, offset int, limit int) ([]model
 		next = strconv.Itoa(end)
 	}
 	return items[offset:end], next
-}
-
-func createdAtOrZero(t time.Time) time.Time {
-	if t.IsZero() {
-		return time.Time{}
-	}
-	return t
 }
