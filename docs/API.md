@@ -64,6 +64,7 @@ Error response example:
 ## Error model by class
 
 Possible `error.type` values:
+
 - `VALIDATION_ERROR`
 - `AUTH_ERROR`
 - `NOT_FOUND_ERROR`
@@ -74,6 +75,7 @@ Possible `error.type` values:
 - `ERROR`
 
 Typical `error.code` values seen across handlers/services:
+
 - `BAD_REQUEST`
 - `VALIDATION_FAILED`
 - `NOT_FOUND`
@@ -89,57 +91,77 @@ Typical `error.code` values seen across handlers/services:
 ### System
 
 #### GET /v1/health
+
 Request:
+
 - No body
 
 Response `200` data:
+
 - `env`: string
 - `version`: string
 - `commit`: string
 - `checks`: object map `{ dependencyName: "up" | "down" }`
 
 Possible errors:
+
 - `503 SERVICE_UNAVAILABLE` when any dependency health check fails
 
 #### GET /v1/livez
+
 Request:
+
 - No body
 
 Response `200` data:
+
 - `version`: string
 
 Possible errors:
+
 - none under normal operation
 
 #### GET /v1/readyz
+
 Request:
+
 - No body
 
 Response `200`:
+
 - Same `data` payload as `/v1/health`
 
 Possible errors:
+
 - `503 NOT_READY` before bootstrap readiness flag is set
 - `503 SERVICE_UNAVAILABLE` when downstream checks fail
 
 #### GET /v1/openapi.yaml
+
 Request:
+
 - No body
 
 Response `200`:
+
 - Raw OpenAPI YAML
 
 #### GET /v1/docs
+
 Request:
+
 - No body
 
 Response `200`:
+
 - Swagger UI HTML
 
 ### Consumer search and playback
 
 #### GET /v1/c/search
+
 Request query:
+
 - `query` (required): non-empty string
 - `in` (optional): `all|movie|tv|people` (default `all`)
 - `sort` (optional): `recent|latest|alpha_asc|alpha_desc` (default `recent`)
@@ -148,6 +170,7 @@ Request query:
 - `peoplePage`, `peoplePageSize` (optional people slice controls)
 
 Response `200` data:
+
 - `content.results`: array of `MoviePublicList`
 - `content.count`, `content.page`, `content.pageSize`
 - `people.results`: array of `SearchPersonResult`
@@ -155,30 +178,38 @@ Response `200` data:
 - `warnings` (optional): array of `{scope, code, message}` for partial backend failures
 
 Possible errors:
+
 - `400 BAD_REQUEST` for missing `query`, invalid `in`, invalid `sort`, invalid/deep page window
 - `500 INTERNAL_ERROR` when both search backends fail
 
 #### GET /v1/c/content/{contentId}/related
+
 Request:
+
 - Path `contentId`
 - Query `page`, `pageSize`
 
 Response `200` data:
+
 - `items`: `MoviePublicList[]`
 - `total`: integer
 - `page`: integer
 - `size`: integer (current page result count)
 
 Possible errors:
+
 - `400 BAD_REQUEST`
 - `500 INTERNAL_ERROR`
 
 #### GET /v1/c/play/{contentType}/{contentId}
+
 Request:
+
 - Path `contentType`: `movie|tv`
 - Path `contentId`
 
 Response `200` data (`PlaybackInfo`):
+
 - `durationSec`: number
 - `streaming`: `{type, masterPlaylist}`
 - `video`: `{defaultQuality, qualities[]}`
@@ -189,15 +220,19 @@ Response `200` data (`PlaybackInfo`):
 - `sprite`: `{image, vtt}`
 
 Possible errors:
+
 - `404 NOT_FOUND` when playback is missing or content type does not match encoder job
 
 ### Consumer content and people
 
 #### GET /v1/c/content/{contentId}
+
 Request:
+
 - Path `contentId`
 
 Response `200` data (`MoviePublicDetail`):
+
 - `id`, `title`, `overview`
 - `backdropPath`, `posterPath`
 - `releaseDate`, `firstAirDate`
@@ -209,39 +244,51 @@ Response `200` data (`MoviePublicDetail`):
 - `stats`: `{totalViews,totalLikes,averageRating}`
 
 Possible errors:
+
 - `400 BAD_REQUEST`
 - `404 NOT_FOUND`
 
 #### GET /v1/c/banner
+
 Request query:
+
 - `type` (optional): `movie|tv`
 
 Response `200` data (`BannerContent`):
+
 - `id`, `backdropPath`, `title`, `overview`, `contentRating`, `assets[]`
 
 Possible errors:
+
 - `404 NOT_FOUND` when no eligible banner exists
 
 #### GET /v1/c/discover
+
 Request query:
+
 - `type` (optional): `latest|recent|popular|trending` (default `latest`)
 - `content` (optional): `movie|tv`
 - `limit`, `cursor` (cursor pagination)
 - `sort` (optional): `alpha_asc|alpha_desc`
 
 Response `200` data:
+
 - `items`: `MoviePublicList[]`
 - `nextCursor`: string or omitted
 - `count`: number of returned items
 
 Possible errors:
+
 - `400 BAD_REQUEST` for invalid pagination/sort inputs
 
 #### GET /v1/c/people/{peopleId}
+
 Request:
+
 - Path `peopleId`
 
 Response `200` data (`PersonPublicDetail`):
+
 - `id`, `contentType`, `name`, `legalName`, `roles[]`, `stageName`
 - `bio`, `birthDate`, `birthPlace`, `nationality`, `gender`
 - `height`, `weight`, `verified`, `active`, `debutYear`, `careerStatus`
@@ -251,73 +298,98 @@ Response `200` data (`PersonPublicDetail`):
 - `career`, `socialPresence[]`
 
 Possible errors:
+
 - `400 BAD_REQUEST`
 - `404 NOT_FOUND`
 
 #### GET /v1/c/people/{peopleId}/content
+
 Request:
+
 - Path `peopleId`
 - Query `type` optional `movie|tv`
 - Query `limit`, `cursor`
 
 Response `200` data:
+
 - `items`: minimal list entries `{id,title,backdropPath}`
 - `nextCursor`
 - `count`
 
 Possible errors:
+
 - `400 BAD_REQUEST`
 
 #### GET /v1/c/attributes
+
 Request query:
+
 - `type` optional; accepts singular/plural style values, normalized in handler
 - `sort` optional `alpha_asc|alpha_desc`
 
 Response `200` data:
+
 - array of `AttributePublicDetail` with fields:
   - `id`, `name`, `attributeType[]`, `logo`, `svg`, `contentType`, `active`
 
 Possible errors:
+
 - `400 BAD_REQUEST` for invalid `type`/`sort`
 
 #### GET /v1/c/attributes/{id}
+
 Request:
+
 - Path `id`
 - Query `content` optional `movie|tv`
 - Query `limit`, `cursor`, optional `sort`
 
 Response `200` data:
+
 - `items`: minimal list entries `{id,title,backdropPath}`
 - `nextCursor`
 - `count`
 
 Possible errors:
+
 - `400 BAD_REQUEST`
 
 ### Admin content
 
 #### GET /v1/a/content/
+
 Request query:
-- `limit`, `cursor`
+
+- `q` optional free-text search (matches title, overview, tagline, cast, tags, genres, mood tags, studios)
+- `sort` optional `recent|latest|alpha_asc|alpha_desc`
+- `limit`, `cursor` (when `q`/`sort` is used, `cursor` is numeric offset)
 
 Response `200` data:
+
 - paged `Movie` objects (admin shape)
 
 Possible errors:
+
 - `400 BAD_REQUEST`
 
 #### GET /v1/a/content/{contentId}
+
 Request:
+
 - Path `contentId`
 
 Response `200` data:
+
 - full admin `Movie` object (includes internal/admin fields)
 
 Possible errors:
+
 - `404 NOT_FOUND`
 
 #### POST /v1/a/content/
+
 Request body:
+
 - `multipart/form-data`
 - Required fields parsed by handler: `overview`, `original_language`
 - Optional text fields: `id,title,release_date,first_air_date,adult,content_rating,content_type,runtime,status,tagline,visibility,origin_country`
@@ -325,26 +397,34 @@ Request body:
 - Optional files: `poster`, `cover`
 
 Response `201` data:
+
 - created admin `Movie` object
 
 Possible errors:
+
 - `400 BAD_REQUEST` / validation
 - `404 NOT_FOUND` (invalid referenced entities)
 - `409 CONFLICT` (duplicate/conditional conflicts)
 - `429 RATE_LIMITED`
 
 #### DELETE /v1/a/content/{contentId}
+
 Request:
+
 - Path `contentId`
 
 Response `200` data:
+
 - `null`
 
 Possible errors:
+
 - `404 NOT_FOUND`
 
 #### POST /v1/a/content/{contentId}
+
 Request body:
+
 - `multipart/form-data`
 - Required fields (exact lowercase names):
   - `contenttype`
@@ -354,49 +434,67 @@ Request body:
   - `contentid` (overrides path `contentId` if provided)
 
 Response `201` data:
+
 - `{contentId, assetType, uploadedCount, paths[]}`
 
 Possible errors:
+
 - `400 BAD_REQUEST` for missing/wrong fields or multiple videos
 - `404 NOT_FOUND`
 
 #### DELETE /v1/a/content/{contentId}/assets/{assetType}/keys/{keyId}
+
 Request:
+
 - Path `contentId`
 - Path `assetType` in `TRAILER|TEASER|CLIP|PROMO|BTS`
 - Path `keyId`
 
 Response `200` data:
+
 - `{contentId, assetType, keyId}`
 
 Possible errors:
+
 - `400 BAD_REQUEST` invalid `assetType`
 - `404 NOT_FOUND`
 
 ### Admin people
 
 #### GET /v1/a/people/
+
 Request query:
-- `limit`, `cursor`
+
+- `q` optional free-text search (matches name, legal/stage names, bio, aliases, roles, tags, categories, specialties)
+- `sort` optional `recent|latest|alpha_asc|alpha_desc`
+- `limit`, `cursor` (when `q`/`sort` is used, `cursor` is numeric offset)
 
 Response `200` data:
+
 - paged admin `Person` objects
 
 Possible errors:
+
 - `400 BAD_REQUEST`
 
 #### GET /v1/a/people/{peopleId}
+
 Request:
+
 - Path `peopleId`
 
 Response `200` data:
+
 - full admin `Person` object
 
 Possible errors:
+
 - `404 NOT_FOUND`
 
 #### POST /v1/a/people/
+
 Request body:
+
 - `multipart/form-data`
 - Required: `name`, `roles`, `gender`, `career_status`
 - Common optional fields:
@@ -409,58 +507,106 @@ Request body:
 - Optional files: `profile`, `backdrop`
 
 Response `201` data:
+
 - created admin `Person` object
 
 Possible errors:
+
 - `400 BAD_REQUEST` / validation
 - `404 NOT_FOUND` for unknown social platform attributes
 - `429 RATE_LIMITED`
 
 #### DELETE /v1/a/people/{peopleId}
+
 Request:
+
 - Path `peopleId`
 
 Response `200` data:
+
 - `null`
 
 Possible errors:
+
 - `404 NOT_FOUND`
 
 #### GET /v1/a/people/{peopleId}/content
+
 Request:
+
 - Path `peopleId`
 - Query `type` optional `movie|tv`
 - Query `limit`, `cursor`
 
 Response `200` data:
+
 - `items`: minimal entries `{id,title,backdropPath}`
 - `nextCursor`
 - `count`
 
 Possible errors:
+
 - `400 BAD_REQUEST`
 
 ### Admin attributes
 
 #### GET /v1/a/attributes/
-Request:
-- No body
+
+Request query:
+
+- `q` optional free-text search (matches name, id, type, logo, svg)
+- `type` optional `GENRE|TAG|MOOD|STUDIO|CATEGORY|SPECIALITY|SOCIAL|PLATFORM`
+- `sort` optional `recent|latest|alpha_asc|alpha_desc`
+- `limit`, `cursor` (optional numeric pagination in filter mode)
 
 Response `200` data:
-- list of full admin `Attribute` objects
+
+- default mode: list of full admin `Attribute` objects
+- filter mode (`q`/`type`/`sort`/`limit`/`cursor` provided): `{items,count,total,nextCursor}`
+
+### Admin unified search
+
+#### GET /v1/a/search
+
+Request query:
+
+- `entity` optional `all|content|people|attributes` (default `all`)
+- `q` optional free-text query
+- `sort` optional `recent|latest|alpha_asc|alpha_desc`
+- `attributeType` optional attribute type filter for attribute results
+- `id` optional exact ID lookup for detail mode
+- `limit`, `cursor` (numeric offset cursor)
+
+Response `200` data:
+
+- `query`, `entity`, `sort`, `limit`, `cursor`
+- Optional sections by scope: `content`, `people`, `attributes`
+- Each section shape: `{items,count,total,nextCursor}`
+- Detail mode (`id` used): `detail: {entity,item}`
+
+Possible errors:
+
+- `400 BAD_REQUEST` for invalid entity/sort/cursor inputs
+- `404 NOT_FOUND` for unresolved id lookup
 
 #### GET /v1/a/attributes/{attributeId}
+
 Request:
+
 - Path `attributeId`
 
 Response `200` data:
+
 - full admin `Attribute`
 
 Possible errors:
+
 - `404 NOT_FOUND`
 
 #### POST /v1/a/attributes/
+
 Request body:
+
 - `multipart/form-data`
 - Required fields:
   - `name`
@@ -469,35 +615,46 @@ Request body:
   - `logo`, `svg`, `active`
 
 Allowed `attribute_type` values:
+
 - `TAG`, `MOOD`, `GENRE`, `CATEGORY`, `SPECIALITY`, `STUDIO`, `SOCIAL`, `PLATFORM`
 
 Response `201` data:
+
 - created admin `Attribute`
 
 Possible errors:
+
 - `400 BAD_REQUEST` / validation
 - `409 CONFLICT`
 
 #### DELETE /v1/a/attributes/{attributeId}
+
 Request:
+
 - Path `attributeId`
 
 Response `200` data:
+
 - `null`
 
 Possible errors:
+
 - `404 NOT_FOUND`
 
 ### Admin system
 
 #### POST /v1/a/reindex
+
 Request:
+
 - No body
 
 Response `200` data:
+
 - `people`: integer
 - `content`: integer
 - `joinTableEntries`: integer
 
 Possible errors:
+
 - `500 INTERNAL_ERROR`
