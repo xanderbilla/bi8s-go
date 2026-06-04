@@ -260,7 +260,25 @@ paths:
           name: type
           schema:
             type: string
-            enum: [genre, genres, tag, tags, mood, moods, studio, studios, category, categories, speciality, specialities, social, socials, platform, platforms]
+            enum:
+              [
+                genre,
+                genres,
+                tag,
+                tags,
+                mood,
+                moods,
+                studio,
+                studios,
+                category,
+                categories,
+                speciality,
+                specialities,
+                social,
+                socials,
+                platform,
+                platforms,
+              ]
           description: Attribute family filter.
         - $ref: "#/components/parameters/AlphaSort"
       responses:
@@ -366,6 +384,8 @@ paths:
       summary: List content (admin)
       operationId: listAdminContent
       parameters:
+        - $ref: "#/components/parameters/AdminQuery"
+        - $ref: "#/components/parameters/AdminSort"
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
       responses:
@@ -500,6 +520,8 @@ paths:
       summary: List people (admin)
       operationId: listAdminPeople
       parameters:
+        - $ref: "#/components/parameters/AdminQuery"
+        - $ref: "#/components/parameters/AdminSort"
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
       responses:
@@ -591,6 +613,12 @@ paths:
       tags: [Admin]
       summary: List attributes (admin)
       operationId: listAdminAttributes
+      parameters:
+        - $ref: "#/components/parameters/AdminQuery"
+        - $ref: "#/components/parameters/AdminSort"
+        - $ref: "#/components/parameters/AdminAttributeType"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
       responses:
         "200":
           description: All attributes including inactive ones.
@@ -665,6 +693,39 @@ paths:
                 $ref: "#/components/schemas/ReindexEnvelope"
         "500":
           $ref: "#/components/responses/InternalServerError"
+  /a/search:
+    get:
+      tags: [Admin]
+      summary: Unified admin search
+      description: Search and filter content, people, and attributes with one endpoint.
+      operationId: adminSearch
+      parameters:
+        - in: query
+          name: entity
+          schema:
+            type: string
+            enum: [all, content, people, attributes]
+            default: all
+          description: Search scope.
+        - $ref: "#/components/parameters/AdminQuery"
+        - $ref: "#/components/parameters/AdminSort"
+        - $ref: "#/components/parameters/AdminAttributeType"
+        - in: query
+          name: id
+          schema:
+            type: string
+          description: Optional exact id lookup for detail fetch.
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Search results grouped by entity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+        "400":
+          $ref: "#/components/responses/BadRequest"
 components:
   parameters:
     ContentId:
@@ -710,6 +771,26 @@ components:
         minimum: 1
         maximum: 100
         default: 20
+    AdminQuery:
+      in: query
+      name: q
+      schema:
+        type: string
+      description: Free-text query across relevant entity fields.
+    AdminSort:
+      in: query
+      name: sort
+      schema:
+        type: string
+        enum: [recent, latest, alpha_asc, alpha_desc]
+      description: Sort mode for admin list/search endpoints.
+    AdminAttributeType:
+      in: query
+      name: attributeType
+      schema:
+        type: string
+        enum: [GENRE, TAG, MOOD, STUDIO, CATEGORY, SPECIALITY, SOCIAL, PLATFORM]
+      description: Optional attribute type filter for attribute search/list.
       description: Items per page.
     Limit:
       in: query
@@ -801,6 +882,7 @@ components:
         data:
           description: Endpoint-specific success payload.
         error:
+          type: object
           nullable: true
           example: null
         path:
@@ -816,7 +898,17 @@ components:
       properties:
         type:
           type: string
-          enum: [VALIDATION_ERROR, AUTH_ERROR, NOT_FOUND_ERROR, CONFLICT_ERROR, RATE_LIMIT_ERROR, CLIENT_ERROR, SERVER_ERROR, ERROR]
+          enum:
+            [
+              VALIDATION_ERROR,
+              AUTH_ERROR,
+              NOT_FOUND_ERROR,
+              CONFLICT_ERROR,
+              RATE_LIMIT_ERROR,
+              CLIENT_ERROR,
+              SERVER_ERROR,
+              ERROR,
+            ]
         code:
           type: string
         title:
@@ -978,7 +1070,18 @@ components:
           type: integer
         status:
           type: string
-          enum: [RUMORED, PLANNED, IN_PRODUCTION, POST_PRODUCTION, RELEASED, ENDED, RETURNING_SERIES, CANCELED, PILOT]
+          enum:
+            [
+              RUMORED,
+              PLANNED,
+              IN_PRODUCTION,
+              POST_PRODUCTION,
+              RELEASED,
+              ENDED,
+              RETURNING_SERIES,
+              CANCELED,
+              PILOT,
+            ]
         tagline:
           type: string
         studios:
@@ -1173,7 +1276,8 @@ components:
           type: array
           items:
             type: string
-            enum: [TAG, MOOD, GENRE, CATEGORY, SPECIALITY, STUDIO, SOCIAL, PLATFORM]
+            enum:
+              [TAG, MOOD, GENRE, CATEGORY, SPECIALITY, STUDIO, SOCIAL, PLATFORM]
         logo:
           type: string
         svg:
@@ -1492,11 +1596,11 @@ components:
         release_date:
           type: string
           example: 2026-06-02
-          description: `YYYY-MM-DD`.
+          description: "`YYYY-MM-DD`."
         first_air_date:
           type: string
           example: 2026-06-02
-          description: `YYYY-MM-DD`.
+          description: "`YYYY-MM-DD`."
         adult:
           type: boolean
         content_rating:
@@ -1512,7 +1616,18 @@ components:
           type: integer
         status:
           type: string
-          enum: [RUMORED, PLANNED, IN_PRODUCTION, POST_PRODUCTION, RELEASED, ENDED, RETURNING_SERIES, CANCELED, PILOT]
+          enum:
+            [
+              RUMORED,
+              PLANNED,
+              IN_PRODUCTION,
+              POST_PRODUCTION,
+              RELEASED,
+              ENDED,
+              RETURNING_SERIES,
+              CANCELED,
+              PILOT,
+            ]
         tagline:
           type: string
         visibility:
@@ -1559,7 +1674,7 @@ components:
           type: string
         birth_date:
           type: string
-          description: `YYYY-MM-DD`.
+          description: "`YYYY-MM-DD`."
         birth_place:
           type: string
         nationality:
@@ -1813,5 +1928,6 @@ components:
         - type: object
           properties:
             data:
+              type: object
               nullable: true
               example: null

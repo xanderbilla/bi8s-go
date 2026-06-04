@@ -105,6 +105,14 @@
     },
 
     {
+      "id": "admin.search",
+      "method": "GET",
+      "route": "/v1/a/search",
+      "handler": "search.Admin",
+      "middlewares": ["localonly", "timeout"]
+    },
+
+    {
       "id": "admin.content.upload",
       "method": "POST",
       "route": "/v1/a/content/{contentId}",

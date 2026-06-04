@@ -64,12 +64,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "health"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
             },
             "description": "Full health check. Runs concurrent checks against DynamoDB, OpenSearch, Redis, S3/B2, ffmpeg, ffprobe (2 s timeout each).\n\nReturns `200` with `{checks: {dep: \"up\"|\"down\"}, version, commit, built}`, or `503 SERVICE_UNAVAILABLE` if any dependency is down."
           },
@@ -82,12 +78,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/livez",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "livez"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["livez"]
             },
             "description": "Kubernetes liveness probe. Always returns `200` with `{version}` if the process is alive. No dependency checks performed."
           },
@@ -100,12 +92,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/readyz",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "readyz"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["readyz"]
             },
             "description": "Kubernetes readiness probe. Returns `503 NOT_READY` until application bootstrap completes. After that behaves identically to `GET /health` — runs all dependency checks."
           },
@@ -118,12 +106,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/openapi.yaml",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "openapi.yaml"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["openapi.yaml"]
             },
             "description": "Returns the raw OpenAPI 3.x specification in YAML format. Served from the embedded `docs/OPENAPI.yaml`."
           },
@@ -136,12 +120,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/docs",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "docs"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["docs"]
             },
             "description": "Serves the embedded Swagger UI HTML page backed by `/v1/openapi.yaml`. Open in a browser for interactive API exploration."
           },
@@ -160,13 +140,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/c/search?query=action&in=content&page=1&pageSize=20&contentPage=1&contentPageSize=20&peoplePage=1&peoplePageSize=20&sort=",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "c",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["c", "search"],
               "query": [
                 {
                   "key": "query",
@@ -227,15 +202,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/c/content/{{contentId}}/related?page=1&pageSize=20",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "c",
-                "content",
-                "{{contentId}}",
-                "related"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["c", "content", "{{contentId}}", "related"],
               "query": [
                 {
                   "key": "page",
@@ -266,14 +234,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/c/content/{{contentId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "c",
-                "content",
-                "{{contentId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["c", "content", "{{contentId}}"]
             },
             "description": "Fetch full public detail for a single content item (movie or TV show).\n\n**Path param `contentId`:** alphanumeric + `-_`, max 100 chars.\n\n**Response fields include:** id, title, overview, backdropPath, posterPath, releaseDate, firstAirDate, adult, contentRating, originalLanguage, genres, casts, tags, moodTags, studios, contentType, originCountry, runtime, status, tagline, assets, stats."
           },
@@ -286,13 +248,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/c/banner?type=movie",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "c",
-                "banner"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["c", "banner"],
               "query": [
                 {
                   "key": "type",
@@ -312,13 +269,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/c/discover?type=latest&content=movie&limit=20&cursor=&sort=",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "c",
-                "discover"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["c", "discover"],
               "query": [
                 {
                   "key": "type",
@@ -359,14 +311,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/c/attributes/{{attributeId}}?content=movie&limit=20&cursor=&sort=",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "c",
-                "attributes",
-                "{{attributeId}}"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["c", "attributes", "{{attributeId}}"],
               "query": [
                 {
                   "key": "content",
@@ -402,15 +348,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/c/play/movie/{{contentId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "c",
-                "play",
-                "movie",
-                "{{contentId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["c", "play", "movie", "{{contentId}}"]
             },
             "description": "Returns HLS playback URLs and quality manifest for the given content item.\n\n**Path param `contentType`:** `movie` | `tv` (lowercase, validated)\n\n**Path param `contentId`:** alphanumeric + `-_`, max 100 chars.\n\n**Response includes:** master playlist URL, per-quality video tracks, audio tracks, subtitle tracks, thumbnails, preview clip, and sprite sheet."
           },
@@ -429,14 +368,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/c/people/{{peopleId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "c",
-                "people",
-                "{{peopleId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["c", "people", "{{peopleId}}"]
             },
             "description": "Returns the public profile of a person.\n\n**Path param `peopleId`:** alphanumeric + `-_`, max 100 chars.\n\n**Response fields:** id, contentType, name, roles[], stageName, bio, birthDate, birthPlace, nationality, gender, height, verified, active, debutYear, careerStatus, profilePath, backdropPath, measurements{bust,waist,hips,unit,bodyType,eyeColor,hairColor}, tags[], categories[], specialties[]."
           },
@@ -449,15 +382,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/c/people/{{peopleId}}/content?type=movie&limit=20&cursor=",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "c",
-                "people",
-                "{{peopleId}}",
-                "content"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["c", "people", "{{peopleId}}", "content"],
               "query": [
                 {
                   "key": "type",
@@ -493,13 +419,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/c/attributes?type=GENRE&sort=alpha_asc",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "c",
-                "attributes"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["c", "attributes"],
               "query": [
                 {
                   "key": "type",
@@ -529,16 +450,20 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/a/content/?limit=20&cursor=",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "content",
-                ""
-              ],
+              "raw": "{{baseUrl}}/a/content/?q=&sort=recent&limit=20&cursor=",
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "content", ""],
               "query": [
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Optional text query. Matches title, overview, tagline, cast, tags, genres, mood tags, studios."
+                },
+                {
+                  "key": "sort",
+                  "value": "recent",
+                  "description": "Optional sort: `recent`, `latest`, `alpha_asc`, `alpha_desc`."
+                },
                 {
                   "key": "limit",
                   "value": "20",
@@ -547,11 +472,62 @@
                 {
                   "key": "cursor",
                   "value": "",
-                  "description": "DynamoDB pagination cursor (base64). Empty for first page."
+                  "description": "Cursor token. With q/sort mode this is numeric offset; otherwise base64 DynamoDB cursor."
                 }
               ]
             },
             "description": "Returns a paginated list of ALL content including private items, with full `Movie` objects and audit fields (`createdAt`, `updatedAt`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Search (Admin Unified)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/a/search?entity=all&q=&sort=recent&attributeType=&id=&limit=20&cursor=",
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "search"],
+              "query": [
+                {
+                  "key": "entity",
+                  "value": "all",
+                  "description": "Search scope: `all`, `content`, `people`, `attributes`."
+                },
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Free-text query across selected entity fields."
+                },
+                {
+                  "key": "sort",
+                  "value": "recent",
+                  "description": "Sort mode: `recent`, `latest`, `alpha_asc`, `alpha_desc`."
+                },
+                {
+                  "key": "attributeType",
+                  "value": "",
+                  "description": "Optional attributes-only filter: `GENRE|TAG|MOOD|STUDIO|CATEGORY|SPECIALITY|SOCIAL|PLATFORM`."
+                },
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "Optional exact id lookup for detail response."
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Page size (max 100)."
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "Numeric offset cursor for result paging."
+                }
+              ]
+            },
+            "description": "Unified admin search endpoint. Returns grouped sections (`content`, `people`, `attributes`) or detail mode when `id` is supplied."
           },
           "response": []
         },
@@ -562,14 +538,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/a/content/{{contentId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "content",
-                "{{contentId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "content", "{{contentId}}"]
             },
             "description": "Fetch full admin detail for a single content item including internal fields (audit, visibility, stats).\n\n**Path param `contentId`:** alphanumeric + `-_`, max 100 chars."
           },
@@ -714,14 +684,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/a/content/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "content",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "content", ""]
             },
             "description": "Create a new content item. Body **must** be `multipart/form-data`.\n\n**Required fields:** `overview`, `original_language`\n\n**EntityRef format** (`genres`, `casts`, `tags`, `mood_tags`, `studios`): `id:name,id2:name2` — the `:name` part is optional but recommended.\n\n**File fields:** `poster` (portrait poster), `cover` (landscape backdrop)\n\nReturns `201 Created` with the full `Movie` object."
           },
@@ -734,14 +698,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/a/content/{{contentId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "content",
-                "{{contentId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "content", "{{contentId}}"]
             },
             "description": "Permanently delete a content item by ID.\n\n**Path param `contentId`:** alphanumeric + `-_`, max 100 chars.\n\nReturns `200` with `{data: null}` on success, `404` if not found."
           },
@@ -777,14 +735,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/a/content/{{contentId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "content",
-                "{{contentId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "content", "{{contentId}}"]
             },
             "description": "Upload one video asset for an existing content item. Body **must** be `multipart/form-data`.\n\n**Path param `contentId`:** existing content ID (alphanumeric + `-_`, max 100 chars).\n\n**Form fields (exact keys):**\n- `contenttype` (required): `movie` | `tv`\n- `assettype` (required): `TRAILER` | `TEASER` | `CLIP` | `PROMO` | `BTS`\n- `video` (required): single file\n- `contentid` (optional): overrides path content id\n\nReturns `201 Created` with `{contentId, assetType, uploadedCount, paths[]}`."
           },
@@ -797,9 +749,7 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/a/content/{{contentId}}/assets/TRAILER/keys/{{assetKeyId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
+              "host": ["{{baseUrl}}"],
               "path": [
                 "a",
                 "content",
@@ -821,15 +771,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/a/people/{{peopleId}}/content?type=movie&limit=20&cursor=",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "people",
-                "{{peopleId}}",
-                "content"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "people", "{{peopleId}}", "content"],
               "query": [
                 {
                   "key": "type",
@@ -864,16 +807,20 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/a/people/?limit=20&cursor=",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "people",
-                ""
-              ],
+              "raw": "{{baseUrl}}/a/people/?q=&sort=recent&limit=20&cursor=",
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "people", ""],
               "query": [
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Optional text query across person profile fields and relations."
+                },
+                {
+                  "key": "sort",
+                  "value": "recent",
+                  "description": "Optional sort: `recent`, `latest`, `alpha_asc`, `alpha_desc`."
+                },
                 {
                   "key": "limit",
                   "value": "20",
@@ -882,7 +829,7 @@
                 {
                   "key": "cursor",
                   "value": "",
-                  "description": "DynamoDB pagination cursor (base64). Empty for first page."
+                  "description": "Cursor token. With q/sort mode this is numeric offset; otherwise base64 DynamoDB cursor."
                 }
               ]
             },
@@ -897,14 +844,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/a/people/{{peopleId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "people",
-                "{{peopleId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "people", "{{peopleId}}"]
             },
             "description": "Fetch full admin detail for a person including audit fields.\n\n**Path param `peopleId`:** alphanumeric + `-_`, max 100 chars."
           },
@@ -1072,14 +1013,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/a/people/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "people",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "people", ""]
             },
             "description": "Create a new person record. Body **must** be `multipart/form-data`.\n\n**Required fields:** `name`, `roles`, `gender`, `career_status`\n\n**EntityRef format** (`tags`, `categories`, `specialties`): `id:name,id2:name2` pairs.\n\n**`roles`:** Comma-separated — `PERFORMER` and/or `CONTENT_CREATOR`\n\n**File fields:** `profile` (headshot), `backdrop` (banner)\n\nReturns `201 Created` with the full `Person` object."
           },
@@ -1092,14 +1027,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/a/people/{{peopleId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "people",
-                "{{peopleId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "people", "{{peopleId}}"]
             },
             "description": "Permanently delete a person record by ID.\n\n**Path param `peopleId`:** alphanumeric + `-_`, max 100 chars.\n\nReturns `200` with `{data: null}` on success, `404` if not found."
           },
@@ -1117,14 +1046,35 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/a/attributes/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "attributes",
-                ""
+              "raw": "{{baseUrl}}/a/attributes/?q=&type=&sort=alpha_asc&limit=20&cursor=",
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "attributes", ""],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Optional text query across name, id, logo, svg, and attribute type."
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "description": "Optional filter: `GENRE|TAG|MOOD|STUDIO|CATEGORY|SPECIALITY|SOCIAL|PLATFORM`."
+                },
+                {
+                  "key": "sort",
+                  "value": "alpha_asc",
+                  "description": "Optional sort: `recent`, `latest`, `alpha_asc`, `alpha_desc`."
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Optional page size in filter mode."
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "Optional numeric offset cursor in filter mode."
+                }
               ]
             },
             "description": "Returns the complete list of all attributes (active and inactive), including audit fields."
@@ -1138,14 +1088,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/a/attributes/{{attributeId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "attributes",
-                "{{attributeId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "attributes", "{{attributeId}}"]
             },
             "description": "Fetch a single attribute by ID.\n\n**Path param `attributeId`:** alphanumeric + `-_`, max 100 chars."
           },
@@ -1175,14 +1119,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/a/attributes/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "attributes",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "attributes", ""]
             },
             "description": "Create a new attribute. Body **must** be `multipart/form-data`.\n\n**Required fields:** `name`, `attribute_type`\n\n**`attribute_type`** (comma-separated): `TAG` | `MOOD` | `GENRE` | `CATEGORY` | `SPECIALITY` | `STUDIO`\n\nReturns `201 Created` with the full `Attribute` object."
           },
@@ -1195,14 +1133,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/a/attributes/{{attributeId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "attributes",
-                "{{attributeId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "attributes", "{{attributeId}}"]
             },
             "description": "Permanently delete an attribute by ID.\n\n**Path param `attributeId`:** alphanumeric + `-_`, max 100 chars.\n\nReturns `200` with `{data: null}` on success, `404` if not found."
           },
@@ -1220,13 +1152,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/a/reindex",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "a",
-                "reindex"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["a", "reindex"]
             },
             "description": "Re-creates OpenSearch indexes (if missing), re-indexes all people and content documents, and resyncs all DynamoDB join-table entries.\n\nThis is a synchronous long-running operation. Returns `200` with `{people, content, joinTableEntries}` on success."
           },
@@ -1240,9 +1167,7 @@
       "listen": "prerequest",
       "script": {
         "type": "text/javascript",
-        "exec": [
-          ""
-        ]
+        "exec": [""]
       }
     },
     {
