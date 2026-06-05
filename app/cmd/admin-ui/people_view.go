@@ -327,10 +327,7 @@ func buildPeopleView(state *AppState) fyne.CanvasObject {
 		attributeOptions := make([]string, 0, len(cachedAttributes))
 		attributeMap := map[string]string{}
 		for _, a := range cachedAttributes {
-			label := a.Name
-			if len(a.AttributeType) > 0 {
-				label = fmt.Sprintf("%s-%s", a.Name, a.AttributeType[0])
-			}
+			label := fmt.Sprintf("%s (%s)", a.Name, a.ID)
 			attributeOptions = append(attributeOptions, label)
 			attributeMap[label] = a.ID
 		}

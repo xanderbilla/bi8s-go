@@ -287,7 +287,7 @@ func buildContentView(state *AppState) fyne.CanvasObject {
 				if !matchesType {
 					continue
 				}
-				label := fmt.Sprintf("%s-%s", attribute.Name, attributeType)
+				label := fmt.Sprintf("%s (%s)", attribute.Name, attribute.ID)
 				options = append(options, label)
 				mapping[label] = attribute.ID
 			}
